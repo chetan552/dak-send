@@ -1,0 +1,140 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { emailQueue } from "@/lib/queue";
+
+export async function GET(req: NextRequest) {
+    // Verify cron secret
+    const secret = req.nextUrl.searchParams.get("secret");
+    const cronSecret = process.env.CRON_SECRET;
+
+    if (cronSecret && secret !== cronSecret) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    try {
+        // Find campaigns that are scheduled and due
+        const now = new Date();
+        const dueCampaigns = await prisma.campaign.findMany({
+            where: {
+                status: "scheduled",
+                scheduledAt: { lte: now },
+            },
+            include: {
+                includedLists: true,
+                excludedLists: true,
+                includedSegments: true,
+                excludedSegments: true,
+            },
+        });
+
+        let dispatched = 0;
+
+        for (const campaign of dueCampaigns) {
+            try {
+                // Gather included subscribers
+                const allIncludedEmails = new Set<string>();
+
+                if (campaign.includedLists.length > 0) {
+                    const listSubs = await prisma.subscriber.findMany({
+                        where: {
+                            listId: { in: campaign.includedLists.map(l => l.id) },
+                            status: "subscribed",
+                        },
+                        select: { email: true },
+                    });
+                    listSubs.forEach(s => allIncludedEmails.add(s.email));
+                }
+
+                for (const seg of campaign.includedSegments) {
+                    try {
+                        const segment = await (prisma as any).segment.findUnique({ where: { id: seg.id } });
+                        if (segment?.query) {
+                            const whereObj = JSON.parse(segment.query);
+                            const subs = await prisma.subscriber.findMany({
+                                where: { ...whereObj, listId: segment.listId, status: "subscribed" },
+                                select: { email: true },
+                            });
+                            subs.forEach(s => allIncludedEmails.add(s.email));
+                        }
+                    } catch { }
+                }
+
+                // Gather excluded subscribers
+                const allExcludedEmails = new Set<string>();
+
+                if (campaign.excludedLists.length > 0) {
+                    const excSubs = await prisma.subscriber.findMany({
+                        where: { listId: { in: campaign.excludedLists.map(l => l.id) } },
+                        select: { email: true },
+                    });
+                    excSubs.forEach(s => allExcludedEmails.add(s.email));
+                }
+
+                for (const seg of campaign.excludedSegments) {
+                    try {
+                        const segment = await (prisma as any).segment.findUnique({ where: { id: seg.id } });
+                        if (segment?.query) {
+                            const whereObj = JSON.parse(segment.query);
+                            const subs = await prisma.subscriber.findMany({
+                                where: { ...whereObj, listId: segment.listId },
+                                select: { email: true },
+                            });
+                            subs.forEach(s => allExcludedEmails.add(s.email));
+                        }
+                    } catch { }
+                }
+
+                // Final list
+                const finalEmails = Array.from(allIncludedEmails).filter(e => !allExcludedEmails.has(e));
+
+                if (finalEmails.length === 0) {
+                    await prisma.campaign.update({
+                        where: { id: campaign.id },
+                        data: { status: "sent" },
+                    });
+                    continue;
+                }
+
+                const subscribers = await prisma.subscriber.findMany({
+                    where: { email: { in: finalEmails }, status: "subscribed" },
+                    distinct: ["email"],
+                    select: { id: true, email: true, name: true, listId: true },
+                });
+
+                // Update status to sending
+                await prisma.campaign.update({
+                    where: { id: campaign.id },
+                    data: { status: "sending" },
+                });
+
+                // Enqueue jobs
+                const jobs = subscribers.map(sub => ({
+                    name: "send-email",
+                    data: {
+                        campaignId: campaign.id,
+                        subscriberId: sub.id,
+                        subscriberEmail: sub.email,
+                        subscriberName: sub.name,
+                        listId: sub.listId,
+                    },
+                }));
+
+                await emailQueue.addBulk(jobs);
+                dispatched++;
+
+                console.log(`Dispatched scheduled campaign "${campaign.name}" with ${jobs.length} emails`);
+            } catch (err) {
+                console.error(`Error dispatching scheduled campaign ${campaign.id}:`, err);
+            }
+        }
+
+        return NextResponse.json({
+            success: true,
+            checked: dueCampaigns.length,
+            dispatched,
+        });
+    } catch (error: any) {
+        console.error("Scheduled send cron error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("user") // admin, user
+  brands    Brand[]  @relation("BrandOwner") // Kept as owner for compatibility
+  brandAccesses Brand[] @relation("BrandUsers")
+  emailTemplates EmailTemplate[]
+  signupForms    SignupForm[]
+  webhooks       Webhook[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Brand {
+  id          String       @id @default(cuid())
+  name        String
+  userId      String       // Using this as "Owner ID"
+  user        User         @relation("BrandOwner", fields: [userId], references: [id], onDelete: Cascade)
+  users       User[]       @relation("BrandUsers") // Users who have been granted access
+  lists       List[]
+  campaigns   Campaign[]
+  fromEmail   String?
+  fromName    String?
+  replyTo     String?
+  rssFeeds    RssFeed[]
+  automations Automation[]
+  warmup      DomainWarmup?
+  emailTemplates EmailTemplate[]
+  signupForms    SignupForm[]
+  webhooks       Webhook[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model List {
+  id          String       @id @default(cuid())
+  name        String
+  brandId     String
+  brand       Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  subscribers Subscriber[]
+
+  // List Settings
+  optIn                      String   @default("single") // single, double
+  requireGdpr                Boolean  @default(false)
+  optInConfirmationUrl       String?
+  unsubscribeConfirmationUrl String?
+  welcomeEmailHtml           String?  @db.Text
+  goodbyeEmailHtml           String?  @db.Text
+  
+  customFields CustomField[]
+  segments     Segment[]
+  
+  includedInCampaigns Campaign[] @relation("CampaignIncludedLists")
+  excludedInCampaigns Campaign[] @relation("CampaignExcludedLists")
+  signupForms         SignupForm[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String
+  name      String?
+  listId    String
+  list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status    String   @default("subscribed") // subscribed, unsubscribed, bounced, complained
+  hasConfirmedGdpr Boolean  @default(false)
+  
+  customFields SubscriberFieldValue[]
+  subscriptionTokens SubscriptionToken[]
+  optimalSendHour Int?  // 0-23, computed from open history
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([email, listId])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  subject     String
+  htmlText    String   @db.Text
+  plainText   String?  @db.Text
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  status      String   @default("draft") // draft, queuing, sending, sent
+  
+  includedLists   List[]    @relation("CampaignIncludedLists")
+  excludedLists   List[]    @relation("CampaignExcludedLists")
+  includedSegments Segment[] @relation("CampaignIncludedSegments")
+  excludedSegments Segment[] @relation("CampaignExcludedSegments")
+  sends       CampaignSend[]
+  clicks      CampaignClick[]
+  abTestVariants AbTestVariant[]
+  rssItemGuid String?   // For RSS-generated campaigns, to prevent duplicates
+  
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CustomField {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   @default("text") // text, number, date, boolean, select
+  required  Boolean  @default(false)
+  options   String?  @db.Text
+  listId    String
+  list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  values    SubscriberFieldValue[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, listId])
+}
+
+model SubscriberFieldValue {
+  id            String      @id @default(cuid())
+  subscriberId  String
+  subscriber    Subscriber  @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  customFieldId String
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  value         String      @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([subscriberId, customFieldId])
+}
+
+model Segment {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  query       String   @db.Text // JSON string of conditions
+  listId      String
+  list        List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  
+  includedInCampaigns Campaign[] @relation("CampaignIncludedSegments")
+  excludedInCampaigns Campaign[] @relation("CampaignExcludedSegments")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model SubscriptionToken {
+  id           String   @id @default(cuid())
+  token        String   @unique
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  listId       String
+  type         String   @default("confirm") // confirm, unsubscribe
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+}
+
+model CampaignSend {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subscriberEmail String
+  subscriberId    String?
+  abVariantId     String?  // Which A/B test variant this was sent with
+  status          String   @default("queued") // queued, sent, failed, bounced, complained
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@unique([campaignId, subscriberEmail])
+}
+
+model RssFeed {
+  id           String   @id @default(cuid())
+  name         String
+  url          String
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  listIds      String[] // IDs of lists to send to
+  isActive     Boolean  @default(true)
+  pollInterval Int      @default(60) // minutes between checks
+  lastCheckedAt DateTime?
+  lastItemGuid  String?  // GUID/link of the last processed item
+  templateHtml  String?  @db.Text // Template with [RssTitle], [RssContent], [RssLink]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model DomainWarmup {
+  id           String   @id @default(cuid())
+  brandId      String   @unique
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  domain       String
+  isActive     Boolean  @default(true)
+  startDate    DateTime @default(now())
+  currentDay   Int      @default(1)
+  dailyLimit   Int      @default(50)
+  sentToday    Int      @default(0)
+  lastResetAt  DateTime @default(now())
+  schedule     String   @db.Text // JSON array of { day, limit } entries
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AbTestVariant {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name         String   // "Variant A", "Variant B", etc.
+  subject      String?  // Override campaign subject
+  htmlText     String?  @db.Text // Override campaign content
+  splitPercent Int      @default(50) // Percentage of recipients for this variant
+  isWinner     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CampaignClick {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  subscriberEmail String
+  url             String
+  clickedAt       DateTime @default(now())
+
+  @@index([campaignId])
+}
+
+model Automation {
+  id            String   @id @default(cuid())
+  name          String
+  brandId       String
+  brand         Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  trigger       String   @default("subscriber_added") // subscriber_added, subscriber_confirmed
+  triggerListId  String
+  status        String   @default("draft") // draft, active, paused
+  steps         AutomationStep[]
+  enrollments   AutomationEnrollment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AutomationStep {
+  id            String   @id @default(cuid())
+  automationId  String
+  automation    Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  order         Int
+  type          String   // delay, email
+  delayMinutes  Int?     // for delay steps: number of minutes to wait
+  emailSubject  String?  // for email steps
+  emailHtml     String?  @db.Text // for email steps
+  enrollments   AutomationEnrollment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([automationId])
+}
+
+model AutomationEnrollment {
+  id            String   @id @default(cuid())
+  automationId  String
+  automation    Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  subscriberEmail String
+  subscriberId    String?
+  currentStepId   String?
+  currentStep     AutomationStep? @relation(fields: [currentStepId], references: [id], onDelete: SetNull)
+  status          String  @default("active") // active, completed, paused, exited
+  nextProcessAt   DateTime?
+  enrolledAt      DateTime @default(now())
+  completedAt     DateTime?
+  updatedAt       DateTime @updatedAt
+
+  @@index([automationId])
+  @@index([status, nextProcessAt])
+  @@unique([automationId, subscriberEmail])
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   @default("Custom")
+  description String?
+  html        String
+  thumbnail   String?  // Short text preview
+  isPublic    Boolean  @default(false) // Admin-shared templates
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  brandId     String?
+  brand       Brand?   @relation(fields: [brandId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SignupForm {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  listId      String
+  list        List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  status      String   @default("active")
+  config      Json     @default("{}")
+  views       Int      @default(0)
+  submissions Int      @default(0)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([slug])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  secret    String?
+  events    String[] // subscribe, unsubscribe, open, click, bounce, complaint
+  active    Boolean  @default(true)
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([brandId])
+}

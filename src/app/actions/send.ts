@@ -1,0 +1,177 @@
+"use server";
+
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { emailQueue } from "@/lib/queue";
+import { revalidatePath } from "next/cache";
+import { translateSegmentQuery } from "@/lib/segment-query";
+import { getNextSendTime } from "@/lib/send-time";
+
+export async function dispatchCampaign(campaignId: string, data: {
+    includedLists: string[];
+    excludedLists: string[];
+    includedSegments: string[];
+    excludedSegments: string[];
+    useOptimalTime?: boolean;
+}) {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    const currentUserRole = (session?.user as any)?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+
+    const whereCondition: any = currentUserRole === 'admin'
+        ? { id: campaignId }
+        : { id: campaignId, brand: { users: { some: { id: userId } } } };
+
+    const campaign = await prisma.campaign.findFirst({
+        where: whereCondition
+    });
+
+    if (!campaign || campaign.status !== 'draft') {
+        throw new Error("Invalid campaign");
+    }
+
+    // 1. Gather all included emails
+    const allIncludedEmails = new Set<string>();
+
+    // Lists
+    if (data.includedLists?.length > 0) {
+        const listSubs = await prisma.subscriber.findMany({
+            where: { listId: { in: data.includedLists }, status: "subscribed" },
+            select: { email: true }
+        });
+        listSubs.forEach(s => allIncludedEmails.add(s.email));
+    }
+
+    // Segments
+    if (data.includedSegments?.length > 0) {
+        for (const segId of data.includedSegments) {
+            const segment = await (prisma as any).segment.findUnique({ where: { id: segId } });
+            if (segment && segment.query) {
+                try {
+                    const whereObj = JSON.parse(segment.query);
+                    const translatedWhere = translateSegmentQuery(whereObj);
+                    const subs = await prisma.subscriber.findMany({
+                        where: { ...translatedWhere, listId: segment.listId, status: "subscribed" },
+                        select: { email: true }
+                    });
+                    subs.forEach(s => allIncludedEmails.add(s.email));
+                } catch (e) { console.warn("Segment parsing error:", e) }
+            }
+        }
+    }
+
+    // 2. Gather excluded emails
+    const allExcludedEmails = new Set<string>();
+
+    if (data.excludedLists?.length > 0) {
+        const excSubs = await prisma.subscriber.findMany({
+            where: { listId: { in: data.excludedLists } },
+            select: { email: true }
+        });
+        excSubs.forEach(s => allExcludedEmails.add(s.email));
+    }
+
+    if (data.excludedSegments?.length > 0) {
+        for (const segId of data.excludedSegments) {
+            const segment = await (prisma as any).segment.findUnique({ where: { id: segId } });
+            if (segment && segment.query) {
+                try {
+                    const whereObj = JSON.parse(segment.query);
+                    const translatedWhere = translateSegmentQuery(whereObj);
+                    const subs = await prisma.subscriber.findMany({
+                        where: { ...translatedWhere, listId: segment.listId },
+                        select: { email: true }
+                    });
+                    subs.forEach(s => allExcludedEmails.add(s.email));
+                } catch (e) { console.warn("Segment parsing error:", e) }
+            }
+        }
+    }
+
+    // 3. Final unique subs
+    const finalEmails = Array.from(allIncludedEmails).filter(e => !allExcludedEmails.has(e));
+
+    if (finalEmails.length === 0) {
+        throw new Error("No active subscribers found in selected criteria.");
+    }
+
+    const subscribers = await (prisma as any).subscriber.findMany({
+        where: { email: { in: finalEmails }, status: "subscribed" },
+        distinct: ['email'],
+        select: { id: true, email: true, name: true, listId: true, optimalSendHour: true }
+    });
+
+    // Update campaign status AND relations
+    // Disconnect old and connect new
+    await (prisma as any).campaign.update({
+        where: { id: campaignId },
+        data: {
+            status: "sending",
+            includedLists: { set: data.includedLists.map((id: string) => ({ id })) },
+            excludedLists: { set: data.excludedLists.map((id: string) => ({ id })) },
+            includedSegments: { set: data.includedSegments.map((id: string) => ({ id })) },
+            excludedSegments: { set: data.excludedSegments.map((id: string) => ({ id })) },
+        }
+    });
+
+    // Enqueue jobs
+    const now = new Date();
+    const jobs = subscribers.map((sub: any) => {
+        let delay = 0;
+        if (data.useOptimalTime && sub.optimalSendHour !== null) {
+            const nextTime = getNextSendTime(sub.optimalSendHour, now);
+            delay = Math.max(0, nextTime.getTime() - now.getTime());
+        }
+
+        return {
+            name: "send-email",
+            data: {
+                campaignId,
+                subscriberId: sub.id,
+                subscriberEmail: sub.email,
+                subscriberName: sub.name,
+                listId: sub.listId,
+            },
+            opts: delay > 0 ? { delay } : undefined
+        };
+    });
+
+    // Batch insert into Redis for speed
+    await emailQueue.addBulk(jobs);
+
+    // Note: We need a long-running worker process to actually consume these jobs from the queue.
+    // In a production setup, we'd run `src/lib/worker.ts` as a separate node process.
+
+    revalidatePath("/dashboard/campaigns");
+    return { jobCount: jobs.length };
+}
+
+export async function cancelCampaign(campaignId: string) {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    const currentUserRole = (session?.user as any)?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+
+    const whereCondition: any = currentUserRole === 'admin'
+        ? { id: campaignId }
+        : { id: campaignId, brand: { users: { some: { id: userId } } } };
+
+    const campaign = await prisma.campaign.findFirst({
+        where: whereCondition
+    });
+
+    if (!campaign || campaign.status !== 'sending') {
+        throw new Error("Invalid campaign or not currently sending");
+    }
+
+    await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: "cancelled" }
+    });
+
+    revalidatePath("/dashboard/campaigns");
+}
