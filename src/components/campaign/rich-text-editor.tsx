@@ -17,9 +17,10 @@ import { Toggle } from "@/components/ui/toggle";
 import { DOMParser } from '@tiptap/pm/model';
 import {
     Bold, Italic, Underline as UnderlineIcon, Strikethrough,
-    List, ListOrdered, Link as LinkIcon, Heading2, Heading3, Quote
+    List, ListOrdered, Link as LinkIcon, Heading2, Heading3, Quote,
+    Image as ImageIcon, Loader2
 } from "lucide-react";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Extension } from '@tiptap/core';
 import CodeMirror from '@uiw/react-codemirror';
@@ -179,6 +180,40 @@ interface ToolbarProps {
 }
 
 const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat }: ToolbarProps) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !editor) return;
+
+        try {
+            setUploading(true);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to upload image');
+            }
+
+            const data = await response.json();
+            editor.chain().focus().setImage({ src: data.url }).run();
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            alert('Failed to upload image.');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
     return (
         <div className="border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-2 flex flex-wrap gap-1 rounded-t-md items-center justify-between sticky top-0 z-10">
             <div className="flex flex-wrap gap-1 items-center">
@@ -281,6 +316,26 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat }: ToolbarProps) =
                 >
                     <LinkIcon className="h-4 w-4" />
                 </Toggle>
+
+                <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
+
+                <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    className="hidden"
+                />
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isHtmlMode || !editor || uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
+                    title="Upload Image"
+                >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                </Button>
             </div>
 
             <div className="flex items-center gap-1">
