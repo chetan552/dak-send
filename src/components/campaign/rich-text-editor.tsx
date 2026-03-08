@@ -18,14 +18,15 @@ import { DOMParser } from '@tiptap/pm/model';
 import {
     Bold, Italic, Underline as UnderlineIcon, Strikethrough,
     List, ListOrdered, Link as LinkIcon, Heading2, Heading3, Quote,
-    Image as ImageIcon, Loader2
+    Image as ImageIcon, Loader2, AlignLeft, AlignCenter, AlignRight, Type
 } from "lucide-react";
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Extension } from '@tiptap/core';
 import CodeMirror from '@uiw/react-codemirror';
 import { html } from '@codemirror/lang-html';
 import { useTheme } from 'next-themes';
+import { MediaPicker } from '@/components/campaign/media-picker';
 
 // Custom extension to allow parsing and rendering global HTML attributes often found in email templates
 const GlobalAttributes = Extension.create({
@@ -171,48 +172,45 @@ function prettyFormatHtml(html: string): string {
     return result.join('\n');
 }
 
+// Upload helper function
+async function uploadImageFile(file: File): Promise<{ url: string } | { error: string }> {
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+
+    if (!ALLOWED.includes(file.type)) {
+        return { error: 'Invalid file type. Only JPEG, PNG, GIF, WebP, and SVG images are allowed.' };
+    }
+    if (file.size > MAX_SIZE) {
+        return { error: 'File too large. Maximum size is 5MB.' };
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return { error: data.error || 'Failed to upload image' };
+    }
+
+    return await response.json();
+}
+
 // Define the toolbar buttons configuration
 interface ToolbarProps {
     editor: any;
     isHtmlMode: boolean;
     onToggleMode: () => void;
     onFormat?: () => void;
+    onOpenMediaPicker: () => void;
 }
 
-const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat }: ToolbarProps) => {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [uploading, setUploading] = useState(false);
-
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !editor) return;
-
-        try {
-            setUploading(true);
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to upload image');
-            }
-
-            const data = await response.json();
-            editor.chain().focus().setImage({ src: data.url }).run();
-        } catch (error) {
-            console.error('Error uploading image:', error);
-            alert('Failed to upload image.');
-        } finally {
-            setUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
+const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker }: ToolbarProps) => {
+    const isImageSelected = !isHtmlMode && editor?.isActive('image');
 
     return (
         <div className="border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-2 flex flex-wrap gap-1 rounded-t-md items-center justify-between sticky top-0 z-10">
@@ -298,6 +296,37 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat }: ToolbarProps) =
 
                 <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
 
+                {/* Text Alignment */}
+                <Toggle
+                    size="sm" pressed={!isHtmlMode && editor?.isActive({ textAlign: 'left' })}
+                    disabled={isHtmlMode || !editor}
+                    onPressedChange={() => editor?.chain().focus().setTextAlign('left').run()}
+                    className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
+                    title="Align Left"
+                >
+                    <AlignLeft className="h-4 w-4" />
+                </Toggle>
+                <Toggle
+                    size="sm" pressed={!isHtmlMode && editor?.isActive({ textAlign: 'center' })}
+                    disabled={isHtmlMode || !editor}
+                    onPressedChange={() => editor?.chain().focus().setTextAlign('center').run()}
+                    className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
+                    title="Align Center"
+                >
+                    <AlignCenter className="h-4 w-4" />
+                </Toggle>
+                <Toggle
+                    size="sm" pressed={!isHtmlMode && editor?.isActive({ textAlign: 'right' })}
+                    disabled={isHtmlMode || !editor}
+                    onPressedChange={() => editor?.chain().focus().setTextAlign('right').run()}
+                    className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
+                    title="Align Right"
+                >
+                    <AlignRight className="h-4 w-4" />
+                </Toggle>
+
+                <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
+
                 <Toggle
                     size="sm" pressed={!isHtmlMode && editor?.isActive('link')}
                     disabled={isHtmlMode || !editor}
@@ -319,23 +348,56 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat }: ToolbarProps) =
 
                 <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
 
-                <input
-                    type="file"
-                    accept="image/*"
-                    ref={fileInputRef}
-                    onChange={handleImageUpload}
-                    className="hidden"
-                />
                 <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
-                    disabled={isHtmlMode || !editor || uploading}
-                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isHtmlMode || !editor}
+                    onClick={onOpenMediaPicker}
                     className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
-                    title="Upload Image"
+                    title="Insert Image from Media Library"
                 >
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                    <ImageIcon className="h-4 w-4" />
                 </Button>
+
+                {/* Image-specific controls (shown when image is selected) */}
+                {isImageSelected && (
+                    <>
+                        <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const currentWidth = editor.getAttributes('image').width;
+                                const width = window.prompt('Image width (e.g. 300, 50%, auto):', currentWidth || '');
+                                if (width !== null) {
+                                    editor.chain().focus().updateAttributes('image', { width: width || null }).run();
+                                }
+                            }}
+                            className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs gap-1"
+                            title="Resize Image"
+                        >
+                            <Type className="h-3 w-3" /> Width
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const currentAlt = editor.getAttributes('image').alt;
+                                const alt = window.prompt('Alt text:', currentAlt || '');
+                                if (alt !== null) {
+                                    editor.chain().focus().updateAttributes('image', { alt, title: alt }).run();
+                                }
+                            }}
+                            className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs gap-1"
+                            title="Edit Alt Text"
+                        >
+                            <Type className="h-3 w-3" /> Alt
+                        </Button>
+                    </>
+                )}
             </div>
 
             <div className="flex items-center gap-1">
@@ -371,6 +433,9 @@ interface RichTextEditorProps {
 
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const [isHtmlMode, setIsHtmlMode] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dropUploading, setDropUploading] = useState(false);
+    const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
     const { theme, systemTheme } = useTheme();
 
     const editor = useEditor({
@@ -385,6 +450,9 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
             Image.configure({
                 inline: true,
                 allowBase64: true,
+                HTMLAttributes: {
+                    class: 'campaign-image',
+                },
             }),
             TextAlign.configure({
                 types: ['heading', 'paragraph'],
@@ -410,7 +478,36 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         content: value,
         editorProps: {
             attributes: {
-                class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[600px] p-6 bg-white text-black border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-md',
+                class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[600px] p-6 bg-white text-black',
+            },
+            // Handle paste events for images
+            handlePaste: (view, event) => {
+                const items = event.clipboardData?.items;
+                if (!items) return false;
+
+                for (const item of Array.from(items)) {
+                    if (item.type.startsWith('image/')) {
+                        event.preventDefault();
+                        const file = item.getAsFile();
+                        if (file) {
+                            handleDropOrPasteUpload(file);
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            },
+            // Handle drop events for images
+            handleDrop: (view, event) => {
+                const files = event.dataTransfer?.files;
+                if (!files || files.length === 0) return false;
+
+                const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+                if (imageFiles.length === 0) return false;
+
+                event.preventDefault();
+                imageFiles.forEach(file => handleDropOrPasteUpload(file));
+                return true;
             },
         },
         immediatelyRender: false,
@@ -418,6 +515,32 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
             onChange(editor.getHTML());
         },
     });
+
+    // Upload handler for drag-drop and paste
+    const handleDropOrPasteUpload = useCallback(async (file: File) => {
+        if (!editor) return;
+
+        setDropUploading(true);
+        try {
+            const result = await uploadImageFile(file);
+            if ('error' in result) {
+                alert(result.error);
+                return;
+            }
+
+            const alt = file.name.replace(/\.[^/.]+$/, '');
+            editor.chain().focus().setImage({
+                src: result.url,
+                alt,
+                title: alt,
+            }).run();
+        } catch (error) {
+            console.error('Error uploading dropped/pasted image:', error);
+            alert('Failed to upload image.');
+        } finally {
+            setDropUploading(false);
+        }
+    }, [editor]);
 
     const handleToggleMode = () => {
         setIsHtmlMode(!isHtmlMode);
@@ -440,15 +563,43 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         }
     };
 
-
-
     const handleFormat = () => {
         onChange(prettyFormatHtml(value));
     };
 
+    // Drag and drop handlers for the editor container
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.types.includes('Files')) {
+            setIsDragging(true);
+        }
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+
+        Array.from(files).forEach(file => {
+            if (file.type.startsWith('image/')) {
+                handleDropOrPasteUpload(file);
+            }
+        });
+    }, [handleDropOrPasteUpload]);
+
     return (
         <div className="w-full relative shadow-sm">
-            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} />
+            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onOpenMediaPicker={() => setMediaPickerOpen(true)} />
 
             {/* HTML Source View */}
             <div className={!isHtmlMode ? "hidden" : "block"}>
@@ -466,10 +617,70 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
             {/* Visual View */}
             <div className={isHtmlMode ? "hidden" : "block"}>
-                <div className="flex-1 overflow-auto bg-white dark:bg-zinc-950 border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-md p-6">
+                <div
+                    className={`relative flex-1 overflow-auto bg-white dark:bg-zinc-950 border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-md transition-colors ${isDragging ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/50' : ''}`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                >
                     <EditorContent editor={editor} />
+
+                    {/* Drag overlay */}
+                    {isDragging && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-blue-50/80 dark:bg-blue-950/80 pointer-events-none z-20 rounded-b-md">
+                            <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-400">
+                                <ImageIcon className="w-10 h-10" />
+                                <span className="text-sm font-medium">Drop image here to upload</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Upload indicator for drop/paste */}
+                    {dropUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-zinc-950/60 pointer-events-none z-20 rounded-b-md">
+                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-800">
+                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                <span className="text-sm text-zinc-700 dark:text-zinc-300">Uploading image...</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Editor styles for images */}
+            <style jsx global>{`
+                .ProseMirror .campaign-image {
+                    max-width: 100%;
+                    height: auto;
+                    cursor: pointer;
+                    border-radius: 4px;
+                    transition: box-shadow 0.15s ease;
+                }
+                .ProseMirror .campaign-image.ProseMirror-selectednode {
+                    outline: 2px solid #3b82f6;
+                    outline-offset: 2px;
+                    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+                }
+            `}</style>
+
+            {/* Media Picker Modal */}
+            <MediaPicker
+                open={mediaPickerOpen}
+                onClose={() => setMediaPickerOpen(false)}
+                onSelect={(url, filename) => {
+                    if (!editor) return;
+                    const alt = window.prompt(
+                        'Image alt text (optional, recommended for accessibility):',
+                        filename.replace(/^\d+-\d+-/, '').replace(/\.[^/.]+$/, '')
+                    );
+                    editor.chain().focus().setImage({
+                        src: url,
+                        alt: alt || '',
+                        title: alt || '',
+                    }).run();
+                    setMediaPickerOpen(false);
+                }}
+            />
         </div>
     );
 }

@@ -4,6 +4,20 @@ import { authOptions } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = new Set([
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+]);
+
+function getUploadsDir() {
+    // Use a persistent directory outside public/ so it survives standalone builds
+    return join(process.cwd(), 'uploads');
+}
+
 export async function POST(request: Request) {
     try {
         const session = await getServerSession(authOptions);
@@ -18,16 +32,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
+        // Validate file type
+        if (!ALLOWED_TYPES.has(file.type)) {
+            return NextResponse.json(
+                { error: 'Invalid file type. Only JPEG, PNG, GIF, WebP, and SVG images are allowed.' },
+                { status: 400 }
+            );
+        }
+
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            return NextResponse.json(
+                { error: 'File too large. Maximum size is 5MB.' },
+                { status: 400 }
+            );
+        }
+
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
         // Ensure the uploads directory exists
-        const uploadsDir = join(process.cwd(), 'public', 'uploads');
-        try {
-            await mkdir(uploadsDir, { recursive: true });
-        } catch (e) {
-            // Ignore error if directory already exists
-        }
+        const uploadsDir = getUploadsDir();
+        await mkdir(uploadsDir, { recursive: true });
 
         // Generate a unique filename
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -37,9 +63,9 @@ export async function POST(request: Request) {
 
         await writeFile(filePath, buffer);
 
-        // Construct public URL
+        // Construct URL via the serve route
         const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
-        const publicUrl = `${appUrl}/uploads/${filename}`;
+        const publicUrl = `${appUrl}/api/uploads/${filename}`;
 
         return NextResponse.json({ url: publicUrl });
     } catch (error) {
