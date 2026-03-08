@@ -21,6 +21,18 @@ export default async function CampaignPreviewPage({ params }: { params: Promise<
     const campaign = await prisma.campaign.findFirst({ where });
     if (!campaign) return notFound();
 
+    // Apply merge tag substitution with preview placeholders so the preview
+    // accurately reflects what a real recipient will see.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const previewUnsubscribeUrl = `${appUrl}/api/unsubscribe?i=preview&l=preview`;
+
+    const previewHtml = campaign.htmlText
+        .replace(/\[Name\]/gi, 'John')
+        .replace(/\[Email\]/gi, 'john@example.com')
+        .replace(/\[UnsubscribeUrl\]/gi, previewUnsubscribeUrl)
+        .replace(/\[Unsubscribe\]/gi, `<a href="${previewUnsubscribeUrl}">Unsubscribe</a>`)
+        .replace(/\[CustomField:[^\]]+\]/gi, '(custom field)');
+
     return (
         <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center gap-4 text-zinc-500 dark:text-zinc-400">
@@ -35,11 +47,11 @@ export default async function CampaignPreviewPage({ params }: { params: Promise<
                     Email Preview
                 </h1>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                    Preview how <strong>{campaign.name}</strong> looks across email clients.
+                    Preview how <strong>{campaign.name}</strong> looks across email clients. Merge tags are shown with sample values.
                 </p>
             </div>
 
-            <EmailPreview html={campaign.htmlText} subject={campaign.subject} />
+            <EmailPreview html={previewHtml} subject={campaign.subject} />
         </div>
     );
 }

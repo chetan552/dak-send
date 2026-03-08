@@ -81,6 +81,7 @@ const startWorker = async () => {
         let processedHtml = campaign.htmlText
             .replace(/\[Name\]/gi, subscriberName || "Friend")
             .replace(/\[Email\]/gi, subscriberEmail)
+            .replace(/\[UnsubscribeUrl\]/gi, unsubscribeUrl)
             .replace(/\[Unsubscribe\]/gi, `<a href="${unsubscribeUrl}">Unsubscribe</a>`);
 
         // Replace Custom Fields: e.g. [CustomField:Company]
