@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LayoutTemplate, Plus, Search, Trash2, Copy, Eye, ExternalLink } from "lucide-react";
+import { LayoutTemplate, Plus, Search, Trash2, Copy, Eye, ExternalLink, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TemplatePreview } from "@/components/template/template-preview";
 import { deleteTemplate } from "@/app/actions/templates";
@@ -133,15 +133,25 @@ export function TemplateLibrary({ templates, currentUserId, isAdmin }: TemplateL
                                         Use Template
                                     </button>
                                     {template.isCustom && (template.userId === currentUserId || isAdmin) && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => handleDelete(template.id, e)}
-                                            disabled={isPending}
-                                            className="p-2.5 rounded-lg bg-white/10 backdrop-blur-sm text-white hover:bg-red-500/50 transition-colors"
-                                            title="Delete"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <>
+                                            <Link
+                                                href={`/dashboard/templates/${template.id}/edit`}
+                                                className="p-2.5 rounded-lg bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-colors"
+                                                title="Edit"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleDelete(template.id, e)}
+                                                disabled={isPending}
+                                                className="p-2.5 rounded-lg bg-white/10 backdrop-blur-sm text-white hover:bg-red-500/50 transition-colors"
+                                                title="Delete"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>

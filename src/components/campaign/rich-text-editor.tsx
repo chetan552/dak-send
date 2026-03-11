@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import { TextStyle } from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
 import { Markdown } from 'tiptap-markdown';
 import Image from '@tiptap/extension-image';
@@ -22,11 +23,80 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Extension } from '@tiptap/core';
-import CodeMirror from '@uiw/react-codemirror';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Extension, Node, Mark, mergeAttributes } from '@tiptap/core';
+import dynamic from 'next/dynamic';
+const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
 import { html } from '@codemirror/lang-html';
 import { useTheme } from 'next-themes';
 import { MediaPicker } from '@/components/campaign/media-picker';
+
+const FontSize = Extension.create({
+    name: 'fontSize',
+    addOptions() {
+        return {
+            types: ['textStyle'],
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    fontSize: {
+                        default: null,
+                        parseHTML: element => element.style.fontSize.replace(/['"]+/g, ''),
+                        renderHTML: attributes => {
+                            if (!attributes.fontSize) {
+                                return {};
+                            }
+                            return {
+                                style: `font-size: ${attributes.fontSize}`,
+                            };
+                        },
+                    },
+                },
+            },
+        ];
+    },
+});
+
+// Custom Node for <div> tags to prevent layout destruction
+const Div = Node.create({
+    name: 'div',
+    group: 'block',
+    content: 'block*',
+    parseHTML() {
+        return [{ tag: 'div' }];
+    },
+    renderHTML({ HTMLAttributes }) {
+        return ['div', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+    },
+});
+
+// Custom Node for <center> tags to prevent layout destruction
+const Center = Node.create({
+    name: 'center',
+    group: 'block',
+    content: 'block*',
+    parseHTML() {
+        return [{ tag: 'center' }];
+    },
+    renderHTML({ HTMLAttributes }) {
+        return ['center', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+    },
+});
+
+// Custom Mark for <span> tags to prevent layout destruction
+const Span = Mark.create({
+    name: 'span',
+    parseHTML() {
+        return [{ tag: 'span' }];
+    },
+    renderHTML({ HTMLAttributes }) {
+        return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+    },
+});
 
 // Custom extension to allow parsing and rendering global HTML attributes often found in email templates
 const GlobalAttributes = Extension.create({
@@ -212,9 +282,87 @@ interface ToolbarProps {
 const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker }: ToolbarProps) => {
     const isImageSelected = !isHtmlMode && editor?.isActive('image');
 
+    const fontFamilies = [
+        { name: 'Default', value: '' },
+        { name: 'Arial', value: 'Arial' },
+        { name: 'Comic Sans', value: '"Comic Sans MS", "Comic Sans"' },
+        { name: 'Courier New', value: '"Courier New", Courier, monospace' },
+        { name: 'Georgia', value: 'Georgia, serif' },
+        { name: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+        { name: 'Inter', value: 'Inter, sans-serif' },
+        { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+        { name: 'Trebuchet MS', value: '"Trebuchet MS", sans-serif' },
+        { name: 'Verdana', value: 'Verdana, sans-serif' },
+    ];
+
+    const fontSizes = [
+        { name: 'Default', value: '' },
+        { name: '10px', value: '10px' },
+        { name: '12px', value: '12px' },
+        { name: '14px', value: '14px' },
+        { name: '16px', value: '16px' },
+        { name: '18px', value: '18px' },
+        { name: '20px', value: '20px' },
+        { name: '24px', value: '24px' },
+        { name: '30px', value: '30px' },
+        { name: '36px', value: '36px' },
+        { name: '48px', value: '48px' },
+        { name: '60px', value: '60px' },
+    ];
+
+    const handleFontFamilyChange = (value: string) => {
+        if (!editor) return;
+        if (value && value !== 'Default') {
+            editor.chain().focus().setFontFamily(value).run();
+        } else {
+            editor.chain().focus().unsetFontFamily().run();
+        }
+    };
+
+    const handleFontSizeChange = (value: string) => {
+        if (!editor) return;
+        if (value && value !== 'Default') {
+            editor.chain().focus().setMark('textStyle', { fontSize: value }).run();
+        } else {
+            // Using removeEmptyTextStyle helps clear out empty inline styles
+            editor.chain().focus().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run();
+        }
+    };
+
+    const currentFontFamily = editor?.getAttributes('textStyle')?.fontFamily || '';
+    const currentFontSize = editor?.getAttributes('textStyle')?.fontSize || '';
+
     return (
         <div className="border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-2 flex flex-wrap gap-1 rounded-t-md items-center justify-between sticky top-0 z-10">
             <div className="flex flex-wrap gap-1 items-center">
+                <Select value={currentFontFamily} onValueChange={handleFontFamilyChange} disabled={isHtmlMode || !editor}>
+                    <SelectTrigger className="w-[120px] h-8 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                        <SelectValue placeholder="Font" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {fontFamilies.map((font) => (
+                            <SelectItem key={font.name} value={font.value || 'Default'} style={{ fontFamily: font.value || 'inherit' }}>
+                                {font.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+
+                <Select value={currentFontSize} onValueChange={handleFontSizeChange} disabled={isHtmlMode || !editor}>
+                    <SelectTrigger className="w-[80px] h-8 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                        <SelectValue placeholder="Size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {fontSizes.map((size) => (
+                            <SelectItem key={size.name} value={size.value || 'Default'}>
+                                {size.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+
+                <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
+
                 <Toggle
                     size="sm" pressed={!isHtmlMode && editor?.isActive('bold')}
                     disabled={isHtmlMode || !editor}
@@ -432,20 +580,77 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
-    const [isHtmlMode, setIsHtmlMode] = useState(false);
+    const isComplexHtml = useCallback((htmlStr: string) => {
+        const v = (htmlStr || '').trim().toLowerCase();
+        return v.startsWith('<!doctype') || v.startsWith('<html') || v.includes('<body') || (v.includes('<table') && v.includes('width="100%"'));
+    }, []);
+
+    const [isHtmlMode, setIsHtmlMode] = useState(() => isComplexHtml(value));
+    const [prevValueProp, setPrevValueProp] = useState(value);
+
+    // Auto-switch to source mode when complex HTML is loaded externally
+    if (value !== prevValueProp) {
+        setPrevValueProp(value);
+        if (isComplexHtml(value) && !isHtmlMode) {
+            setIsHtmlMode(true);
+        }
+    }
+
     const [isDragging, setIsDragging] = useState(false);
     const [dropUploading, setDropUploading] = useState(false);
     const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
     const { theme, systemTheme } = useTheme();
+
+    // Write HTML into iframe for visual preview of complex templates
+    const iframeWriting = useRef(false);
+    useEffect(() => {
+        if (!isHtmlMode && isComplexHtml(value) && iframeRef.current) {
+            const doc = iframeRef.current.contentDocument;
+            if (doc) {
+                iframeWriting.current = true;
+                doc.open();
+                doc.write(value);
+                doc.close();
+
+                // Make the body editable
+                if (doc.body) {
+                    doc.body.contentEditable = 'true';
+                    doc.body.style.outline = 'none';
+
+                    // Sync edits back to parent
+                    doc.body.addEventListener('input', () => {
+                        if (!iframeWriting.current) {
+                            // Reconstruct the full HTML including doctype/html/head
+                            const doctype = doc.doctype
+                                ? `<!DOCTYPE ${doc.doctype.name}>\n`
+                                : '';
+                            const fullHtml = doctype + doc.documentElement.outerHTML;
+                            onChange(fullHtml);
+                        }
+                    });
+                }
+                // Allow the input listener to fire after initial write
+                requestAnimationFrame(() => {
+                    iframeWriting.current = false;
+                });
+            }
+        }
+    }, [value, isHtmlMode, isComplexHtml, onChange]);
 
     const editor = useEditor({
         extensions: [
             GlobalAttributes,
+            Div,
+            Center,
+            Span,
             StarterKit.configure({
                 heading: { levels: [1, 2, 3] },
             }),
             Underline,
             TextStyle,
+            FontFamily,
+            FontSize,
             Color,
             Image.configure({
                 inline: true,
@@ -475,7 +680,8 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 },
             }),
         ],
-        content: value,
+        // Don't initialize Tiptap with complex HTML — it would strip tags
+        content: isComplexHtml(value) ? '' : value,
         editorProps: {
             attributes: {
                 class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[600px] p-6 bg-white text-black',
@@ -512,9 +718,27 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         },
         immediatelyRender: false,
         onUpdate: ({ editor }) => {
-            onChange(editor.getHTML());
+            // Don't let Tiptap overwrite complex HTML source
+            if (!isComplexHtml(value)) {
+                onChange(editor.getHTML());
+            }
         },
     });
+
+    // Synchronize external value changes to the editor (skip complex HTML)
+    useEffect(() => {
+        if (editor && value !== editor.getHTML()) {
+            if (isHtmlMode || isComplexHtml(value)) {
+                // Don't push complex HTML or source-mode edits into Tiptap
+            } else {
+                const el = document.createElement('div');
+                el.innerHTML = value;
+                const newDoc = DOMParser.fromSchema(editor.schema).parse(el);
+                const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, newDoc.content);
+                editor.view.dispatch(tr);
+            }
+        }
+    }, [value, editor, isHtmlMode, isComplexHtml]);
 
     // Upload handler for drag-drop and paste
     const handleDropOrPasteUpload = useCallback(async (file: File) => {
@@ -544,21 +768,14 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
     const handleToggleMode = () => {
         setIsHtmlMode(!isHtmlMode);
-        // Ensure switching views updates content completely
         if (editor) {
-            if (isHtmlMode) {
-                // Switching FROM source TO visual
-                // We bypass tiptap-markdown by using ProseMirror's DOMParser directly
+            if (isHtmlMode && !isComplexHtml(value)) {
+                // Switching FROM source TO visual — only for simple HTML
                 const el = document.createElement('div');
                 el.innerHTML = value;
                 const newDoc = DOMParser.fromSchema(editor.schema).parse(el);
-
-                // Replace the entire document content
                 const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, newDoc.content);
                 editor.view.dispatch(tr);
-            } else {
-                // Switching FROM visual TO source
-                editor.commands.setContent(value);
             }
         }
     };
@@ -617,34 +834,48 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
             {/* Visual View */}
             <div className={isHtmlMode ? "hidden" : "block"}>
-                <div
-                    className={`relative flex-1 overflow-auto bg-white dark:bg-zinc-950 border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-md transition-colors ${isDragging ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/50' : ''}`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                >
-                    <EditorContent editor={editor} />
+                {isComplexHtml(value) ? (
+                    /* Complex HTML: render in iframe to preserve full source */
+                    <div className="border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-md overflow-hidden bg-white">
+                        <iframe
+                            ref={iframeRef}
+                            title="Email Preview"
+                            sandbox="allow-same-origin"
+                            className="w-full bg-white"
+                            style={{ height: '600px', border: 'none' }}
+                        />
+                    </div>
+                ) : (
+                    /* Simple HTML: Tiptap visual editor */
+                    <div
+                        className={`relative flex-1 overflow-auto bg-white dark:bg-zinc-950 border border-t-0 border-zinc-200 dark:border-zinc-800 rounded-b-md transition-colors ${isDragging ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/50' : ''}`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <EditorContent editor={editor} />
 
-                    {/* Drag overlay */}
-                    {isDragging && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-blue-50/80 dark:bg-blue-950/80 pointer-events-none z-20 rounded-b-md">
-                            <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-400">
-                                <ImageIcon className="w-10 h-10" />
-                                <span className="text-sm font-medium">Drop image here to upload</span>
+                        {/* Drag overlay */}
+                        {isDragging && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-blue-50/80 dark:bg-blue-950/80 pointer-events-none z-20 rounded-b-md">
+                                <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-400">
+                                    <ImageIcon className="w-10 h-10" />
+                                    <span className="text-sm font-medium">Drop image here to upload</span>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Upload indicator for drop/paste */}
-                    {dropUploading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-zinc-950/60 pointer-events-none z-20 rounded-b-md">
-                            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-800">
-                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                                <span className="text-sm text-zinc-700 dark:text-zinc-300">Uploading image...</span>
+                        {/* Upload indicator for drop/paste */}
+                        {dropUploading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-zinc-950/60 pointer-events-none z-20 rounded-b-md">
+                                <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-900 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-800">
+                                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Uploading image...</span>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Editor styles for images */}

@@ -5,16 +5,27 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { LayoutTemplate, ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-import { saveTemplate } from "@/app/actions/templates";
+import { saveTemplate, updateTemplate } from "@/app/actions/templates";
 
-export function SaveTemplateForm() {
+interface SaveTemplateFormProps {
+    initialData?: {
+        id: string;
+        name: string;
+        category: string;
+        description: string;
+        html: string;
+        isPublic: boolean;
+    };
+}
+
+export function SaveTemplateForm({ initialData }: SaveTemplateFormProps = {}) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
-    const [name, setName] = useState("");
-    const [category, setCategory] = useState("Custom");
-    const [description, setDescription] = useState("");
-    const [html, setHtml] = useState("");
-    const [isPublic, setIsPublic] = useState(false);
+    const [name, setName] = useState(initialData?.name || "");
+    const [category, setCategory] = useState(initialData?.category || "Custom");
+    const [description, setDescription] = useState(initialData?.description || "");
+    const [html, setHtml] = useState(initialData?.html || "");
+    const [isPublic, setIsPublic] = useState(initialData?.isPublic || false);
     const [error, setError] = useState("");
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -26,7 +37,11 @@ export function SaveTemplateForm() {
 
         startTransition(async () => {
             try {
-                await saveTemplate({ name, category, description, html, isPublic });
+                if (initialData?.id) {
+                    await updateTemplate(initialData.id, { name, category, description, html, isPublic });
+                } else {
+                    await saveTemplate({ name, category, description, html, isPublic });
+                }
                 router.push("/dashboard/templates");
             } catch (err: any) {
                 setError(err.message || "Failed to save template.");
@@ -45,10 +60,10 @@ export function SaveTemplateForm() {
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1 flex items-center gap-3">
                     <LayoutTemplate className="w-7 h-7 text-indigo-500" />
-                    Save Custom Template
+                    {initialData?.id ? "Edit Custom Template" : "Save Custom Template"}
                 </h1>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    Save your email HTML as a reusable template for future campaigns.
+                    {initialData?.id ? "Update your template HTML and settings." : "Save your email HTML as a reusable template for future campaigns."}
                 </p>
             </div>
 
@@ -142,7 +157,7 @@ export function SaveTemplateForm() {
                             className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                         >
                             <Save className="w-4 h-4" />
-                            {isPending ? "Saving..." : "Save Template"}
+                            {isPending ? "Saving..." : initialData?.id ? "Update Template" : "Save Template"}
                         </button>
                     </form>
                 </CardContent>

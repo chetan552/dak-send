@@ -431,3 +431,35 @@ export async function getTemplateById(id: string) {
     if (!template) throw new Error("Template not found");
     return { ...template, isCustom: true };
 }
+
+export async function updateTemplate(id: string, data: {
+    name: string;
+    category?: string;
+    description?: string;
+    html: string;
+    isPublic?: boolean;
+}) {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    const role = (session?.user as any)?.role || "user";
+    if (!userId) throw new Error("Unauthorized");
+
+    // Verify ownership or admin
+    const where: any = role === "admin" ? { id } : { id, userId };
+    const existing = await (prisma as any).emailTemplate.findFirst({ where });
+    if (!existing) throw new Error("Template not found or unauthorized");
+
+    const template = await (prisma as any).emailTemplate.update({
+        where: { id },
+        data: {
+            name: data.name,
+            category: data.category || "Custom",
+            description: data.description || null,
+            html: data.html,
+            isPublic: data.isPublic || false,
+        },
+    });
+
+    revalidatePath("/dashboard/templates");
+    return template;
+}

@@ -26,7 +26,7 @@ export function CampaignForm({ brands, initialData }: CampaignFormProps) {
         if (typeof window !== "undefined" && !initialData) {
             const templateHtml = sessionStorage.getItem("template_html");
             if (templateHtml) {
-                setHtmlContent(templateHtml);
+                setHtmlContent(templateHtml.trim());
                 sessionStorage.removeItem("template_html");
             }
         }
