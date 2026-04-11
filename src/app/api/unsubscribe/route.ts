@@ -3,6 +3,52 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
 import { dispatchWebhooks } from "@/lib/webhooks";
 
+// ---------------------------------------------------------------------------
+// Shared helper — used by both GET and POST
+// ---------------------------------------------------------------------------
+
+async function markUnsubscribed(subscriberId: string, listId: string): Promise<
+    | { ok: false; status: number; error: string }
+    | { ok: true; alreadyUnsubscribed: boolean; subscriber: Awaited<ReturnType<typeof fetchSubscriber>> }
+> {
+    const subscriber = await fetchSubscriber(subscriberId, listId);
+    if (!subscriber) return { ok: false, status: 404, error: "Subscriber not found" };
+    if (subscriber.listId !== listId) return { ok: false, status: 404, error: "Subscriber not found" };
+
+    if (subscriber.status === "unsubscribed") {
+        return { ok: true, alreadyUnsubscribed: true, subscriber };
+    }
+
+    await prisma.subscriber.update({
+        where: { id: subscriberId },
+        data: { status: "unsubscribed" },
+    });
+
+    // Dispatch webhook (fire-and-forget, non-fatal)
+    try {
+        dispatchWebhooks(
+            "unsubscribe",
+            { email: subscriber.email, listId: subscriber.listId },
+            subscriber.list.brand.id,
+        );
+    } catch {
+        // webhooks are best-effort
+    }
+
+    return { ok: true, alreadyUnsubscribed: false, subscriber };
+}
+
+async function fetchSubscriber(subscriberId: string, listId: string) {
+    return prisma.subscriber.findUnique({
+        where: { id: subscriberId },
+        include: { list: { include: { brand: true } } },
+    }).then((s) => (s?.listId === listId ? s : null));
+}
+
+// ---------------------------------------------------------------------------
+// GET — user clicks the unsubscribe link in their email client
+// ---------------------------------------------------------------------------
+
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const subscriberId = searchParams.get("i");
@@ -13,45 +59,32 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const subscriber = await prisma.subscriber.findUnique({
-            where: { id: subscriberId },
-            include: { list: { include: { brand: true } } }
-        });
+        const result = await markUnsubscribed(subscriberId, listId);
 
-        if (!subscriber || subscriber.listId !== listId) {
-            return NextResponse.json({ error: "Subscriber not found" }, { status: 404 });
+        if (!result.ok) {
+            return NextResponse.json({ error: result.error }, { status: result.status });
         }
 
-        if (subscriber.status === "unsubscribed") {
-            const list = subscriber.list;
+        const { subscriber, alreadyUnsubscribed } = result;
+        const list = subscriber!.list;
+
+        if (alreadyUnsubscribed) {
             if (list.unsubscribeConfirmationUrl) {
                 return NextResponse.redirect(list.unsubscribeConfirmationUrl, { status: 302 });
             }
-            return new NextResponse(getUnsubscribeHtml("Already Unsubscribed", "You have already been unsubscribed from this list."), {
-                status: 200,
-                headers: { "Content-Type": "text/html" }
-            });
+            return new NextResponse(
+                getUnsubscribeHtml("Already Unsubscribed", "You have already been unsubscribed from this list."),
+                { status: 200, headers: { "Content-Type": "text/html" } },
+            );
         }
 
-        await prisma.subscriber.update({
-            where: { id: subscriberId },
-            data: { status: "unsubscribed" }
-        });
-
-        // Dispatch unsubscribe webhook
-        dispatchWebhooks("unsubscribe", {
-            email: subscriber.email,
-            listId: subscriber.listId,
-        }, subscriber.list.brand.id);
-
         // Send goodbye email if configured
-        const list = subscriber.list;
         if (list.goodbyeEmailHtml && list.brand.fromEmail) {
             try {
                 const brandName = list.brand.fromName || list.brand.name;
                 await sendEmail({
                     FromEmailAddress: `${brandName} <${list.brand.fromEmail}>`,
-                    Destination: { ToAddresses: [subscriber.email] },
+                    Destination: { ToAddresses: [subscriber!.email] },
                     ReplyToAddresses: list.brand.replyTo ? [list.brand.replyTo] : [],
                     Content: {
                         Simple: {
@@ -59,33 +92,83 @@ export async function GET(req: NextRequest) {
                             Body: {
                                 Html: {
                                     Data: list.goodbyeEmailHtml
-                                        .replace(/\[Name\]/gi, subscriber.name || "Friend")
-                                        .replace(/\[Email\]/gi, subscriber.email)
-                                }
-                            }
-                        }
-                    }
+                                        .replace(/\[Name\]/gi, subscriber!.name || "Friend")
+                                        .replace(/\[Email\]/gi, subscriber!.email),
+                                },
+                            },
+                        },
+                    },
                 });
             } catch (emailError) {
                 console.error("Error sending goodbye email:", emailError);
             }
         }
 
-        // Redirect to custom unsubscribe confirmation URL or show success page
         if (list.unsubscribeConfirmationUrl) {
             return NextResponse.redirect(list.unsubscribeConfirmationUrl, { status: 302 });
         }
 
-        return new NextResponse(getUnsubscribeHtml("Unsubscribed", "You have been successfully unsubscribed. You will no longer receive emails from this list."), {
-            status: 200,
-            headers: { "Content-Type": "text/html" }
-        });
-
+        return new NextResponse(
+            getUnsubscribeHtml(
+                "Unsubscribed",
+                "You have been successfully unsubscribed. You will no longer receive emails from this list.",
+            ),
+            { status: 200, headers: { "Content-Type": "text/html" } },
+        );
     } catch (error) {
         console.error("Unsubscribe error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+// ---------------------------------------------------------------------------
+// POST — one-click unsubscribe per RFC 8058 / Gmail & Yahoo bulk-sender rules
+//
+// Gmail and Yahoo POST to the exact URL in the List-Unsubscribe header
+// (i.e. the same URL as GET with ?i=...&l=... query params) with a body of
+// "List-Unsubscribe=One-Click". We read the subscriber IDs from query params
+// just like GET does, so no body parsing is needed.
+//
+// Requirements:
+//  - Must return 2xx without requiring additional user interaction
+//  - Must NOT redirect
+//  - Must NOT send a goodbye email (that's for the human-clicked GET flow)
+// ---------------------------------------------------------------------------
+
+export async function POST(req: NextRequest) {
+    const searchParams = req.nextUrl.searchParams;
+    const subscriberId = searchParams.get("i");
+    const listId = searchParams.get("l");
+
+    // Skip test sends that use a placeholder URL
+    if (searchParams.get("test") === "1") {
+        return new NextResponse(null, { status: 200 });
+    }
+
+    if (!subscriberId || !listId) {
+        return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+    }
+
+    try {
+        const result = await markUnsubscribed(subscriberId, listId);
+
+        if (!result.ok) {
+            // Return 200 even on not-found — RFC 8058 says the server MUST respond
+            // with a 2xx so mailbox providers don't retry indefinitely.
+            return new NextResponse(null, { status: 200 });
+        }
+
+        return new NextResponse(null, { status: 200 });
+    } catch (error) {
+        console.error("One-click unsubscribe error:", error);
+        // Still 200 — we don't want ISPs retrying
+        return new NextResponse(null, { status: 200 });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HTML helper
+// ---------------------------------------------------------------------------
 
 function getUnsubscribeHtml(title: string, message: string): string {
     return `<!DOCTYPE html>

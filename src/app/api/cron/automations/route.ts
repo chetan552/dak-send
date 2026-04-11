@@ -88,25 +88,13 @@ export async function GET(req: NextRequest) {
                         }
                     }
 
-                    // Process HTML personalization
-                    let processedHtml = (currentStep.emailHtml || "")
-                        .replace(/\[Name\]/gi, subscriberName || "Friend")
-                        .replace(/\[Email\]/gi, subscriberEmail);
+                    // Pass raw template + personalization data to the worker.
+                    // The worker's renderEmail() pipeline handles personalization,
+                    // HTML wrapping, CSS inlining, tracking, and plain-text generation.
+                    const unsubscribeUrl = subscriber
+                        ? `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriber.id)}&l=${encodeURIComponent(listId)}`
+                        : "";
 
-                    // Replace [CustomField:FieldName] tags
-                    processedHtml = processedHtml.replace(/\[CustomField:([^\]]+)\]/gi, (_match, fieldName: string) => {
-                        const key = Object.keys(customFieldMap).find(k => k.toLowerCase() === fieldName.toLowerCase());
-                        return key ? customFieldMap[key] : "";
-                    });
-
-                    // Add unsubscribe link
-                    if (subscriber) {
-                        const unsubscribeUrl = `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriber.id)}&l=${encodeURIComponent(listId)}`;
-                        processedHtml = processedHtml.replace(/\[UnsubscribeUrl\]/gi, unsubscribeUrl);
-                        processedHtml = processedHtml.replace(/\[Unsubscribe\]/gi, `<a href="${unsubscribeUrl}">Unsubscribe</a>`);
-                    }
-
-                    // Queue the email directly (not via campaign worker, but directly to SES)
                     await emailQueue.add("send-automation-email", {
                         automationId: automation.id,
                         enrollmentId: enrollment.id,
@@ -116,7 +104,10 @@ export async function GET(req: NextRequest) {
                         subscriberId: subscriber?.id,
                         listId,
                         subject: currentStep.emailSubject || "No Subject",
-                        html: processedHtml,
+                        html: currentStep.emailHtml || "",
+                        customFields: customFieldMap,
+                        unsubscribeUrl,
+                        brandId: automation.brandId,
                         brandFromEmail: automation.brand.fromEmail,
                         brandFromName: automation.brand.fromName || automation.brand.name,
                         brandReplyTo: automation.brand.replyTo,

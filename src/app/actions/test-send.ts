@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
+import { renderEmail, buildUnsubscribeHeaders } from "@/lib/email-render";
 
 export async function sendTestEmail(campaignId: string, testEmail: string) {
     const session = await getServerSession(authOptions);
@@ -27,12 +28,26 @@ export async function sendTestEmail(campaignId: string, testEmail: string) {
         throw new Error("Brand sender email is not configured");
     }
 
-    // Process merge tags with test data
-    let processedHtml = campaign.htmlText
-        .replace(/\[Name\]/gi, "Test User")
-        .replace(/\[Email\]/gi, testEmail)
-        .replace(/\[Unsubscribe\]/gi, `<a href="#">Unsubscribe (test)</a>`)
-        .replace(/\[CustomField:[^\]]+\]/gi, "[Test Value]");
+    // Render with test personalization data.
+    // tracking is omitted so test sends don't pollute open/click analytics.
+    const testUnsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/unsubscribe?test=1`;
+    const rendered = renderEmail({
+        html: campaign.htmlText,
+        plainText: campaign.plainText,
+        subject: `[TEST] ${campaign.subject}`,
+        personalization: {
+            name: "Test User",
+            email: testEmail,
+            customFields: { Company: "Acme Corp", Website: "https://example.com" },
+        },
+        unsubscribeUrl: testUnsubscribeUrl,
+        // no tracking — test sends should not affect analytics
+    });
+
+    const { listUnsubscribe, listUnsubscribePost } = buildUnsubscribeHeaders(
+        testUnsubscribeUrl,
+        campaign.brand.fromEmail,
+    );
 
     await sendEmail({
         FromEmailAddress: `${campaign.brand.fromName || campaign.brand.name} <${campaign.brand.fromEmail}>`,
@@ -41,9 +56,18 @@ export async function sendTestEmail(campaignId: string, testEmail: string) {
         Content: {
             Simple: {
                 Subject: { Data: `[TEST] ${campaign.subject}` },
-                Body: { Html: { Data: processedHtml } }
-            }
-        }
+                Body: {
+                    Html: { Data: rendered.html },
+                    Text: { Data: rendered.text },
+                },
+                Headers: [
+                    { Name: "List-Unsubscribe",      Value: listUnsubscribe },
+                    { Name: "List-Unsubscribe-Post", Value: listUnsubscribePost },
+                    { Name: "Precedence",            Value: "bulk" },
+                    { Name: "X-Test-Send",           Value: "true" },
+                ],
+            },
+        },
     });
 
     return { success: true, message: `Test email sent to ${testEmail}` };
