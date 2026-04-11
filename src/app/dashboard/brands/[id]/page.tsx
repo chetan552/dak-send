@@ -44,8 +44,8 @@ export default async function BrandPage({ params }: { params: Promise<{ id: stri
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1">{brand.name}</h1>
-                    <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">Manage all mailing lists associated with this brand.</p>
+                    <h1 className="page-title mb-1">{brand.name}</h1>
+                    <p className="page-subtitle">Manage all mailing lists associated with this brand.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     {currentUserRole === 'admin' && <DeleteBrandButton brandId={brand.id} brandName={brand.name} />}

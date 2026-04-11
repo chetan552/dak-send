@@ -6,6 +6,7 @@ import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/components/logout-button";
 import { MobileNav } from "@/components/mobile-nav";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default async function DashboardLayout({
     children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
     const userName = session.user?.name || "User";
 
     return (
+        <TooltipProvider delayDuration={300}>
         <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex transition-colors duration-300">
             {/* Desktop Sidebar — hidden on mobile */}
             <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col backdrop-blur-md transition-colors duration-300 flex-shrink-0">
@@ -63,5 +65,6 @@ export default async function DashboardLayout({
                 </div>
             </main>
         </div>
+        </TooltipProvider>
     );
 }

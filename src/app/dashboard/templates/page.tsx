@@ -18,11 +18,11 @@ export default async function TemplatesPage() {
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1 flex items-center gap-3">
+                    <h1 className="page-title mb-1 flex items-center gap-3">
                         <LayoutTemplate className="w-7 h-7 text-indigo-500" />
                         Template Library
                     </h1>
-                    <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                    <p className="page-subtitle">
                         Browse pre-built templates or save your own. Click any template to use it in a campaign.
                     </p>
                 </div>

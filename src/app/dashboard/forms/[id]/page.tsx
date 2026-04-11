@@ -30,7 +30,7 @@ export default async function FormBuilderPage({ params }: { params: Promise<{ id
 
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1 flex items-center gap-3">
+                    <h1 className="page-title mb-1 flex items-center gap-3">
                         <FileInput className="w-7 h-7 text-teal-500" />
                         {form.name}
                     </h1>

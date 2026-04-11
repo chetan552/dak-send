@@ -28,10 +28,10 @@ export default async function WarmupPage() {
             </div>
 
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1 flex items-center gap-3">
+                <h1 className="page-title mb-1 flex items-center gap-3">
                     <Flame className="w-7 h-7 text-orange-500" /> Domain Warmup
                 </h1>
-                <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                <p className="page-subtitle">
                     Gradually increase your sending volume over 14 days to build domain reputation and avoid spam filters.
                 </p>
             </div>

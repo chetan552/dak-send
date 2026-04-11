@@ -28,10 +28,10 @@ export default async function DeliverabilityPage() {
             </div>
 
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1 flex items-center gap-3">
+                <h1 className="page-title mb-1 flex items-center gap-3">
                     <Shield className="w-7 h-7 text-emerald-500" /> Email Deliverability
                 </h1>
-                <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                <p className="page-subtitle">
                     Check SPF, DKIM, DMARC, and MX records for your sending domains.
                 </p>
             </div>

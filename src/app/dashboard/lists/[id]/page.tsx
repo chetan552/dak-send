@@ -66,10 +66,10 @@ export default async function ListPage({ params, searchParams }: { params: Promi
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <div className="flex flex-wrap items-center gap-3 mb-1">
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white break-words">{list.name}</h1>
+                        <h1 className="page-title break-words">{list.name}</h1>
                         <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap">{totalSubscribers} Subscribers</span>
                     </div>
-                    <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">View and manage your subscribers for this list.</p>
+                    <p className="page-subtitle">View and manage your subscribers for this list.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <EngagementSegmentsButton listId={list.id} />

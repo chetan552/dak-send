@@ -5,6 +5,7 @@ import { duplicateCampaign } from "@/app/actions/campaign";
 import { Loader2, Copy } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function DuplicateCampaignButton({
     campaignId,
@@ -32,7 +33,7 @@ export function DuplicateCampaignButton({
         }
     };
 
-    return (
+    const button = (
         <Button
             type="button"
             variant="ghost"
@@ -40,10 +41,18 @@ export function DuplicateCampaignButton({
             onClick={handleDuplicate}
             disabled={loading}
             className={className || "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors h-8 px-2"}
-            title="Duplicate Campaign"
         >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
             {showText && <span className="ml-2">Duplicate</span>}
         </Button>
+    );
+
+    if (showText) return button;
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent side="top">Duplicate campaign</TooltipContent>
+        </Tooltip>
     );
 }

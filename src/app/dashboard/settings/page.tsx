@@ -43,8 +43,8 @@ export default async function SettingsPage() {
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1">Settings</h1>
-                    <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">Manage your account and platform settings.</p>
+                    <h1 className="page-title mb-1">Settings</h1>
+                    <p className="page-subtitle">Manage your account and platform settings.</p>
                 </div>
             </div>
 

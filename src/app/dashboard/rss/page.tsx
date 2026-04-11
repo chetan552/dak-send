@@ -35,8 +35,8 @@ export default async function RssPage() {
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1">RSS Feeds</h1>
-                    <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">Automatically create campaigns from blog posts and RSS feeds.</p>
+                    <h1 className="page-title mb-1">RSS Feeds</h1>
+                    <p className="page-subtitle">Automatically create campaigns from blog posts and RSS feeds.</p>
                 </div>
             </div>
 

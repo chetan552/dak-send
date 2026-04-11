@@ -5,6 +5,7 @@ import { deleteCampaign } from "@/app/actions/campaign";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function DeleteCampaignButton({
     campaignId,
@@ -34,7 +35,7 @@ export function DeleteCampaignButton({
         }
     };
 
-    return (
+    const button = (
         <Button
             type="button"
             variant="ghost"
@@ -46,5 +47,14 @@ export function DeleteCampaignButton({
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             {showText && <span className="ml-2">Delete</span>}
         </Button>
+    );
+
+    if (showText) return button;
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent side="top">Delete campaign</TooltipContent>
+        </Tooltip>
     );
 }

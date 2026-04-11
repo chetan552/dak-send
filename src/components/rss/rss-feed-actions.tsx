@@ -7,6 +7,7 @@ import { toggleRssFeed, deleteRssFeed } from "@/app/actions/rss";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { RssFeedEdit } from "./rss-feed-edit";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RssFeedActionsProps {
     feed: any;
@@ -52,21 +53,36 @@ export function RssFeedActions({ feed, lists }: RssFeedActionsProps) {
     return (
         <>
             <div className="flex items-center gap-1 flex-shrink-0">
-                <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(!editing)} className="text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400">
-                    <Pencil className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" disabled={busy} onClick={handleToggle} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
-                    {toggling ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : feed.isActive ? (
-                        <Pause className="w-4 h-4" />
-                    ) : (
-                        <Play className="w-4 h-4" />
-                    )}
-                </Button>
-                <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={handleDelete} className="text-zinc-500 hover:text-red-600">
-                    {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(!editing)} className="text-zinc-500 hover:text-primary">
+                            <Pencil className="w-4 h-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{editing ? "Close editor" : "Edit feed"}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" disabled={busy} onClick={handleToggle} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
+                            {toggling ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : feed.isActive ? (
+                                <Pause className="w-4 h-4" />
+                            ) : (
+                                <Play className="w-4 h-4" />
+                            )}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{feed.isActive ? "Pause feed" : "Activate feed"}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={handleDelete} className="text-zinc-500 hover:text-red-600">
+                            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Delete feed</TooltipContent>
+                </Tooltip>
             </div>
             {editing && (
                 <div className="col-span-full">

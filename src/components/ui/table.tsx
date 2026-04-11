@@ -19,21 +19,37 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   )
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+function TableHeader({
+  className,
+  sticky = false,
+  ...props
+}: React.ComponentProps<"thead"> & { sticky?: boolean }) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn(
+        "[&_tr]:border-b",
+        sticky && "sticky top-0 z-10 bg-zinc-50/95 dark:bg-zinc-900/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-50/75 dark:supports-[backdrop-filter]:bg-zinc-900/75",
+        className,
+      )}
       {...props}
     />
   )
 }
 
-function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
+function TableBody({
+  className,
+  striped = false,
+  ...props
+}: React.ComponentProps<"tbody"> & { striped?: boolean }) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
+      className={cn(
+        "[&_tr:last-child]:border-0",
+        striped && "[&_tr:nth-child(even)]:bg-zinc-50/60 dark:[&_tr:nth-child(even)]:bg-zinc-900/40",
+        className,
+      )}
       {...props}
     />
   )

@@ -35,15 +35,15 @@ export function SidebarNav() {
                         key={item.href}
                         href={item.href}
                         className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors",
+                            "relative flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors",
                             isActive
-                                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white"
+                                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800/70 dark:text-white before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-primary before:rounded-r-full"
                                 : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50"
                         )}
                     >
                         <Icon className={cn(
                             "w-4 h-4",
-                            isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-500 dark:text-zinc-400"
+                            isActive ? "text-primary" : "text-zinc-500 dark:text-zinc-400"
                         )} />
                         <span className="text-sm font-medium">{item.name}</span>
                     </Link>

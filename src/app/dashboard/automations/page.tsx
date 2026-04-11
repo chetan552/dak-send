@@ -22,11 +22,11 @@ export default async function AutomationsPage() {
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1 flex items-center gap-3">
+                    <h1 className="page-title mb-1 flex items-center gap-3">
                         <Zap className="w-7 h-7 text-yellow-500" />
                         Automations
                     </h1>
-                    <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                    <p className="page-subtitle">
                         Create automated email sequences triggered by subscriber events.
                     </p>
                 </div>
