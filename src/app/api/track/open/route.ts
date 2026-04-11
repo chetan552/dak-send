@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     if (campaignId && email) {
         try {
-            const updated = await (prisma as any).campaignSend.updateMany({
+            const updated = await prisma.campaignSend.updateMany({
                 where: {
                     campaignId,
                     subscriberEmail: email,
@@ -36,14 +36,14 @@ export async function GET(req: NextRequest) {
 
                 // Update optimal send hour
                 try {
-                    const allOpens = await (prisma as any).campaignSend.findMany({
+                    const allOpens = await prisma.campaignSend.findMany({
                         where: { subscriberEmail: email, openedAt: { not: null } },
                         select: { openedAt: true },
                     });
                     const timestamps = allOpens.map((o: any) => new Date(o.openedAt));
                     const optimalHour = computeOptimalHour(timestamps);
                     if (optimalHour !== null) {
-                        await (prisma as any).subscriber.updateMany({
+                        await prisma.subscriber.updateMany({
                             where: { email },
                             data: { optimalSendHour: optimalHour },
                         });

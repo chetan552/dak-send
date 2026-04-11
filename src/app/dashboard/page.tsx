@@ -8,12 +8,12 @@ import { CreateBrandButton } from "@/components/brand/create-brand-button";
 
 export default async function DashboardPage() {
     const session = await getServerSession(authOptions);
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const currentUserRole = session?.user?.role || "user";
 
     const brands = await prisma.brand.findMany({
         where: currentUserRole === 'admin'
             ? undefined
-            : { users: { some: { id: (session?.user as any)?.id } } },
+            : { users: { some: { id: session?.user?.id } } },
         include: {
             _count: {
                 select: { lists: true, campaigns: true }

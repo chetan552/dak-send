@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 
 export async function createCampaignDraft(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -49,8 +49,8 @@ export async function createCampaignDraft(formData: FormData) {
 
 export async function updateCampaignDraft(id: string, formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -87,8 +87,8 @@ export async function updateCampaignDraft(id: string, formData: FormData) {
 
 export async function deleteCampaign(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -113,8 +113,8 @@ export async function deleteCampaign(id: string) {
 
 export async function duplicateCampaign(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 

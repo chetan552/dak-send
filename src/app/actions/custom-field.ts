@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 
 async function verifyListAccess(listId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -24,7 +24,7 @@ async function verifyListAccess(listId: string) {
 
 export async function getCustomFields(listId: string) {
     await verifyListAccess(listId);
-    return await (prisma as any).customField.findMany({
+    return await prisma.customField.findMany({
         where: { listId },
         orderBy: { createdAt: 'asc' }
     });
@@ -34,12 +34,12 @@ export async function createCustomField(data: { listId: string, name: string, ty
     await verifyListAccess(data.listId);
 
     // Check if name already exists
-    const existing = await (prisma as any).customField.findFirst({
+    const existing = await prisma.customField.findFirst({
         where: { listId: data.listId, name: data.name }
     });
     if (existing) throw new Error("Custom field with this name already exists");
 
-    await (prisma as any).customField.create({
+    await prisma.customField.create({
         data: {
             listId: data.listId,
             name: data.name,
@@ -56,7 +56,7 @@ export async function createCustomField(data: { listId: string, name: string, ty
 export async function deleteCustomField(id: string, listId: string) {
     await verifyListAccess(listId);
 
-    await (prisma as any).customField.delete({
+    await prisma.customField.delete({
         where: { id, listId }
     });
 

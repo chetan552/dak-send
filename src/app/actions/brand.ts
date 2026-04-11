@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 
 export async function createBrand(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role;
+    const userId = session?.user?.id;
+    const role = session?.user?.role;
 
     if (!userId || role !== 'admin') {
         throw new Error("Unauthorized");
@@ -48,8 +48,8 @@ export async function createBrand(formData: FormData) {
 
 export async function assignUserToBrand(brandId: string, emailToAssign: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role;
+    const userId = session?.user?.id;
+    const role = session?.user?.role;
 
     // Only admin or the brand owner can assign
     if (!userId) throw new Error("Unauthorized");
@@ -77,8 +77,8 @@ export async function assignUserToBrand(brandId: string, emailToAssign: string) 
 
 export async function removeUserFromBrand(brandId: string, userIdToRemove: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role;
+    const userId = session?.user?.id;
+    const role = session?.user?.role;
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -106,8 +106,8 @@ export async function removeUserFromBrand(brandId: string, userIdToRemove: strin
 
 export async function updateBrandSettings(brandId: string, formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role;
+    const userId = session?.user?.id;
+    const role = session?.user?.role;
 
     if (!userId) throw new Error("Unauthorized");
 

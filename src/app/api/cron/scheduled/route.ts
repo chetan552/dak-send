@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { emailQueue } from "@/lib/queue";
+import { translateSegmentQuery } from "@/lib/segment-query";
+import { getWarmupRemaining } from "@/lib/warmup";
 
 export async function GET(req: NextRequest) {
     // Verify cron secret
@@ -47,16 +49,16 @@ export async function GET(req: NextRequest) {
 
                 for (const seg of campaign.includedSegments) {
                     try {
-                        const segment = await (prisma as any).segment.findUnique({ where: { id: seg.id } });
+                        const segment = await prisma.segment.findUnique({ where: { id: seg.id } });
                         if (segment?.query) {
-                            const whereObj = JSON.parse(segment.query);
+                            const translatedWhere = translateSegmentQuery(JSON.parse(segment.query));
                             const subs = await prisma.subscriber.findMany({
-                                where: { ...whereObj, listId: segment.listId, status: "subscribed" },
+                                where: { ...translatedWhere, listId: segment.listId, status: "subscribed" },
                                 select: { email: true },
                             });
                             subs.forEach(s => allIncludedEmails.add(s.email));
                         }
-                    } catch { }
+                    } catch (e) { console.warn("Included segment parsing error:", e); }
                 }
 
                 // Gather excluded subscribers
@@ -72,16 +74,16 @@ export async function GET(req: NextRequest) {
 
                 for (const seg of campaign.excludedSegments) {
                     try {
-                        const segment = await (prisma as any).segment.findUnique({ where: { id: seg.id } });
+                        const segment = await prisma.segment.findUnique({ where: { id: seg.id } });
                         if (segment?.query) {
-                            const whereObj = JSON.parse(segment.query);
+                            const translatedWhere = translateSegmentQuery(JSON.parse(segment.query));
                             const subs = await prisma.subscriber.findMany({
-                                where: { ...whereObj, listId: segment.listId },
+                                where: { ...translatedWhere, listId: segment.listId },
                                 select: { email: true },
                             });
                             subs.forEach(s => allExcludedEmails.add(s.email));
                         }
-                    } catch { }
+                    } catch (e) { console.warn("Excluded segment parsing error:", e); }
                 }
 
                 // Final list
@@ -95,11 +97,23 @@ export async function GET(req: NextRequest) {
                     continue;
                 }
 
-                const subscribers = await prisma.subscriber.findMany({
+                let subscribers = await prisma.subscriber.findMany({
                     where: { email: { in: finalEmails }, status: "subscribed" },
                     distinct: ["email"],
                     select: { id: true, email: true, name: true, listId: true },
                 });
+
+                // Enforce domain warmup daily limit
+                const warmupRemaining = await getWarmupRemaining(campaign.brandId);
+                if (warmupRemaining !== -1 && subscribers.length > warmupRemaining) {
+                    console.log(`Warmup cap: scheduled campaign "${campaign.name}" truncated from ${subscribers.length} to ${warmupRemaining}`);
+                    subscribers = subscribers.slice(0, warmupRemaining);
+                }
+
+                if (subscribers.length === 0) {
+                    console.log(`Warmup daily limit reached for campaign "${campaign.name}", skipping until tomorrow`);
+                    continue;
+                }
 
                 // Update status to sending
                 await prisma.campaign.update({

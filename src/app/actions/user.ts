@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 
 export async function createUser(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const role = (session?.user as any)?.role;
+    const role = session?.user?.role;
 
     if (role !== "admin") {
         throw new Error("Unauthorized: Only admins can create users");
@@ -48,8 +48,8 @@ export async function createUser(formData: FormData) {
 
 export async function deleteUser(userId: string) {
     const session = await getServerSession(authOptions);
-    const role = (session?.user as any)?.role;
-    const currentUserId = (session?.user as any)?.id;
+    const role = session?.user?.role;
+    const currentUserId = session?.user?.id;
 
     if (role !== "admin") throw new Error("Unauthorized");
     if (currentUserId === userId) throw new Error("Cannot delete yourself");
@@ -63,12 +63,12 @@ export async function deleteUser(userId: string) {
 
 export async function deleteUsers(userIds: string[]) {
     const session = await getServerSession(authOptions);
-    const role = (session?.user as any)?.role;
-    const currentUserId = (session?.user as any)?.id;
+    const role = session?.user?.role;
+    const currentUserId = session?.user?.id;
 
     if (role !== "admin") throw new Error("Unauthorized");
     if (!Array.isArray(userIds) || userIds.length === 0) throw new Error("No users selected");
-    if (userIds.includes(currentUserId)) throw new Error("Cannot delete yourself");
+    if (currentUserId && userIds.includes(currentUserId)) throw new Error("Cannot delete yourself");
 
     await prisma.user.deleteMany({
         where: { id: { in: userIds } }
@@ -79,7 +79,7 @@ export async function deleteUsers(userIds: string[]) {
 
 export async function changePassword(currentPassword: string, newPassword: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
 
     if (!userId) {
         throw new Error("Not authenticated");

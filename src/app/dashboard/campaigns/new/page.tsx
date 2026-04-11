@@ -10,7 +10,7 @@ export default async function NewCampaignPage() {
     const session = await getServerSession(authOptions);
 
     const brands = await prisma.brand.findMany({
-        where: { users: { some: { id: (session?.user as any)?.id } } },
+        where: { users: { some: { id: session?.user?.id } } },
         orderBy: { createdAt: 'desc' }
     });
 

@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button";
 export default async function GlobalListsPage() {
     const session = await getServerSession(authOptions);
 
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const currentUserRole = session?.user?.role || "user";
 
     const lists = await prisma.list.findMany({
         where: currentUserRole === 'admin'
             ? undefined
-            : { brand: { users: { some: { id: (session?.user as any)?.id } } } },
+            : { brand: { users: { some: { id: session?.user?.id } } } },
         include: {
             brand: true,
             _count: {

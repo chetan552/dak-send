@@ -15,12 +15,12 @@ export default async function EditTemplatePage({ params }: { params: Promise<{ i
         return notFound();
     }
 
-    const userId = (session.user as any).id;
-    const role = (session.user as any).role;
+    const userId = session.user.id;
+    const role = session.user.role;
     
     if (role !== "admin" && template.userId !== userId) {
         return notFound();
     }
 
-    return <SaveTemplateForm initialData={template} />;
+    return <SaveTemplateForm initialData={{ ...template, description: template.description ?? "" }} />;
 }

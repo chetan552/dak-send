@@ -9,8 +9,8 @@ import { translateSegmentQuery } from "@/lib/segment-query";
 
 async function verifyListAccess(listId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -26,7 +26,7 @@ async function verifyListAccess(listId: string) {
 
 export async function getSegments(listId: string) {
     await verifyListAccess(listId);
-    return await (prisma as any).segment.findMany({
+    return await prisma.segment.findMany({
         where: { listId },
         orderBy: { createdAt: 'desc' }
     });
@@ -42,7 +42,7 @@ export async function createSegment(data: { listId: string, name: string, descri
         throw new Error("Invalid JSON format");
     }
 
-    await (prisma as any).segment.create({
+    await prisma.segment.create({
         data: {
             listId: data.listId,
             name: data.name,
@@ -58,7 +58,7 @@ export async function createSegment(data: { listId: string, name: string, descri
 export async function deleteSegment(id: string, listId: string) {
     await verifyListAccess(listId);
 
-    await (prisma as any).segment.delete({
+    await prisma.segment.delete({
         where: { id, listId }
     });
 
@@ -69,7 +69,7 @@ export async function deleteSegment(id: string, listId: string) {
 export async function previewSegment(segmentId: string, listId: string) {
     await verifyListAccess(listId);
 
-    const segment = await (prisma as any).segment.findFirst({
+    const segment = await prisma.segment.findFirst({
         where: { id: segmentId, listId },
     });
     if (!segment) throw new Error("Segment not found");

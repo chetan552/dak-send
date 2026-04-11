@@ -7,6 +7,28 @@ import { emailQueue } from "@/lib/queue";
 import { revalidatePath } from "next/cache";
 import { translateSegmentQuery } from "@/lib/segment-query";
 import { getNextSendTime } from "@/lib/send-time";
+import { getWarmupRemaining } from "@/lib/warmup";
+
+async function drainCampaignJobs(campaignId: string) {
+    try {
+        // Fetch all waiting and delayed jobs, remove those belonging to this campaign.
+        // BullMQ doesn't support pattern-based removal, so we iterate and filter by data.
+        const [waiting, delayed] = await Promise.all([
+            emailQueue.getWaiting(0, -1),
+            emailQueue.getDelayed(0, -1),
+        ]);
+        const toRemove = [...waiting, ...delayed].filter(
+            job => job.data?.campaignId === campaignId
+        );
+        await Promise.all(toRemove.map(job => job.remove()));
+        if (toRemove.length > 0) {
+            console.log(`Removed ${toRemove.length} queued jobs for cancelled campaign ${campaignId}`);
+        }
+    } catch (e) {
+        // Non-fatal — the worker skips jobs for non-sending campaigns anyway
+        console.error("Failed to drain jobs for campaign", campaignId, e);
+    }
+}
 
 export async function dispatchCampaign(campaignId: string, data: {
     includedLists: string[];
@@ -16,8 +38,8 @@ export async function dispatchCampaign(campaignId: string, data: {
     useOptimalTime?: boolean;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -48,7 +70,7 @@ export async function dispatchCampaign(campaignId: string, data: {
     // Segments
     if (data.includedSegments?.length > 0) {
         for (const segId of data.includedSegments) {
-            const segment = await (prisma as any).segment.findUnique({ where: { id: segId } });
+            const segment = await prisma.segment.findUnique({ where: { id: segId } });
             if (segment && segment.query) {
                 try {
                     const whereObj = JSON.parse(segment.query);
@@ -76,7 +98,7 @@ export async function dispatchCampaign(campaignId: string, data: {
 
     if (data.excludedSegments?.length > 0) {
         for (const segId of data.excludedSegments) {
-            const segment = await (prisma as any).segment.findUnique({ where: { id: segId } });
+            const segment = await prisma.segment.findUnique({ where: { id: segId } });
             if (segment && segment.query) {
                 try {
                     const whereObj = JSON.parse(segment.query);
@@ -98,15 +120,32 @@ export async function dispatchCampaign(campaignId: string, data: {
         throw new Error("No active subscribers found in selected criteria.");
     }
 
-    const subscribers = await (prisma as any).subscriber.findMany({
+    let subscribers = await prisma.subscriber.findMany({
         where: { email: { in: finalEmails }, status: "subscribed" },
         distinct: ['email'],
         select: { id: true, email: true, name: true, listId: true, optimalSendHour: true }
     });
 
+    // Enforce domain warmup daily limit
+    const warmupRemaining = await getWarmupRemaining(campaign.brandId);
+    let warmupTruncated = false;
+    if (warmupRemaining !== -1 && subscribers.length > warmupRemaining) {
+        console.log(`Warmup active: capping send from ${subscribers.length} to ${warmupRemaining} subscribers for brand ${campaign.brandId}`);
+        subscribers = subscribers.slice(0, warmupRemaining);
+        warmupTruncated = true;
+    }
+
+    if (subscribers.length === 0) {
+        throw new Error(
+            warmupTruncated
+                ? "Domain warmup daily limit already reached. Try again tomorrow."
+                : "No active subscribers found in selected criteria."
+        );
+    }
+
     // Update campaign status AND relations
     // Disconnect old and connect new
-    await (prisma as any).campaign.update({
+    await prisma.campaign.update({
         where: { id: campaignId },
         data: {
             status: "sending",
@@ -142,17 +181,14 @@ export async function dispatchCampaign(campaignId: string, data: {
     // Batch insert into Redis for speed
     await emailQueue.addBulk(jobs);
 
-    // Note: We need a long-running worker process to actually consume these jobs from the queue.
-    // In a production setup, we'd run `src/lib/worker.ts` as a separate node process.
-
     revalidatePath("/dashboard/campaigns");
-    return { jobCount: jobs.length };
+    return { jobCount: jobs.length, warmupTruncated };
 }
 
 export async function cancelCampaign(campaignId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -172,6 +208,10 @@ export async function cancelCampaign(campaignId: string) {
         where: { id: campaignId },
         data: { status: "cancelled" }
     });
+
+    // Best-effort: remove queued/delayed jobs from Redis so they don't consume
+    // worker capacity. The worker also skips jobs for non-sending campaigns.
+    await drainCampaignJobs(campaignId);
 
     revalidatePath("/dashboard/campaigns");
 }

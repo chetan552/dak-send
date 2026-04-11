@@ -7,8 +7,8 @@ import { authOptions } from "@/lib/auth";
 
 export async function deleteBrand(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role;
+    const userId = session?.user?.id;
+    const role = session?.user?.role;
 
     if (!userId || role !== 'admin') {
         throw new Error("Only admins can delete brands");

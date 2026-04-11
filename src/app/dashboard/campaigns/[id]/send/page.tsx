@@ -10,8 +10,8 @@ import { ListSelectionForm } from "@/components/campaign/list-selection";
 export default async function SendCampaignPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
         : { id, brand: { users: { some: { id: userId } } } };
@@ -28,7 +28,7 @@ export default async function SendCampaignPage({ params }: { params: Promise<{ i
     }
 
     // Get all lists for this brand that have active subscribers
-    const lists = await (prisma as any).list.findMany({
+    const lists = await prisma.list.findMany({
         where: {
             brandId: campaign.brandId,
         },

@@ -8,8 +8,8 @@ import { RssFeedActions } from "@/components/rss/rss-feed-actions";
 
 export default async function RssPage() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     const brandsWhere: any = currentUserRole === "admin"
         ? undefined
@@ -25,7 +25,7 @@ export default async function RssPage() {
         ? {}
         : { brand: { users: { some: { id: userId } } } };
 
-    const feeds = await (prisma as any).rssFeed.findMany({
+    const feeds = await prisma.rssFeed.findMany({
         where: feedsWhere,
         include: { brand: true },
         orderBy: { createdAt: "desc" },

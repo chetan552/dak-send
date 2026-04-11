@@ -8,8 +8,8 @@ import { revalidatePath } from "next/cache";
 // List all automations the user can access
 export async function getAutomations() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -17,7 +17,7 @@ export async function getAutomations() {
         ? {}
         : { brand: { users: { some: { id: userId } } } };
 
-    return (prisma as any).automation.findMany({
+    return prisma.automation.findMany({
         where,
         include: {
             brand: { select: { name: true } },
@@ -31,8 +31,8 @@ export async function getAutomations() {
 // Get a single automation with all steps and enrollment stats
 export async function getAutomation(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -40,7 +40,7 @@ export async function getAutomation(id: string) {
         ? { id }
         : { id, brand: { users: { some: { id: userId } } } };
 
-    const automation = await (prisma as any).automation.findFirst({
+    const automation = await prisma.automation.findFirst({
         where,
         include: {
             brand: { select: { name: true, id: true, fromEmail: true, fromName: true } },
@@ -52,10 +52,10 @@ export async function getAutomation(id: string) {
     if (!automation) throw new Error("Automation not found");
 
     // Get enrollment stats
-    const activeCount = await (prisma as any).automationEnrollment.count({
+    const activeCount = await prisma.automationEnrollment.count({
         where: { automationId: id, status: "active" },
     });
-    const completedCount = await (prisma as any).automationEnrollment.count({
+    const completedCount = await prisma.automationEnrollment.count({
         where: { automationId: id, status: "completed" },
     });
 
@@ -70,8 +70,8 @@ export async function createAutomation(data: {
     triggerListId: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -83,7 +83,7 @@ export async function createAutomation(data: {
     const brand = await prisma.brand.findFirst({ where: brandWhere });
     if (!brand) throw new Error("Brand not found or access denied");
 
-    const automation = await (prisma as any).automation.create({
+    const automation = await prisma.automation.create({
         data: {
             name: data.name,
             brandId: data.brandId,
@@ -105,8 +105,8 @@ export async function updateAutomation(id: string, data: {
     status?: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -114,10 +114,10 @@ export async function updateAutomation(id: string, data: {
         ? { id }
         : { id, brand: { users: { some: { id: userId } } } };
 
-    const automation = await (prisma as any).automation.findFirst({ where });
+    const automation = await prisma.automation.findFirst({ where });
     if (!automation) throw new Error("Automation not found");
 
-    const updated = await (prisma as any).automation.update({
+    const updated = await prisma.automation.update({
         where: { id },
         data,
     });
@@ -130,8 +130,8 @@ export async function updateAutomation(id: string, data: {
 // Delete an automation
 export async function deleteAutomation(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -139,10 +139,10 @@ export async function deleteAutomation(id: string) {
         ? { id }
         : { id, brand: { users: { some: { id: userId } } } };
 
-    const automation = await (prisma as any).automation.findFirst({ where });
+    const automation = await prisma.automation.findFirst({ where });
     if (!automation) throw new Error("Automation not found");
 
-    await (prisma as any).automation.delete({ where: { id } });
+    await prisma.automation.delete({ where: { id } });
 
     revalidatePath("/dashboard/automations");
 }
@@ -155,8 +155,8 @@ export async function addStep(automationId: string, data: {
     emailHtml?: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -164,18 +164,18 @@ export async function addStep(automationId: string, data: {
         ? { id: automationId }
         : { id: automationId, brand: { users: { some: { id: userId } } } };
 
-    const automation = await (prisma as any).automation.findFirst({ where: automationWhere });
+    const automation = await prisma.automation.findFirst({ where: automationWhere });
     if (!automation) throw new Error("Automation not found");
 
     // Get the highest order number
-    const lastStep = await (prisma as any).automationStep.findFirst({
+    const lastStep = await prisma.automationStep.findFirst({
         where: { automationId },
         orderBy: { order: "desc" },
     });
 
     const order = lastStep ? lastStep.order + 1 : 0;
 
-    const step = await (prisma as any).automationStep.create({
+    const step = await prisma.automationStep.create({
         data: {
             automationId,
             order,
@@ -198,16 +198,16 @@ export async function updateStep(stepId: string, data: {
     emailHtml?: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const step = await (prisma as any).automationStep.findUnique({
+    const step = await prisma.automationStep.findUnique({
         where: { id: stepId },
         include: { automation: true },
     });
     if (!step) throw new Error("Step not found");
 
-    const updated = await (prisma as any).automationStep.update({
+    const updated = await prisma.automationStep.update({
         where: { id: stepId },
         data: {
             type: data.type ?? step.type,
@@ -224,24 +224,24 @@ export async function updateStep(stepId: string, data: {
 // Delete a step
 export async function deleteStep(stepId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const step = await (prisma as any).automationStep.findUnique({
+    const step = await prisma.automationStep.findUnique({
         where: { id: stepId },
     });
     if (!step) throw new Error("Step not found");
 
-    await (prisma as any).automationStep.delete({ where: { id: stepId } });
+    await prisma.automationStep.delete({ where: { id: stepId } });
 
     // Re-order remaining steps
-    const remainingSteps = await (prisma as any).automationStep.findMany({
+    const remainingSteps = await prisma.automationStep.findMany({
         where: { automationId: step.automationId },
         orderBy: { order: "asc" },
     });
 
     for (let i = 0; i < remainingSteps.length; i++) {
-        await (prisma as any).automationStep.update({
+        await prisma.automationStep.update({
             where: { id: remainingSteps[i].id },
             data: { order: i },
         });
@@ -253,7 +253,7 @@ export async function deleteStep(stepId: string) {
 // Enroll a subscriber into an automation (called by trigger hooks)
 export async function enrollSubscriber(automationId: string, subscriberEmail: string, subscriberId?: string) {
     // Check if already enrolled
-    const existing = await (prisma as any).automationEnrollment.findUnique({
+    const existing = await prisma.automationEnrollment.findUnique({
         where: {
             automationId_subscriberEmail: {
                 automationId,
@@ -265,7 +265,7 @@ export async function enrollSubscriber(automationId: string, subscriberEmail: st
     if (existing) return existing; // Already enrolled, skip
 
     // Get the first step
-    const firstStep = await (prisma as any).automationStep.findFirst({
+    const firstStep = await prisma.automationStep.findFirst({
         where: { automationId },
         orderBy: { order: "asc" },
     });
@@ -278,7 +278,7 @@ export async function enrollSubscriber(automationId: string, subscriberEmail: st
         nextProcessAt = new Date(Date.now() + (firstStep.delayMinutes || 0) * 60 * 1000);
     }
 
-    const enrollment = await (prisma as any).automationEnrollment.create({
+    const enrollment = await prisma.automationEnrollment.create({
         data: {
             automationId,
             subscriberEmail,

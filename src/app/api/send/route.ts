@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Validate API key against system settings
-        const apiKeySetting = await (prisma as any).setting.findUnique({
+        const apiKeySetting = await prisma.setting.findUnique({
             where: { key: "API_KEY" }
         });
 

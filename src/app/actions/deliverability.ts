@@ -15,7 +15,7 @@ interface DnsCheckResult {
 
 export async function checkDeliverability(domain: string): Promise<DnsCheckResult> {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
     const result: DnsCheckResult = {
@@ -130,7 +130,7 @@ export async function checkDeliverability(domain: string): Promise<DnsCheckResul
 
 export async function checkBrandDeliverability(brandId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
     const brand = await prisma.brand.findFirst({ where: { id: brandId } });

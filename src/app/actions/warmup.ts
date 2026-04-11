@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getWarmupRemaining, incrementWarmupSent } from "@/lib/warmup";
+
+export { getWarmupRemaining, incrementWarmupSent };
 
 // Standard 14-day warmup schedule
 const DEFAULT_WARMUP_SCHEDULE = [
@@ -25,10 +28,10 @@ const DEFAULT_WARMUP_SCHEDULE = [
 
 export async function getWarmupStatus(brandId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const warmup = await (prisma as any).domainWarmup.findUnique({
+    const warmup = await prisma.domainWarmup.findUnique({
         where: { brandId },
     });
 
@@ -51,8 +54,8 @@ export async function getWarmupStatus(brandId: string) {
 
 export async function startWarmup(brandId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const whereCondition: any = currentUserRole === "admin"
@@ -65,7 +68,7 @@ export async function startWarmup(brandId: string) {
 
     const domain = brand.fromEmail.split("@")[1];
 
-    await (prisma as any).domainWarmup.upsert({
+    await prisma.domainWarmup.upsert({
         where: { brandId },
         update: {
             isActive: true,
@@ -91,10 +94,10 @@ export async function startWarmup(brandId: string) {
 
 export async function stopWarmup(brandId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    await (prisma as any).domainWarmup.update({
+    await prisma.domainWarmup.update({
         where: { brandId },
         data: { isActive: false },
     });
@@ -103,46 +106,3 @@ export async function stopWarmup(brandId: string) {
     return { success: true };
 }
 
-// Called before sending — returns the current daily limit or -1 if unlimited
-export async function getWarmupLimit(brandId: string): Promise<number> {
-    const warmup = await (prisma as any).domainWarmup.findUnique({
-        where: { brandId },
-    });
-
-    if (!warmup || !warmup.isActive) return -1; // No limit
-
-    // Check if we need to advance to the next day
-    const now = new Date();
-    const lastReset = new Date(warmup.lastResetAt);
-    const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
-
-    if (hoursSinceReset >= 24) {
-        const schedule = JSON.parse(warmup.schedule);
-        const nextDay = Math.min(warmup.currentDay + 1, schedule.length);
-        const nextDaySchedule = schedule.find((s: any) => s.day === nextDay);
-        const newLimit = nextDaySchedule ? nextDaySchedule.limit : -1;
-
-        await (prisma as any).domainWarmup.update({
-            where: { brandId },
-            data: {
-                currentDay: nextDay,
-                dailyLimit: newLimit === -1 ? 999999 : newLimit,
-                sentToday: 0,
-                lastResetAt: now,
-                isActive: nextDay <= schedule.length,
-            },
-        });
-
-        return newLimit;
-    }
-
-    return Math.max(0, warmup.dailyLimit - warmup.sentToday);
-}
-
-// Increment the sent counter
-export async function incrementWarmupSent(brandId: string, count: number) {
-    await (prisma as any).domainWarmup.update({
-        where: { brandId },
-        data: { sentToday: { increment: count } },
-    });
-}

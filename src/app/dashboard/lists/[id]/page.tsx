@@ -24,8 +24,8 @@ export default async function ListPage({ params, searchParams }: { params: Promi
     const SUBSCRIBERS_PER_PAGE = 50;
 
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
         : { id, brand: { users: { some: { id: userId } } } };

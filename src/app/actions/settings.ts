@@ -8,13 +8,13 @@ import { revalidatePath } from "next/cache";
 
 async function isAdmin() {
     const session = await getServerSession(authOptions);
-    return (session?.user as any)?.role === "admin";
+    return session?.user?.role === "admin";
 }
 
 export async function getSystemSettings() {
     if (!await isAdmin()) throw new Error("Unauthorized");
 
-    const settings = await (prisma as any).setting.findMany();
+    const settings = await prisma.setting.findMany();
     return settings.reduce((acc: Record<string, string>, s: any) => ({ ...acc, [s.key]: s.value }), {} as Record<string, string>);
 }
 
@@ -22,7 +22,7 @@ export async function updateSystemSettings(data: Record<string, string>) {
     if (!await isAdmin()) throw new Error("Unauthorized");
 
     for (const [key, value] of Object.entries(data)) {
-        await (prisma as any).setting.upsert({
+        await prisma.setting.upsert({
             where: { key },
             update: { value },
             create: { key, value },
@@ -37,8 +37,8 @@ export async function getSESQuota() {
     if (!await isAdmin()) throw new Error("Unauthorized");
 
     // Fetch settings from DB
-    const settings = await (prisma as any).setting.findMany();
-    const config = settings.reduce((acc: Record<string, string>, s: any) => ({ ...acc, [s.key]: s.value }), {} as Record<string, string>);
+    const settings = await prisma.setting.findMany();
+    const config = settings.reduce<Record<string, string>>((acc, s) => ({ ...acc, [s.key]: s.value }), {});
 
     const region = config.AWS_REGION || process.env.AWS_REGION || "us-east-1";
     const accessKeyId = config.AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;

@@ -5,8 +5,8 @@ export const getSESClient = async () => {
     // Try to get from DB first
     let config: Record<string, string> = {};
     try {
-        const settings = await (prisma as any).setting.findMany();
-        config = settings.reduce((acc: any, s: any) => ({ ...acc, [s.key]: s.value }), {});
+        const settings = await prisma.setting.findMany();
+        config = settings.reduce<Record<string, string>>((acc, s) => ({ ...acc, [s.key]: s.value }), {});
     } catch (e) {
         console.error("Failed to fetch SES settings from DB", e);
     }

@@ -338,7 +338,7 @@ export async function getEmailTemplates() {
 export async function getAllTemplates(includeCustom = true) {
     const builtIn = BUILT_IN_TEMPLATES.map(t => ({
         ...t,
-        isCustom: false,
+        isCustom: false as const,
         createdAt: null,
         userName: null,
     }));
@@ -346,8 +346,8 @@ export async function getAllTemplates(includeCustom = true) {
     if (!includeCustom) return builtIn;
 
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) return builtIn;
 
@@ -355,20 +355,20 @@ export async function getAllTemplates(includeCustom = true) {
         ? {} // Admin sees all custom templates
         : { OR: [{ userId }, { isPublic: true }] };
 
-    const custom = await (prisma as any).emailTemplate.findMany({
+    const custom = await prisma.emailTemplate.findMany({
         where,
         include: { user: { select: { name: true, email: true } } },
         orderBy: { createdAt: "desc" },
     });
 
-    const customMapped = custom.map((t: any) => ({
+    const customMapped = custom.map(t => ({
         id: t.id,
         name: t.name,
         category: t.category,
         description: t.description || "",
         html: t.html,
-        builtIn: false,
-        isCustom: true,
+        builtIn: false as const,
+        isCustom: true as const,
         isPublic: t.isPublic,
         createdAt: t.createdAt,
         userName: t.user?.name || t.user?.email,
@@ -387,10 +387,10 @@ export async function saveTemplate(data: {
     brandId?: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const template = await (prisma as any).emailTemplate.create({
+    const template = await prisma.emailTemplate.create({
         data: {
             name: data.name,
             category: data.category || "Custom",
@@ -408,28 +408,28 @@ export async function saveTemplate(data: {
 
 export async function deleteTemplate(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, userId };
-    const template = await (prisma as any).emailTemplate.findFirst({ where });
+    const template = await prisma.emailTemplate.findFirst({ where });
     if (!template) throw new Error("Template not found");
 
-    await (prisma as any).emailTemplate.delete({ where: { id } });
+    await prisma.emailTemplate.delete({ where: { id } });
     revalidatePath("/dashboard/templates");
 }
 
 export async function getTemplateById(id: string) {
     // Check built-in first
     const builtIn = BUILT_IN_TEMPLATES.find(t => t.id === id);
-    if (builtIn) return { ...builtIn, isCustom: false };
+    if (builtIn) return { ...builtIn, isCustom: false as const };
 
-    const template = await (prisma as any).emailTemplate.findUnique({
+    const template = await prisma.emailTemplate.findUnique({
         where: { id },
     });
     if (!template) throw new Error("Template not found");
-    return { ...template, isCustom: true };
+    return { ...template, isCustom: true as const };
 }
 
 export async function updateTemplate(id: string, data: {
@@ -440,16 +440,16 @@ export async function updateTemplate(id: string, data: {
     isPublic?: boolean;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     // Verify ownership or admin
     const where: any = role === "admin" ? { id } : { id, userId };
-    const existing = await (prisma as any).emailTemplate.findFirst({ where });
+    const existing = await prisma.emailTemplate.findFirst({ where });
     if (!existing) throw new Error("Template not found or unauthorized");
 
-    const template = await (prisma as any).emailTemplate.update({
+    const template = await prisma.emailTemplate.update({
         where: { id },
         data: {
             name: data.name,

@@ -7,8 +7,8 @@ import { WarmupCard } from "@/components/settings/warmup-card";
 
 export default async function WarmupPage() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     const brandsWhere: any = currentUserRole === "admin"
         ? undefined

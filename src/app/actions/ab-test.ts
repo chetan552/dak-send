@@ -7,10 +7,10 @@ import { revalidatePath } from "next/cache";
 
 export async function getAbTestVariants(campaignId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    return await (prisma as any).abTestVariant.findMany({
+    return await prisma.abTestVariant.findMany({
         where: { campaignId },
         orderBy: { createdAt: "asc" },
     });
@@ -18,8 +18,8 @@ export async function getAbTestVariants(campaignId: string) {
 
 export async function createAbTestVariant(campaignId: string, formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const whereCondition: any = currentUserRole === "admin"
@@ -36,7 +36,7 @@ export async function createAbTestVariant(campaignId: string, formData: FormData
 
     if (!name) throw new Error("Variant name is required");
 
-    await (prisma as any).abTestVariant.create({
+    await prisma.abTestVariant.create({
         data: {
             campaignId,
             name,
@@ -52,31 +52,31 @@ export async function createAbTestVariant(campaignId: string, formData: FormData
 
 export async function deleteAbTestVariant(variantId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    await (prisma as any).abTestVariant.delete({ where: { id: variantId } });
+    await prisma.abTestVariant.delete({ where: { id: variantId } });
     return { success: true };
 }
 
 export async function pickAbTestWinner(variantId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const variant = await (prisma as any).abTestVariant.findUnique({
+    const variant = await prisma.abTestVariant.findUnique({
         where: { id: variantId },
     });
 
     if (!variant) throw new Error("Variant not found");
 
     // Mark all variants as not winner, then mark this one
-    await (prisma as any).abTestVariant.updateMany({
+    await prisma.abTestVariant.updateMany({
         where: { campaignId: variant.campaignId },
         data: { isWinner: false },
     });
 
-    await (prisma as any).abTestVariant.update({
+    await prisma.abTestVariant.update({
         where: { id: variantId },
         data: { isWinner: true },
     });
@@ -99,25 +99,25 @@ export async function pickAbTestWinner(variantId: string) {
 
 export async function getAbTestResults(campaignId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const variants = await (prisma as any).abTestVariant.findMany({
+    const variants = await prisma.abTestVariant.findMany({
         where: { campaignId },
         orderBy: { createdAt: "asc" },
     });
 
     const results = [];
     for (const variant of variants) {
-        const totalSent = await (prisma as any).campaignSend.count({
+        const totalSent = await prisma.campaignSend.count({
             where: { campaignId, abVariantId: variant.id, status: "sent" },
         });
 
-        const totalOpened = await (prisma as any).campaignSend.count({
+        const totalOpened = await prisma.campaignSend.count({
             where: { campaignId, abVariantId: variant.id, openedAt: { not: null } },
         });
 
-        const totalClicked = await (prisma as any).campaignSend.count({
+        const totalClicked = await prisma.campaignSend.count({
             where: { campaignId, abVariantId: variant.id, clickedAt: { not: null } },
         });
 

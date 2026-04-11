@@ -13,10 +13,10 @@ import { DeleteBrandButton } from "@/components/brand/delete-brand-button";
 export default async function BrandPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const currentUserRole = session?.user?.role || "user";
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
-        : { id, users: { some: { id: (session?.user as any)?.id } } };
+        : { id, users: { some: { id: session?.user?.id } } };
 
     const brand = await prisma.brand.findFirst({
         where: whereCondition,

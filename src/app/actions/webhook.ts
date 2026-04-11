@@ -9,15 +9,15 @@ import { isSafeWebhookUrl } from "@/lib/validators";
 
 export async function getWebhooks() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where = role === "admin"
         ? {}
         : { brand: { users: { some: { id: userId } } } };
 
-    return (prisma as any).webhook.findMany({
+    return prisma.webhook.findMany({
         where,
         include: { brand: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
@@ -32,14 +32,14 @@ export async function createWebhook(data: {
     secret?: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
     if (!isSafeWebhookUrl(data.url)) {
         throw new Error("Invalid or blocked webhook URL");
     }
 
-    const webhook = await (prisma as any).webhook.create({
+    const webhook = await prisma.webhook.create({
         data: {
             name: data.name,
             url: data.url,
@@ -56,15 +56,15 @@ export async function createWebhook(data: {
 
 export async function toggleWebhook(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    const webhook = await (prisma as any).webhook.findFirst({ where });
+    const webhook = await prisma.webhook.findFirst({ where });
     if (!webhook) throw new Error("Not found");
 
-    await (prisma as any).webhook.update({
+    await prisma.webhook.update({
         where: { id },
         data: { active: !webhook.active },
     });
@@ -74,26 +74,26 @@ export async function toggleWebhook(id: string) {
 
 export async function deleteWebhook(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    const webhook = await (prisma as any).webhook.findFirst({ where });
+    const webhook = await prisma.webhook.findFirst({ where });
     if (!webhook) throw new Error("Not found");
 
-    await (prisma as any).webhook.delete({ where: { id } });
+    await prisma.webhook.delete({ where: { id } });
     revalidatePath("/dashboard/settings/webhooks");
 }
 
 export async function testWebhook(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    const webhook = await (prisma as any).webhook.findFirst({ where });
+    const webhook = await prisma.webhook.findFirst({ where });
     if (!webhook) throw new Error("Not found");
     if (!isSafeWebhookUrl(webhook.url)) throw new Error("Invalid or blocked webhook URL");
 

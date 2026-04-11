@@ -7,8 +7,8 @@ import { prisma } from "@/lib/prisma";
 // Get high-level overview stats across all campaigns the user has access to
 export async function getOverviewStats() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -37,19 +37,19 @@ export async function getOverviewStats() {
         };
     }
 
-    const totalSent = await (prisma as any).campaignSend.count({
+    const totalSent = await prisma.campaignSend.count({
         where: { campaignId: { in: campaignIds }, status: "sent" },
     });
-    const totalOpened = await (prisma as any).campaignSend.count({
+    const totalOpened = await prisma.campaignSend.count({
         where: { campaignId: { in: campaignIds }, openedAt: { not: null } },
     });
-    const totalClicked = await (prisma as any).campaignSend.count({
+    const totalClicked = await prisma.campaignSend.count({
         where: { campaignId: { in: campaignIds }, clickedAt: { not: null } },
     });
-    const totalBounced = await (prisma as any).campaignSend.count({
+    const totalBounced = await prisma.campaignSend.count({
         where: { campaignId: { in: campaignIds }, status: "bounced" },
     });
-    const totalComplaints = await (prisma as any).campaignSend.count({
+    const totalComplaints = await prisma.campaignSend.count({
         where: { campaignId: { in: campaignIds }, status: "complained" },
     });
 
@@ -69,8 +69,8 @@ export async function getOverviewStats() {
 // Get per-campaign metrics for the comparison table
 export async function getCampaignPerformanceTable() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -89,16 +89,16 @@ export async function getCampaignPerformanceTable() {
 
     const results = await Promise.all(
         campaigns.map(async (campaign) => {
-            const sent = await (prisma as any).campaignSend.count({
+            const sent = await prisma.campaignSend.count({
                 where: { campaignId: campaign.id, status: "sent" },
             });
-            const opened = await (prisma as any).campaignSend.count({
+            const opened = await prisma.campaignSend.count({
                 where: { campaignId: campaign.id, openedAt: { not: null } },
             });
-            const clicked = await (prisma as any).campaignSend.count({
+            const clicked = await prisma.campaignSend.count({
                 where: { campaignId: campaign.id, clickedAt: { not: null } },
             });
-            const bounced = await (prisma as any).campaignSend.count({
+            const bounced = await prisma.campaignSend.count({
                 where: { campaignId: campaign.id, status: "bounced" },
             });
 
@@ -126,8 +126,8 @@ export async function getCampaignPerformanceTable() {
 // Get daily activity data for area chart (last N days)
 export async function getActivityOverTime(days: number = 30) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -146,7 +146,7 @@ export async function getActivityOverTime(days: number = 30) {
     startDate.setHours(0, 0, 0, 0);
 
     // Get all sends within the date range
-    const sends = await (prisma as any).campaignSend.findMany({
+    const sends = await prisma.campaignSend.findMany({
         where: {
             campaignId: { in: campaignIds },
             createdAt: { gte: startDate },
@@ -190,8 +190,8 @@ export async function getActivityOverTime(days: number = 30) {
 // Get top clicked links for a specific campaign
 export async function getTopLinks(campaignId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -202,7 +202,7 @@ export async function getTopLinks(campaignId: string) {
     const campaign = await prisma.campaign.findFirst({ where: campaignWhere });
     if (!campaign) throw new Error("Campaign not found");
 
-    const clicks = await (prisma as any).campaignClick.findMany({
+    const clicks = await prisma.campaignClick.findMany({
         where: { campaignId },
         select: { url: true, subscriberEmail: true },
     });
@@ -231,8 +231,8 @@ export async function getTopLinks(campaignId: string) {
 // Get open/click activity timeline for a specific campaign
 export async function getCampaignTimeline(campaignId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -243,7 +243,7 @@ export async function getCampaignTimeline(campaignId: string) {
     const campaign = await prisma.campaign.findFirst({ where: campaignWhere });
     if (!campaign) throw new Error("Campaign not found");
 
-    const sends = await (prisma as any).campaignSend.findMany({
+    const sends = await prisma.campaignSend.findMany({
         where: { campaignId },
         select: { openedAt: true, clickedAt: true, sentAt: true },
     });

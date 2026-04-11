@@ -11,9 +11,9 @@ import { DuplicateCampaignButton } from "@/components/campaign/duplicate-campaig
 
 export default async function CampaignsPage() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
 
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const currentUserRole = session?.user?.role || "user";
 
     const campaigns = await prisma.campaign.findMany({
         where: currentUserRole === 'admin'

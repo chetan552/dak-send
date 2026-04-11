@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         const now = new Date();
 
         // Find all active enrollments that are due for processing
-        const dueEnrollments = await (prisma as any).automationEnrollment.findMany({
+        const dueEnrollments = await prisma.automationEnrollment.findMany({
             where: {
                 status: "active",
                 nextProcessAt: { lte: now },
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
                 // Skip if automation is no longer active
                 if (automation.status !== "active") {
-                    await (prisma as any).automationEnrollment.update({
+                    await prisma.automationEnrollment.update({
                         where: { id: enrollment.id },
                         data: { status: "paused" },
                     });
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
                 if (!currentStep) {
                     // No current step — mark as completed
-                    await (prisma as any).automationEnrollment.update({
+                    await prisma.automationEnrollment.update({
                         where: { id: enrollment.id },
                         data: { status: "completed", completedAt: now },
                     });
@@ -74,18 +74,35 @@ export async function GET(req: NextRequest) {
                     const subscriberName = subscriber?.name || "";
                     const listId = subscriber?.listId || automation.triggerListId;
 
-                    // Create a temporary campaign-like structure for the worker
-                    // We use the automation email queue which uses the same worker
                     const trackingBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+                    // Fetch custom fields scoped to the subscriber's list
+                    const customFieldMap: Record<string, string> = {};
+                    if (subscriber) {
+                        const cfValues = await prisma.subscriberFieldValue.findMany({
+                            where: { subscriber: { id: subscriber.id, listId } },
+                            include: { customField: true },
+                        });
+                        for (const cfv of cfValues) {
+                            customFieldMap[cfv.customField.name] = cfv.value;
+                        }
+                    }
 
                     // Process HTML personalization
                     let processedHtml = (currentStep.emailHtml || "")
                         .replace(/\[Name\]/gi, subscriberName || "Friend")
                         .replace(/\[Email\]/gi, subscriberEmail);
 
+                    // Replace [CustomField:FieldName] tags
+                    processedHtml = processedHtml.replace(/\[CustomField:([^\]]+)\]/gi, (_match, fieldName: string) => {
+                        const key = Object.keys(customFieldMap).find(k => k.toLowerCase() === fieldName.toLowerCase());
+                        return key ? customFieldMap[key] : "";
+                    });
+
                     // Add unsubscribe link
                     if (subscriber) {
                         const unsubscribeUrl = `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriber.id)}&l=${encodeURIComponent(listId)}`;
+                        processedHtml = processedHtml.replace(/\[UnsubscribeUrl\]/gi, unsubscribeUrl);
                         processedHtml = processedHtml.replace(/\[Unsubscribe\]/gi, `<a href="${unsubscribeUrl}">Unsubscribe</a>`);
                     }
 
@@ -113,7 +130,7 @@ export async function GET(req: NextRequest) {
 
                 if (nextIndex >= steps.length) {
                     // No more steps — mark as completed
-                    await (prisma as any).automationEnrollment.update({
+                    await prisma.automationEnrollment.update({
                         where: { id: enrollment.id },
                         data: {
                             status: "completed",
@@ -130,7 +147,7 @@ export async function GET(req: NextRequest) {
                         nextProcessAt = new Date(now.getTime() + (nextStep.delayMinutes || 0) * 60 * 1000);
                     }
 
-                    await (prisma as any).automationEnrollment.update({
+                    await prisma.automationEnrollment.update({
                         where: { id: enrollment.id },
                         data: {
                             currentStepId: nextStep.id,

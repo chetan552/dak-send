@@ -19,7 +19,7 @@ export async function dispatchWebhooks(event: WebhookEvent, data: Record<string,
         const where: any = { active: true, events: { has: event } };
         if (brandId) where.brandId = brandId;
 
-        const webhooks = await (prisma as any).webhook.findMany({ where });
+        const webhooks = await prisma.webhook.findMany({ where });
 
         if (webhooks.length === 0) return;
 

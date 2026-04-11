@@ -1,16 +1,15 @@
-import { Worker, Job, QueueEvents } from "bullmq";
+import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "./prisma";
 import { sendEmail } from "./aws";
-
-const prisma = new PrismaClient();
+import { incrementWarmupSent } from "./warmup";
 const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
 });
 
 const getSendRate = async () => {
     try {
-        const setting = await (prisma as any).setting.findUnique({ where: { key: "SEND_RATE" } });
+        const setting = await prisma.setting.findUnique({ where: { key: "SEND_RATE" } });
         return parseInt(setting?.value || "14", 10);
     } catch (e) {
         return 14;
@@ -63,9 +62,11 @@ const startWorker = async () => {
 
         const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/unsubscribe?i=${encodeURIComponent(subscriberId)}&l=${encodeURIComponent(listId)}`;
 
-        // Fetch custom fields for this subscriber across all their lists
-        const subscriberCustomFields = await (prisma as any).subscriberFieldValue.findMany({
-            where: { subscriber: { email: subscriberEmail } },
+        // Fetch custom fields for this subscriber scoped to the list being sent to.
+        // Querying by email alone would leak values from other lists if the same
+        // subscriber has different custom field values across brands.
+        const subscriberCustomFields = await prisma.subscriberFieldValue.findMany({
+            where: { subscriber: { email: subscriberEmail, listId } },
             include: { customField: true }
         });
 
@@ -135,17 +136,18 @@ const startWorker = async () => {
                         Body: { Html: { Data: processedHtml } }
                     }
                 },
-                ListManagementOptions: {
-                    ListUnsubscribePost: "List-Unsubscribe=One-Click"
-                },
-                // Add custom headers for List-Unsubscribe
                 EmailTags: [
                     { Name: "campaign_id", Value: campaignId }
                 ]
-            } as any); // SESv2 requires setting headers a bit differently if we want raw custom headers, or we can just rely on AWS SES doing it automatically if configured, or use Raw content. Let's see if we can use ListUnsubscribePost or if we need Raw/Templated. We'll use ListManagementOptions mostly, but actually SESv2 allows Header configuration or EmailTags. Wait, SESv2 SendEmail Simple does not support Headers directly. Let's send ListUnsubscribe as a standard header by formatting it properly. Actually it's easier to use Raw or just standard content. Actually, let's fix the type below.
+            });
+
+            // Track against warmup daily limit (fire-and-forget, non-fatal)
+            incrementWarmupSent(campaign.brandId).catch(e =>
+                console.error("Failed to increment warmup counter:", e)
+            );
 
             // Record successful send
-            await (prisma as any).campaignSend.upsert({
+            await prisma.campaignSend.upsert({
                 where: {
                     campaignId_subscriberEmail: {
                         campaignId,
@@ -163,7 +165,7 @@ const startWorker = async () => {
             });
         } catch (sendError: any) {
             // Record failed send
-            await (prisma as any).campaignSend.upsert({
+            await prisma.campaignSend.upsert({
                 where: {
                     campaignId_subscriberEmail: {
                         campaignId,
@@ -198,9 +200,6 @@ const startWorker = async () => {
         console.error(`Job ${job?.id} has failed with ${err.message}`);
     });
 
-    // Listen for queue completion to transition campaign status
-    const queueEvents = new QueueEvents("email-queue", { connection: connection.duplicate() });
-
     // Check periodically for campaigns that have finished sending
     setInterval(async () => {
         try {
@@ -209,11 +208,11 @@ const startWorker = async () => {
             });
 
             for (const campaign of sendingCampaigns) {
-                const totalSends = await (prisma as any).campaignSend.count({
+                const totalSends = await prisma.campaignSend.count({
                     where: { campaignId: campaign.id }
                 });
 
-                const pendingSends = await (prisma as any).campaignSend.count({
+                const pendingSends = await prisma.campaignSend.count({
                     where: { campaignId: campaign.id, status: "queued" }
                 });
 

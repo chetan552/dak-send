@@ -6,8 +6,8 @@ import { prisma } from "@/lib/prisma";
 
 export async function getCampaignStats(campaignId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -21,31 +21,31 @@ export async function getCampaignStats(campaignId: string) {
 
     if (!campaign) throw new Error("Campaign not found or unauthorized");
 
-    const totalSent = await (prisma as any).campaignSend.count({
+    const totalSent = await prisma.campaignSend.count({
         where: { campaignId, status: "sent" }
     });
 
-    const totalFailed = await (prisma as any).campaignSend.count({
+    const totalFailed = await prisma.campaignSend.count({
         where: { campaignId, status: "failed" }
     });
 
-    const totalBounced = await (prisma as any).campaignSend.count({
+    const totalBounced = await prisma.campaignSend.count({
         where: { campaignId, status: "bounced" }
     });
 
-    const totalComplained = await (prisma as any).campaignSend.count({
+    const totalComplained = await prisma.campaignSend.count({
         where: { campaignId, status: "complained" }
     });
 
-    const totalOpened = await (prisma as any).campaignSend.count({
+    const totalOpened = await prisma.campaignSend.count({
         where: { campaignId, openedAt: { not: null } }
     });
 
-    const totalClicked = await (prisma as any).campaignSend.count({
+    const totalClicked = await prisma.campaignSend.count({
         where: { campaignId, clickedAt: { not: null } }
     });
 
-    const totalQueued = await (prisma as any).campaignSend.count({
+    const totalQueued = await prisma.campaignSend.count({
         where: { campaignId, status: "queued" }
     });
 
@@ -69,8 +69,8 @@ export async function getCampaignStats(campaignId: string) {
 
 export async function getListStats(listId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 

@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const subToken = await (prisma as any).subscriptionToken.findUnique({
+        const subToken = await prisma.subscriptionToken.findUnique({
             where: { token },
             include: { subscriber: { include: { list: { include: { brand: true } } } } }
         });
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (subToken.expiresAt < new Date()) {
-            await (prisma as any).subscriptionToken.delete({ where: { id: subToken.id } });
+            await prisma.subscriptionToken.delete({ where: { id: subToken.id } });
             return NextResponse.json({ error: "Token has expired. Please subscribe again." }, { status: 410 });
         }
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         });
 
         // Clean up the used token
-        await (prisma as any).subscriptionToken.delete({ where: { id: subToken.id } });
+        await prisma.subscriptionToken.delete({ where: { id: subToken.id } });
 
         // Send welcome email if configured
         const list = subToken.subscriber.list;
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
         // Trigger automations for confirmed subscriber
         try {
-            const activeAutomations = await (prisma as any).automation.findMany({
+            const activeAutomations = await prisma.automation.findMany({
                 where: {
                     triggerListId: list.id,
                     trigger: "subscriber_confirmed",
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
                 }
 
                 try {
-                    await (prisma as any).automationEnrollment.create({
+                    await prisma.automationEnrollment.create({
                         data: {
                             automationId: automation.id,
                             subscriberEmail: subToken.subscriber.email,

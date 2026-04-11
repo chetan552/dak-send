@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
 import { randomBytes } from "crypto";
 import { dispatchWebhooks } from "@/lib/webhooks";
+import { redis } from "@/lib/queue";
+
+const RATE_LIMIT_WINDOW_SEC = 60;
+const MAX_REQUESTS_PER_WINDOW = 10;
 
 export async function OPTIONS() {
     return NextResponse.json({}, {
@@ -14,33 +18,25 @@ export async function OPTIONS() {
     });
 }
 
-const rateLimitMap = new Map<string, { count: number, resetAt: number }>();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 10;
-
 export async function POST(req: NextRequest) {
     try {
         const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
         if (ip !== "unknown") {
-            const now = Date.now();
-            const record = rateLimitMap.get(ip);
-            if (record) {
-                if (now > record.resetAt) {
-                    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-                } else {
-                    if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-                        return NextResponse.json({ error: "Too many requests. Please try again later." }, {
-                            status: 429,
-                            headers: {
-                                "Access-Control-Allow-Origin": "*",
-                                "Retry-After": Math.ceil((record.resetAt - now) / 1000).toString()
-                            }
-                        });
+            const key = `subscribe:ratelimit:${ip}`;
+            const count = await redis.incr(key);
+            if (count === 1) {
+                // First request in this window — set TTL
+                await redis.expire(key, RATE_LIMIT_WINDOW_SEC);
+            }
+            if (count > MAX_REQUESTS_PER_WINDOW) {
+                const ttl = await redis.ttl(key);
+                return NextResponse.json({ error: "Too many requests. Please try again later." }, {
+                    status: 429,
+                    headers: {
+                        "Access-Control-Allow-Origin": "*",
+                        "Retry-After": String(ttl > 0 ? ttl : RATE_LIMIT_WINDOW_SEC),
                     }
-                    record.count++;
-                }
-            } else {
-                rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+                });
             }
         }
 
@@ -175,7 +171,7 @@ export async function POST(req: NextRequest) {
             const token = randomBytes(32).toString("hex");
             const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
 
-            await (prisma as any).subscriptionToken.create({
+            await prisma.subscriptionToken.create({
                 data: {
                     token,
                     subscriberId: subscriber.id,
@@ -247,7 +243,7 @@ export async function POST(req: NextRequest) {
 
         // Trigger automations for new subscriber
         try {
-            const activeAutomations = await (prisma as any).automation.findMany({
+            const activeAutomations = await prisma.automation.findMany({
                 where: {
                     triggerListId: listId,
                     trigger: isDoubleOptIn ? "subscriber_confirmed" : "subscriber_added",
@@ -268,7 +264,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 try {
-                    await (prisma as any).automationEnrollment.create({
+                    await prisma.automationEnrollment.create({
                         data: {
                             automationId: automation.id,
                             subscriberEmail: email,

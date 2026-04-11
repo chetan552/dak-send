@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 
 export async function importSubscribersAction(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) {
         throw new Error("Unauthorized");
@@ -38,7 +38,7 @@ export async function importSubscribersAction(formData: FormData) {
     let importedCount = 0;
 
     // Fetch list custom fields to validate against and avoid querying inside the loop
-    const listCustomFields = await (prisma as any).customField.findMany({
+    const listCustomFields = await prisma.customField.findMany({
         where: { listId }
     });
 
@@ -72,7 +72,7 @@ export async function importSubscribersAction(formData: FormData) {
                     const customFieldDef = listCustomFields.find((cf: any) => cf.id === cfId);
 
                     if (customFieldDef) {
-                        await (prisma as any).subscriberFieldValue.upsert({
+                        await prisma.subscriberFieldValue.upsert({
                             where: {
                                 subscriberId_customFieldId: {
                                     subscriberId: dbSub.id,
@@ -102,8 +102,8 @@ export async function importSubscribersAction(formData: FormData) {
 
 export async function deleteSubscriber(id: string, listId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const whereCondition: any = currentUserRole === 'admin'
@@ -125,8 +125,8 @@ export async function deleteSubscriber(id: string, listId: string) {
 
 export async function deleteSubscribers(listId: string, subscriberIds: string[]) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
     if (!Array.isArray(subscriberIds) || subscriberIds.length === 0) throw new Error("No subscribers selected");
 
@@ -153,8 +153,8 @@ export async function deleteSubscribers(listId: string, subscriberIds: string[])
 
 export async function unsubscribeSubscriber(id: string, listId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const whereCondition: any = currentUserRole === 'admin'
@@ -177,8 +177,8 @@ export async function unsubscribeSubscriber(id: string, listId: string) {
 
 export async function addSubscriberAction(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const listId = formData.get("listId") as string;
@@ -254,8 +254,8 @@ export async function addSubscriberAction(formData: FormData) {
 
 export async function updateSubscriberAction(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const subscriberId = formData.get("subscriberId") as string;

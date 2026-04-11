@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 
 export async function createList(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) {
         throw new Error("Unauthorized");
@@ -56,8 +56,8 @@ export async function updateListSettings(listId: string, data: {
     goodbyeEmailHtml?: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 

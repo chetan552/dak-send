@@ -7,8 +7,8 @@ import { sendEmail } from "@/lib/aws";
 
 export async function sendTestEmail(campaignId: string, testEmail: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -56,8 +56,8 @@ export async function scheduleCampaign(campaignId: string, scheduledAt: string, 
     excludedSegments: string[];
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -78,7 +78,7 @@ export async function scheduleCampaign(campaignId: string, scheduledAt: string, 
         throw new Error("Scheduled time must be in the future");
     }
 
-    await (prisma as any).campaign.update({
+    await prisma.campaign.update({
         where: { id: campaignId },
         data: {
             status: "scheduled",

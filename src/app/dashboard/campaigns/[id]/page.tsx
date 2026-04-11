@@ -15,10 +15,10 @@ import { TestSendButton } from "@/components/campaign/test-send-button";
 export default async function CampaignDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const currentUserRole = session?.user?.role || "user";
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
-        : { id, brand: { users: { some: { id: (session?.user as any)?.id } } } };
+        : { id, brand: { users: { some: { id: session?.user?.id } } } };
 
     const campaign = await prisma.campaign.findFirst({
         where: whereCondition,
@@ -27,7 +27,7 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
 
     if (!campaign) notFound();
 
-    const brandsQuery: any = currentUserRole !== 'admin' ? { users: { some: { id: (session?.user as any)?.id } } } : undefined;
+    const brandsQuery: any = currentUserRole !== 'admin' ? { users: { some: { id: session?.user?.id } } } : undefined;
     const brands = await prisma.brand.findMany({
         where: brandsQuery,
     });

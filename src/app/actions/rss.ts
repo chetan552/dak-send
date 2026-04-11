@@ -32,8 +32,8 @@ const DEFAULT_RSS_TEMPLATE = `<!DOCTYPE html>
 
 export async function getRssFeeds() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -41,7 +41,7 @@ export async function getRssFeeds() {
         ? {}
         : { brand: { users: { some: { id: userId } } } };
 
-    return await (prisma as any).rssFeed.findMany({
+    return await prisma.rssFeed.findMany({
         where: whereCondition,
         include: { brand: true },
         orderBy: { createdAt: "desc" },
@@ -50,8 +50,8 @@ export async function getRssFeeds() {
 
 export async function createRssFeed(formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -79,7 +79,7 @@ export async function createRssFeed(formData: FormData) {
 
     const listIds = listIdsStr ? listIdsStr.split(",").filter(Boolean) : [];
 
-    await (prisma as any).rssFeed.create({
+    await prisma.rssFeed.create({
         data: {
             name,
             url,
@@ -95,8 +95,8 @@ export async function createRssFeed(formData: FormData) {
 
 export async function deleteRssFeed(feedId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -104,10 +104,10 @@ export async function deleteRssFeed(feedId: string) {
         ? { id: feedId }
         : { id: feedId, brand: { users: { some: { id: userId } } } };
 
-    const feed = await (prisma as any).rssFeed.findFirst({ where: whereCondition });
+    const feed = await prisma.rssFeed.findFirst({ where: whereCondition });
     if (!feed) throw new Error("Feed not found or unauthorized");
 
-    await (prisma as any).rssFeed.delete({ where: { id: feedId } });
+    await prisma.rssFeed.delete({ where: { id: feedId } });
 
     revalidatePath("/dashboard/rss");
     return { success: true };
@@ -115,8 +115,8 @@ export async function deleteRssFeed(feedId: string) {
 
 export async function toggleRssFeed(feedId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -124,10 +124,10 @@ export async function toggleRssFeed(feedId: string) {
         ? { id: feedId }
         : { id: feedId, brand: { users: { some: { id: userId } } } };
 
-    const feed = await (prisma as any).rssFeed.findFirst({ where: whereCondition });
+    const feed = await prisma.rssFeed.findFirst({ where: whereCondition });
     if (!feed) throw new Error("Feed not found or unauthorized");
 
-    await (prisma as any).rssFeed.update({
+    await prisma.rssFeed.update({
         where: { id: feedId },
         data: { isActive: !feed.isActive },
     });
@@ -138,8 +138,8 @@ export async function toggleRssFeed(feedId: string) {
 
 export async function updateRssFeed(feedId: string, formData: FormData) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -147,7 +147,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
         ? { id: feedId }
         : { id: feedId, brand: { users: { some: { id: userId } } } };
 
-    const feed = await (prisma as any).rssFeed.findFirst({ where: whereCondition });
+    const feed = await prisma.rssFeed.findFirst({ where: whereCondition });
     if (!feed) throw new Error("Feed not found or unauthorized");
 
     const name = formData.get("name") as string;
@@ -168,7 +168,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
         data.templateHtml = templateHtml || null;
     }
 
-    await (prisma as any).rssFeed.update({ where: { id: feedId }, data });
+    await prisma.rssFeed.update({ where: { id: feedId }, data });
 
     revalidatePath("/dashboard/rss");
     return { success: true };
@@ -176,7 +176,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
 
 // Called by the cron endpoint to check all active feeds
 export async function checkRssFeeds() {
-    const feeds = await (prisma as any).rssFeed.findMany({
+    const feeds = await prisma.rssFeed.findMany({
         where: { isActive: true },
         include: { brand: true },
     });
@@ -194,7 +194,7 @@ export async function checkRssFeeds() {
             const parsedFeed = await parser.parseURL(feed.url);
 
             if (!parsedFeed.items || parsedFeed.items.length === 0) {
-                await (prisma as any).rssFeed.update({
+                await prisma.rssFeed.update({
                     where: { id: feed.id },
                     data: { lastCheckedAt: new Date() },
                 });
@@ -207,7 +207,7 @@ export async function checkRssFeeds() {
 
             if (itemGuid === feed.lastItemGuid) {
                 // No new items
-                await (prisma as any).rssFeed.update({
+                await prisma.rssFeed.update({
                     where: { id: feed.id },
                     data: { lastCheckedAt: new Date() },
                 });
@@ -238,7 +238,7 @@ export async function checkRssFeeds() {
             });
 
             // Update feed
-            await (prisma as any).rssFeed.update({
+            await prisma.rssFeed.update({
                 where: { id: feed.id },
                 data: {
                     lastCheckedAt: new Date(),

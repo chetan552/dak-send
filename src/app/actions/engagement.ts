@@ -8,8 +8,8 @@ import { revalidatePath } from "next/cache";
 // Automatically segment subscribers based on open/click engagement
 export async function generateEngagementSegments(listId: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const currentUserRole = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
 
     if (!userId) throw new Error("Unauthorized");
 
@@ -32,14 +32,14 @@ export async function generateEngagementSegments(listId: string) {
     const engagement: { email: string; opens: number; clicks: number }[] = [];
 
     for (const sub of subscribers) {
-        const opens = await (prisma as any).campaignSend.count({
+        const opens = await prisma.campaignSend.count({
             where: {
                 subscriberEmail: sub.email,
                 openedAt: { not: null, gte: thirtyDaysAgo }
             }
         });
 
-        const clicks = await (prisma as any).campaignSend.count({
+        const clicks = await prisma.campaignSend.count({
             where: {
                 subscriberEmail: sub.email,
                 clickedAt: { not: null, gte: thirtyDaysAgo }
@@ -76,17 +76,17 @@ export async function generateEngagementSegments(listId: string) {
 
     for (const seg of segments) {
         // Upsert by name + listId to avoid duplicates
-        const existing = await (prisma as any).segment.findFirst({
+        const existing = await prisma.segment.findFirst({
             where: { listId, name: seg.name }
         });
 
         if (existing) {
-            await (prisma as any).segment.update({
+            await prisma.segment.update({
                 where: { id: existing.id },
                 data: { query: seg.query, description: seg.description }
             });
         } else {
-            await (prisma as any).segment.create({
+            await prisma.segment.create({
                 data: { ...seg, listId }
             });
         }

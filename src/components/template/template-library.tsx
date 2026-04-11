@@ -17,14 +17,14 @@ interface Template {
     builtIn?: boolean;
     isCustom: boolean;
     isPublic?: boolean;
-    createdAt: string | null;
+    createdAt: Date | string | null;
     userName: string | null;
     userId?: string;
 }
 
 interface TemplateLibraryProps {
     templates: Template[];
-    currentUserId: string;
+    currentUserId: string | undefined;
     isAdmin: boolean;
 }
 

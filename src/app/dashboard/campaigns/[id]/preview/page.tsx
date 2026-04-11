@@ -11,8 +11,8 @@ export default async function CampaignPreviewPage({ params }: { params: Promise<
     const session = await getServerSession(authOptions);
     if (!session?.user) return null;
 
-    const userId = (session.user as any)?.id;
-    const role = (session.user as any)?.role || "user";
+    const userId = session.user?.id;
+    const role = session.user?.role || "user";
 
     const where: any = role === "admin"
         ? { id }

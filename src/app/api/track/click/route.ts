@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     if (campaignId && email) {
         try {
-            await (prisma as any).campaignSend.updateMany({
+            await prisma.campaignSend.updateMany({
                 where: {
                     campaignId,
                     subscriberEmail: email,
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
             });
 
             // Record individual click for URL-level analytics
-            await (prisma as any).campaignClick.create({
+            await prisma.campaignClick.create({
                 data: {
                     campaignId,
                     subscriberEmail: email,

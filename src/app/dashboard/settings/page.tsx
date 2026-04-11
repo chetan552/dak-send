@@ -20,8 +20,8 @@ export default async function SettingsPage() {
 
     if (!session?.user) return null;
 
-    const currentUserRole = (session.user as any)?.role || "user";
-    const currentUserId = (session.user as any)?.id;
+    const currentUserRole = session.user?.role || "user";
+    const currentUserId = session.user?.id;
 
     let allUsers: any[] = [];
     let allBrands: any[] = [];

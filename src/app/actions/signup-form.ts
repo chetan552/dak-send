@@ -9,15 +9,15 @@ import type { FormConfig } from "@/lib/form-config";
 
 export async function getSignupForms() {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where = role === "admin"
         ? {}
         : { brand: { users: { some: { id: userId } } } };
 
-    return (prisma as any).signupForm.findMany({
+    return prisma.signupForm.findMany({
         where,
         include: {
             brand: { select: { name: true } },
@@ -34,16 +34,16 @@ export async function createSignupForm(data: {
     listId: string;
 }) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
+    const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
     // Check slug uniqueness
-    const existing = await (prisma as any).signupForm.findUnique({
+    const existing = await prisma.signupForm.findUnique({
         where: { slug: data.slug },
     });
     if (existing) throw new Error("This URL slug is already taken.");
 
-    const form = await (prisma as any).signupForm.create({
+    const form = await prisma.signupForm.create({
         data: {
             name: data.name,
             slug: data.slug,
@@ -60,18 +60,18 @@ export async function createSignupForm(data: {
 
 export async function updateSignupForm(id: string, config: Partial<FormConfig>) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    const form = await (prisma as any).signupForm.findFirst({ where });
+    const form = await prisma.signupForm.findFirst({ where });
     if (!form) throw new Error("Form not found");
 
     const currentConfig = (form.config || {}) as Record<string, any>;
     const mergedConfig = { ...DEFAULT_FORM_CONFIG, ...currentConfig, ...config };
 
-    await (prisma as any).signupForm.update({
+    await prisma.signupForm.update({
         where: { id },
         data: { config: mergedConfig },
     });
@@ -82,15 +82,15 @@ export async function updateSignupForm(id: string, config: Partial<FormConfig>) 
 
 export async function updateSignupFormStatus(id: string, status: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    const form = await (prisma as any).signupForm.findFirst({ where });
+    const form = await prisma.signupForm.findFirst({ where });
     if (!form) throw new Error("Form not found");
 
-    await (prisma as any).signupForm.update({
+    await prisma.signupForm.update({
         where: { id },
         data: { status },
     });
@@ -100,26 +100,26 @@ export async function updateSignupFormStatus(id: string, status: string) {
 
 export async function deleteSignupForm(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    const form = await (prisma as any).signupForm.findFirst({ where });
+    const form = await prisma.signupForm.findFirst({ where });
     if (!form) throw new Error("Form not found");
 
-    await (prisma as any).signupForm.delete({ where: { id } });
+    await prisma.signupForm.delete({ where: { id } });
     revalidatePath("/dashboard/forms");
 }
 
 export async function getSignupFormById(id: string) {
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    const role = (session?.user as any)?.role || "user";
+    const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
 
     const where: any = role === "admin" ? { id } : { id, brand: { users: { some: { id: userId } } } };
-    return (prisma as any).signupForm.findFirst({
+    return prisma.signupForm.findFirst({
         where,
         include: {
             brand: { select: { name: true } },
@@ -130,7 +130,7 @@ export async function getSignupFormById(id: string) {
 
 // Public: get form by slug (no auth)
 export async function getSignupFormBySlug(slug: string) {
-    const form = await (prisma as any).signupForm.findUnique({
+    const form = await prisma.signupForm.findUnique({
         where: { slug },
         include: {
             brand: { select: { name: true } },
@@ -142,14 +142,14 @@ export async function getSignupFormBySlug(slug: string) {
 
 // Increment stats (no auth — called from public pages)
 export async function incrementFormViews(id: string) {
-    await (prisma as any).signupForm.update({
+    await prisma.signupForm.update({
         where: { id },
         data: { views: { increment: 1 } },
     });
 }
 
 export async function incrementFormSubmissions(id: string) {
-    await (prisma as any).signupForm.update({
+    await prisma.signupForm.update({
         where: { id },
         data: { submissions: { increment: 1 } },
     });
