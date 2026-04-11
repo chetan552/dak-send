@@ -1,0 +1,53 @@
+{
+  "name": "n8n-nodes-daksend",
+  "version": "0.1.0",
+  "description": "n8n community nodes for DakSend email platform",
+  "keywords": [
+    "n8n-community-node-package",
+    "daksend",
+    "email",
+    "newsletter"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/your-org/dak-send",
+  "author": {
+    "name": "DakSend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/dak-send"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json && npm run copy-icons",
+    "copy-icons": "copyfiles -u 1 \"nodes/**/*.{png,svg}\" dist/",
+    "dev": "tsc --project tsconfig.json --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials --ext .ts",
+    "prepublishOnly": "npm run build && npm run lint && npm run format"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/DakSendApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/DakSend.node.js",
+      "dist/nodes/DakSendTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^18.16.16",
+    "copyfiles": "^2.4.1",
+    "eslint": "^8.49.0",
+    "n8n-workflow": "*",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
