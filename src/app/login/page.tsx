@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,18 +15,28 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const res = await signIn("credentials", {
-            redirect: false,
-            email,
-            password,
-        });
-        if (res?.error) {
-            setError("Invalid credentials");
-        } else {
-            router.push("/dashboard");
+        setError("");
+        setLoading(true);
+        try {
+            const res = await signIn("credentials", {
+                redirect: false,
+                email,
+                password,
+            });
+            if (res?.error) {
+                setError("Invalid credentials");
+                setLoading(false);
+            } else {
+                router.push("/dashboard");
+                // Keep `loading` true during navigation so the button stays disabled
+            }
+        } catch {
+            setError("Something went wrong. Please try again.");
+            setLoading(false);
         }
     };
 
@@ -70,8 +81,19 @@ export default function LoginPage() {
                                 className="bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-600 focus-visible:ring-blue-500"
                             />
                         </div>
-                        <Button type="submit" className="w-full bg-white text-black hover:bg-zinc-200 transition-colors font-medium text-base h-11">
-                            Sign In
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-white text-black hover:bg-zinc-200 transition-colors font-medium text-base h-11 disabled:opacity-80"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Signing in...
+                                </>
+                            ) : (
+                                "Sign In"
+                            )}
                         </Button>
                     </form>
                 </CardContent>
