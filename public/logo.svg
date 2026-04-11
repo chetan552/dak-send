@@ -1,0 +1,30 @@
+<svg viewBox="0 0 200 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ds-logo-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="ds-logo-text" x1="56" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon mark -->
+  <rect width="48" height="48" rx="11" fill="url(#ds-logo-bg)"/>
+  <!-- Paper plane body -->
+  <path d="M10 35 L38 10 L27 39 Z" fill="white"/>
+  <!-- Wing fold shadow -->
+  <path d="M10 35 L23 25 L27 39 Z" fill="rgba(67,56,202,0.35)"/>
+  <!-- Fold crease -->
+  <line x1="23" y1="25" x2="38" y2="10" stroke="rgba(255,255,255,0.25)" stroke-width="0.9"/>
+  <!-- Wordmark -->
+  <text
+    x="62"
+    y="33"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    font-size="24"
+    font-weight="700"
+    letter-spacing="-0.6"
+    fill="url(#ds-logo-text)"
+  >DakSend</text>
+</svg>

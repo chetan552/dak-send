@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -35,12 +36,12 @@ export default function LoginPage() {
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none" />
 
             <Card className="w-full max-w-md z-10 border-zinc-800 bg-zinc-900/50 backdrop-blur-xl shadow-2xl">
-                <CardHeader className="space-y-1 pb-6">
-                    <CardTitle className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-                        <span className="bg-gradient-to-br from-blue-400 to-purple-500 text-transparent bg-clip-text">DakSend</span>
-                    </CardTitle>
+                <CardHeader className="space-y-3 pb-6">
+                    <div className="mb-1">
+                        <Image src="/logo.svg" alt="DakSend" width={150} height={36} priority />
+                    </div>
                     <CardDescription className="text-zinc-400 text-base">
-                        Enter your email and password to sign in to your self-hosted mailers.
+                        Enter your email and password to sign in to your self-hosted mailer.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
