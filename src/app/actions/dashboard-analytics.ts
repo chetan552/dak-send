@@ -12,12 +12,10 @@ export async function getOverviewStats() {
 
     if (!userId) throw new Error("Unauthorized");
 
-    const campaignWhere: any = role === "admin"
-        ? { status: "sent" }
-        : { status: "sent", brand: { users: { some: { id: userId } } } };
-
     const campaigns = await prisma.campaign.findMany({
-        where: campaignWhere,
+        where: role === "admin"
+            ? { status: "sent" }
+            : { status: "sent", brand: { users: { some: { id: userId } } } },
         select: { id: true },
     });
 
@@ -74,12 +72,10 @@ export async function getCampaignPerformanceTable() {
 
     if (!userId) throw new Error("Unauthorized");
 
-    const campaignWhere: any = role === "admin"
-        ? { status: "sent" }
-        : { status: "sent", brand: { users: { some: { id: userId } } } };
-
     const campaigns = await prisma.campaign.findMany({
-        where: campaignWhere,
+        where: role === "admin"
+            ? { status: "sent" }
+            : { status: "sent", brand: { users: { some: { id: userId } } } },
         include: {
             brand: { select: { name: true } },
             _count: { select: { sends: true } },
@@ -131,12 +127,10 @@ export async function getActivityOverTime(days: number = 30) {
 
     if (!userId) throw new Error("Unauthorized");
 
-    const campaignWhere: any = role === "admin"
-        ? { status: "sent" }
-        : { status: "sent", brand: { users: { some: { id: userId } } } };
-
     const campaigns = await prisma.campaign.findMany({
-        where: campaignWhere,
+        where: role === "admin"
+            ? { status: "sent" }
+            : { status: "sent", brand: { users: { some: { id: userId } } } },
         select: { id: true },
     });
 
@@ -195,11 +189,11 @@ export async function getTopLinks(campaignId: string) {
 
     if (!userId) throw new Error("Unauthorized");
 
-    const campaignWhere: any = role === "admin"
-        ? { id: campaignId }
-        : { id: campaignId, brand: { users: { some: { id: userId } } } };
-
-    const campaign = await prisma.campaign.findFirst({ where: campaignWhere });
+    const campaign = await prisma.campaign.findFirst({
+        where: role === "admin"
+            ? { id: campaignId }
+            : { id: campaignId, brand: { users: { some: { id: userId } } } },
+    });
     if (!campaign) throw new Error("Campaign not found");
 
     const clicks = await prisma.campaignClick.findMany({
@@ -236,11 +230,11 @@ export async function getCampaignTimeline(campaignId: string) {
 
     if (!userId) throw new Error("Unauthorized");
 
-    const campaignWhere: any = role === "admin"
-        ? { id: campaignId }
-        : { id: campaignId, brand: { users: { some: { id: userId } } } };
-
-    const campaign = await prisma.campaign.findFirst({ where: campaignWhere });
+    const campaign = await prisma.campaign.findFirst({
+        where: role === "admin"
+            ? { id: campaignId }
+            : { id: campaignId, brand: { users: { some: { id: userId } } } },
+    });
     if (!campaign) throw new Error("Campaign not found");
 
     const sends = await prisma.campaignSend.findMany({
