@@ -590,8 +590,11 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
     // Track whether the user has explicitly toggled mode
     const userExplicitMode = useRef(false);
-    // Track whether the current value change originated from the editor itself
-    const selfChange = useRef(false);
+    // Stores the last value the editor itself produced via onChange, so we can
+    // distinguish "prop changed because the editor emitted it" from "prop changed
+    // because a template was loaded externally". Value-based — no timing issues
+    // between render phase and effect phase.
+    const lastSelfValue = useRef<string | null>(null);
     // Stable ref for onChange to avoid re-running effects on every parent render
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
@@ -600,9 +603,8 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     // never during active user editing.
     if (value !== prevValueProp) {
         setPrevValueProp(value);
-        if (selfChange.current) {
-            selfChange.current = false;
-        } else if (!userExplicitMode.current && isComplexHtml(value) && !isHtmlMode) {
+        const isSelfChange = value === lastSelfValue.current;
+        if (!isSelfChange && !userExplicitMode.current && isComplexHtml(value) && !isHtmlMode) {
             setIsHtmlMode(true);
         }
     }
@@ -637,7 +639,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                                 ? `<!DOCTYPE ${doc.doctype.name}>\n`
                                 : '';
                             const fullHtml = doctype + doc.documentElement.outerHTML;
-                            selfChange.current = true;
+                            lastSelfValue.current = fullHtml;
                             onChangeRef.current(fullHtml);
                         }
                     });
@@ -732,14 +734,16 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         onUpdate: ({ editor }) => {
             // Don't let Tiptap overwrite complex HTML source
             if (!isComplexHtml(value)) {
-                selfChange.current = true;
-                onChange(editor.getHTML());
+                const html = editor.getHTML();
+                lastSelfValue.current = html;
+                onChange(html);
             }
         },
     });
 
-    // Synchronize external value changes to the editor (skip complex HTML)
+    // Synchronize external value changes to the editor (skip complex HTML and self-changes)
     useEffect(() => {
+        if (value === lastSelfValue.current) return;
         if (editor && value !== editor.getHTML()) {
             if (isHtmlMode || isComplexHtml(value)) {
                 // Don't push complex HTML or source-mode edits into Tiptap
@@ -839,7 +843,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                         value={value}
                         height="600px"
                         extensions={[html()]}
-                        onChange={(val) => { selfChange.current = true; onChange(val); }}
+                        onChange={(val) => { lastSelfValue.current = val; onChange(val); }}
                         theme={theme === 'system' ? (systemTheme === 'dark' ? 'dark' : 'light') : (theme === 'dark' ? 'dark' : 'light')}
                         className="text-sm"
                     />
