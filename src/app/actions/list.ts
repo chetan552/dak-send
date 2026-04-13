@@ -66,6 +66,32 @@ export async function createList(formData: FormData) {
     return list;
 }
 
+export async function deleteList(listId: string) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+
+    const whereCondition: any = currentUserRole === 'admin'
+        ? { id: listId }
+        : { id: listId, brand: { users: { some: { id: userId } } } };
+
+    const list = await prisma.list.findFirst({
+        where: whereCondition,
+        select: { id: true, brandId: true },
+    });
+
+    if (!list) throw new Error("List not found or unauthorized");
+
+    await prisma.list.delete({ where: { id: listId } });
+
+    revalidatePath(`/dashboard/brands/${list.brandId}`);
+    revalidatePath("/dashboard/lists");
+
+    return { brandId: list.brandId };
+}
+
 export async function updateListSettings(listId: string, data: {
     name?: string;
     optIn?: string;

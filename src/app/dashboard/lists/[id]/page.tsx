@@ -15,6 +15,7 @@ import { AddSubscriberButton } from "@/components/subscriber/add-subscriber-butt
 import { SubscribersTable } from "@/components/subscriber/subscribers-table";
 import { ExportSubscribersButton } from "@/components/subscriber/export-button";
 import { EngagementSegmentsButton } from "@/components/subscriber/engagement-segments-button";
+import { DeleteListButton } from "@/components/list/delete-list-button";
 
 export default async function ListPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
     const { id } = await params;
@@ -77,6 +78,7 @@ export default async function ListPage({ params, searchParams }: { params: Promi
                     <EmbedForm listId={list.id} requireGdpr={list.requireGdpr} customFields={list.customFields} />
                     <AddSubscriberButton listId={list.id} requireGdpr={list.requireGdpr} customFields={list.customFields} />
                     <ImportCsvButton listId={list.id} requireGdpr={list.requireGdpr} customFields={list.customFields} />
+                    <DeleteListButton listId={list.id} listName={list.name} brandId={list.brandId} />
                 </div>
             </div>
 
