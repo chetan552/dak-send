@@ -259,8 +259,9 @@ model Automation {
   name          String
   brandId       String
   brand         Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  trigger       String   @default("subscriber_added") // subscriber_added, subscriber_confirmed
-  triggerListId  String
+  trigger       String   @default("subscriber_added") // subscriber_added, subscriber_confirmed, webhook, api
+  triggerListId  String?
+  webhookSecret  String?  // Bearer token for inbound webhook trigger
   status        String   @default("draft") // draft, active, paused
   steps         AutomationStep[]
   enrollments   AutomationEnrollment[]
