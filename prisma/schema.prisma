@@ -209,7 +209,11 @@ model RssFeed {
   pollInterval Int      @default(60) // minutes between checks
   lastCheckedAt DateTime?
   lastItemGuid  String?  // GUID/link of the last processed item
-  templateHtml  String?  @db.Text // Template with [RssTitle], [RssContent], [RssLink]
+  templateHtml  String?  @db.Text // Non-digest: full email template. Digest: per-item block. Tags: [RssTitle] [RssContent] [RssLink] [RssAuthor] [RssDate]
+  // Digest mode
+  digestMode        Boolean @default(false) // Send one email with ALL new items instead of one email per item
+  digestSubject     String? // Subject template — supports [RssDate] [RssCount] [RssFeedName]
+  digestWrapperHtml String? @db.Text // Outer email wrapper — use [RssItems] where items are injected. Also supports [RssDate] [RssCount] [RssFeedName] [Unsubscribe]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

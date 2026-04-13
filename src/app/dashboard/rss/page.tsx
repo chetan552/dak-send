@@ -72,7 +72,12 @@ export default async function RssPage() {
                                                 <span className={`px-2 py-0.5 rounded-full font-medium ${feed.isActive ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500'}`}>
                                                     {feed.isActive ? "Active" : "Paused"}
                                                 </span>
-                                                {feed.templateHtml && (
+                                                {feed.digestMode && (
+                                                    <span className="px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
+                                                        Daily Digest
+                                                    </span>
+                                                )}
+                                                {!feed.digestMode && feed.templateHtml && (
                                                     <span className="px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
                                                         Custom Template
                                                     </span>
@@ -92,11 +97,14 @@ export default async function RssPage() {
             )}
 
             <Card className="bg-blue-50/50 dark:bg-blue-500/5 border-blue-200/50 dark:border-blue-500/20">
-                <CardContent className="p-4 text-sm text-blue-700 dark:text-blue-300">
-                    <p className="font-medium mb-1">💡 How RSS-to-Email works</p>
+                <CardContent className="p-4 text-sm text-blue-700 dark:text-blue-300 space-y-2">
+                    <p className="font-medium">How RSS-to-Email works</p>
                     <p className="text-blue-600/80 dark:text-blue-400/80">
                         Set up a cron job to call <code className="bg-blue-100 dark:bg-blue-500/10 px-1 py-0.5 rounded">/api/cron/rss?secret=YOUR_CRON_SECRET</code> periodically.
                         When new items appear in your feed, a campaign draft is automatically created and ready to send.
+                    </p>
+                    <p className="text-blue-600/80 dark:text-blue-400/80">
+                        <strong>Daily Digest Mode:</strong> Instead of one email per item, all new items found in a single cron run are batched into one digest email. Schedule the cron to run once per day for a true daily digest.
                     </p>
                 </CardContent>
             </Card>
