@@ -49,7 +49,10 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
         }
         setScheduling(true);
         try {
-            await scheduleCampaign(campaignId, { ...payload, scheduledAt });
+            // Convert the datetime-local string (no timezone) to a UTC ISO string
+            // so the server receives the correct moment regardless of server timezone.
+            const scheduledAtUtc = new Date(scheduledAt).toISOString();
+            await scheduleCampaign(campaignId, { ...payload, scheduledAt: scheduledAtUtc });
             toast.success("Campaign scheduled!");
             router.push("/dashboard/campaigns");
         } catch (err: any) {
@@ -191,7 +194,7 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
                         className="w-full px-3 py-2 rounded-md border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                     <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70">
-                        Time is in your browser's local timezone. The "Scheduled Campaigns" cron job must be active (Settings → Cron Jobs) for the campaign to dispatch automatically.
+                        Time is interpreted as your browser's local timezone. The "Scheduled Campaigns" cron job must be active (Settings → Cron Jobs) for the campaign to dispatch automatically.
                     </p>
                 </div>
             )}
