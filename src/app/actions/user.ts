@@ -77,6 +77,42 @@ export async function deleteUsers(userIds: string[]) {
     revalidatePath("/dashboard/settings");
 }
 
+export async function updateProfile(name: string, email: string, currentPassword: string) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+
+    if (!userId) throw new Error("Not authenticated");
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!trimmedEmail) throw new Error("Email is required");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) throw new Error("Invalid email address");
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, password: true },
+    });
+
+    if (!user) throw new Error("User not found");
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) throw new Error("Current password is incorrect");
+
+    if (trimmedEmail !== user.email) {
+        const conflict = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+        if (conflict) throw new Error("That email is already in use");
+    }
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { name: trimmedName || null, email: trimmedEmail },
+    });
+
+    revalidatePath("/dashboard/settings");
+    return { emailChanged: trimmedEmail !== user.email };
+}
+
 export async function changePassword(currentPassword: string, newPassword: string) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;

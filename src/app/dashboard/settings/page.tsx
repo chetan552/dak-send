@@ -13,6 +13,7 @@ import { SESStats } from "@/components/settings/ses-stats";
 import { getSystemSettings } from "@/app/actions/settings";
 import { UsersTable } from "@/components/settings/users-table";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
+import { EditProfileForm } from "@/components/settings/edit-profile-form";
 import Link from "next/link";
 
 export default async function SettingsPage() {
@@ -85,26 +86,20 @@ export default async function SettingsPage() {
                     </CardTitle>
                     <CardDescription className="text-zinc-500 dark:text-zinc-400">Your personal account information.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 max-w-md">
-                        <div>
-                            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-500">Name</p>
-                            <p className="text-zinc-900 dark:text-white font-medium">{session.user.name}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-500">Email Address</p>
-                            <p className="text-zinc-900 dark:text-white font-medium">{session.user.email}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-500">Role</p>
-                            {currentUserRole === 'admin' ? (
-                                <Badge className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border-indigo-200 dark:border-indigo-500/30">Administrator</Badge>
-                            ) : (
-                                <Badge variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">Standard User</Badge>
-                            )}
-                        </div>
+                <CardContent className="space-y-6">
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-500">Role:</p>
+                        {currentUserRole === 'admin' ? (
+                            <Badge className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 border-indigo-200 dark:border-indigo-500/30">Administrator</Badge>
+                        ) : (
+                            <Badge variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400">Standard User</Badge>
+                        )}
                     </div>
-                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 mt-6">
+                    <EditProfileForm
+                        currentName={session.user.name || ""}
+                        currentEmail={session.user.email || ""}
+                    />
+                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
                         <h3 className="text-base font-semibold text-zinc-900 dark:text-white mb-4">Change Password</h3>
                         <ChangePasswordForm />
                     </div>
