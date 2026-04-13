@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
 
                     const subscriberEmail = enrollment.subscriberEmail;
                     const subscriberName = subscriber?.name || "";
-                    const listId = subscriber?.listId || automation.triggerListId;
+                    const listId = subscriber?.listId ?? automation.triggerListId ?? undefined;
 
                     const trackingBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -80,18 +80,18 @@ export async function GET(req: NextRequest) {
                     const customFieldMap: Record<string, string> = {};
                     if (subscriber) {
                         const cfValues = await prisma.subscriberFieldValue.findMany({
-                            where: { subscriber: { id: subscriber.id, listId } },
+                            where: { subscriberId: subscriber.id, ...(listId ? { subscriber: { listId } } : {}) },
                             include: { customField: true },
                         });
                         for (const cfv of cfValues) {
-                            customFieldMap[cfv.customField.name] = cfv.value;
+                            customFieldMap[(cfv as any).customField.name] = cfv.value;
                         }
                     }
 
                     // Pass raw template + personalization data to the worker.
                     // The worker's renderEmail() pipeline handles personalization,
                     // HTML wrapping, CSS inlining, tracking, and plain-text generation.
-                    const unsubscribeUrl = subscriber
+                    const unsubscribeUrl = subscriber && listId
                         ? `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriber.id)}&l=${encodeURIComponent(listId)}`
                         : "";
 

@@ -25,17 +25,19 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
     const selectedBrand = brands.find((b) => b.id === brandId);
     const lists = selectedBrand?.lists || [];
 
+    const requiresListTrigger = trigger === "subscriber_added" || trigger === "subscriber_confirmed";
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
 
         if (!name.trim()) { setError("Name is required"); return; }
         if (!brandId) { setError("Select a brand"); return; }
-        if (!triggerListId) { setError("Select a trigger list"); return; }
+        if (requiresListTrigger && !triggerListId) { setError("Select a trigger list"); return; }
 
         startTransition(async () => {
             try {
-                const automation = await createAutomation({ name, brandId, trigger, triggerListId });
+                const automation = await createAutomation({ name, brandId, trigger, triggerListId: requiresListTrigger ? triggerListId : undefined });
                 router.push(`/dashboard/automations/${automation.id}`);
             } catch (err: any) {
                 setError(err.message || "Failed to create automation");
@@ -99,17 +101,20 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
                             </label>
                             <select
                                 value={trigger}
-                                onChange={(e) => setTrigger(e.target.value)}
+                                onChange={(e) => { setTrigger(e.target.value); setTriggerListId(""); }}
                                 className="w-full px-3 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                             >
                                 <option value="subscriber_added">Subscriber joins list (single opt-in)</option>
                                 <option value="subscriber_confirmed">Subscriber confirms opt-in (double opt-in)</option>
+                                <option value="webhook">Inbound Webhook — external system POSTs to a unique URL</option>
+                                <option value="api">API Trigger — enroll via REST API using your API key</option>
                             </select>
                             <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                                 Choose when this automation should start for each subscriber.
                             </p>
                         </div>
 
+                        {requiresListTrigger && (
                         <div>
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                                 Trigger List
@@ -130,6 +135,7 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
                                 </p>
                             )}
                         </div>
+                        )}
 
                         {error && (
                             <div className="p-3 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-sm">

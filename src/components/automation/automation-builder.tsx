@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Clock, Mail, ArrowDown, GripVertical, Play, Pause, Loader2 } from "lucide-react";
+import { Plus, Trash2, Clock, Mail, ArrowDown, GripVertical, Play, Pause, Loader2, Copy, Check, Webhook, Code2 } from "lucide-react";
 import { addStep, updateStep, deleteStep, updateAutomation, deleteAutomation } from "@/app/actions/automation";
 
 interface Step {
@@ -21,13 +21,15 @@ interface AutomationBuilderProps {
         name: string;
         status: string;
         trigger: string;
-        triggerListId: string;
+        triggerListId: string | null;
+        webhookSecret: string | null;
         activeCount: number;
         completedCount: number;
         steps: Step[];
         brand: { name: string; id: string; fromEmail: string | null; fromName: string | null };
         _count: { enrollments: number };
     };
+    appUrl: string;
 }
 
 function formatDelay(minutes: number): string {
@@ -40,12 +42,13 @@ function formatDelay(minutes: number): string {
     return `${d} day${d !== 1 ? "s" : ""}`;
 }
 
-export function AutomationBuilder({ automation }: AutomationBuilderProps) {
+export function AutomationBuilder({ automation, appUrl }: AutomationBuilderProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [showAddStep, setShowAddStep] = useState(false);
     const [editingStepId, setEditingStepId] = useState<string | null>(null);
     const [newStepType, setNewStepType] = useState<"delay" | "email">("delay");
+    const [copiedField, setCopiedField] = useState<string | null>(null);
 
     // Delay step state
     const [delayValue, setDelayValue] = useState(1);
@@ -64,7 +67,18 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
     const triggerLabels: Record<string, string> = {
         subscriber_added: "Subscriber joins list",
         subscriber_confirmed: "Subscriber confirms opt-in",
+        webhook: "Inbound Webhook",
+        api: "API Trigger",
     };
+
+    const copyToClipboard = (text: string, field: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 2000);
+    };
+
+    const webhookUrl = `${appUrl}/api/automations/${automation.id}/trigger`;
+    const apiEnrollUrl = `${appUrl}/api/v1/automations/${automation.id}/enroll`;
 
     const getMinutes = (value: number, unit: string) => {
         if (unit === "minutes") return value;
@@ -194,6 +208,85 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
                         </div>
                     </div>
                 </div>
+
+                {/* Webhook trigger info */}
+                {automation.trigger === "webhook" && automation.webhookSecret && (
+                    <div className="flex items-start gap-3 mt-3">
+                        <div className="w-10 flex-shrink-0" />
+                        <div className="flex-1 p-4 rounded-lg border border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-950/20 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-300">
+                                <Webhook className="w-4 h-4" />
+                                Webhook Endpoint
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">POST URL</p>
+                                <div className="flex items-center gap-2">
+                                    <code className="flex-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-zinc-800 dark:text-zinc-200 truncate">
+                                        {webhookUrl}
+                                    </code>
+                                    <button onClick={() => copyToClipboard(webhookUrl, "url")} className="p-1.5 rounded hover:bg-purple-100 dark:hover:bg-purple-900/30 text-zinc-500 hover:text-purple-700 dark:hover:text-purple-300 flex-shrink-0">
+                                        {copiedField === "url" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Bearer Token (Authorization header)</p>
+                                <div className="flex items-center gap-2">
+                                    <code className="flex-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-zinc-800 dark:text-zinc-200 truncate font-mono">
+                                        {automation.webhookSecret}
+                                    </code>
+                                    <button onClick={() => copyToClipboard(automation.webhookSecret!, "secret")} className="p-1.5 rounded hover:bg-purple-100 dark:hover:bg-purple-900/30 text-zinc-500 hover:text-purple-700 dark:hover:text-purple-300 flex-shrink-0">
+                                        {copiedField === "secret" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded p-2 font-mono whitespace-pre-wrap break-all">
+                                {[
+                                    "# Example request",
+                                    "curl -X POST \\",
+                                    '  -H "Authorization: Bearer <token>" \\',
+                                    '  -H "Content-Type: application/json" \\',
+                                    "  -d '{\"email\":\"user@example.com\",\"name\":\"Alice\"}' \\",
+                                    "  " + webhookUrl,
+                                ].join("\n")}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* API trigger info */}
+                {automation.trigger === "api" && (
+                    <div className="flex items-start gap-3 mt-3">
+                        <div className="w-10 flex-shrink-0" />
+                        <div className="flex-1 p-4 rounded-lg border border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-950/20 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-sky-800 dark:text-sky-300">
+                                <Code2 className="w-4 h-4" />
+                                API Enroll Endpoint
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">POST URL</p>
+                                <div className="flex items-center gap-2">
+                                    <code className="flex-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1.5 text-zinc-800 dark:text-zinc-200 truncate">
+                                        {apiEnrollUrl}
+                                    </code>
+                                    <button onClick={() => copyToClipboard(apiEnrollUrl, "apiUrl")} className="p-1.5 rounded hover:bg-sky-100 dark:hover:bg-sky-900/30 text-zinc-500 hover:text-sky-700 dark:hover:text-sky-300 flex-shrink-0">
+                                        {copiedField === "apiUrl" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded p-2 font-mono whitespace-pre-wrap break-all">
+                                {[
+                                    "# Authenticate with your API key (Settings → API)",
+                                    "curl -X POST \\",
+                                    '  -H "x-api-key: <your-api-key>" \\',
+                                    '  -H "Content-Type: application/json" \\',
+                                    "  -d '{\"email\":\"user@example.com\",\"name\":\"Alice\"}' \\",
+                                    "  " + apiEnrollUrl,
+                                ].join("\n")}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Steps */}
                 {automation.steps.map((step, i) => (

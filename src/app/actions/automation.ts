@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import crypto from "crypto";
 
 // List all automations the user can access
 export async function getAutomations() {
@@ -67,7 +68,7 @@ export async function createAutomation(data: {
     name: string;
     brandId: string;
     trigger: string;
-    triggerListId: string;
+    triggerListId?: string;
 }) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
@@ -83,12 +84,18 @@ export async function createAutomation(data: {
     const brand = await prisma.brand.findFirst({ where: brandWhere });
     if (!brand) throw new Error("Brand not found or access denied");
 
+    const isWebhookTrigger = data.trigger === "webhook";
+    const webhookSecret = isWebhookTrigger
+        ? crypto.randomBytes(32).toString("hex")
+        : null;
+
     const automation = await prisma.automation.create({
         data: {
             name: data.name,
             brandId: data.brandId,
             trigger: data.trigger,
-            triggerListId: data.triggerListId,
+            triggerListId: data.triggerListId || null,
+            webhookSecret,
             status: "draft",
         },
     });

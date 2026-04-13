@@ -47,7 +47,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
                 </span>
             </div>
 
-            <AutomationBuilder automation={automation} />
+            <AutomationBuilder automation={automation} appUrl={process.env.NEXT_PUBLIC_APP_URL || ""} />
         </div>
     );
 }
