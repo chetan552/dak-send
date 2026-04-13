@@ -1,11 +1,15 @@
 import { hasUsers } from "@/app/actions/auth";
-import { LoginForm } from "./login-form";
+import { redirect } from "next/navigation";
+import { SignUpForm } from "./signup-form";
 import Image from "next/image";
-import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 
-export default async function LoginPage() {
+export default async function SignUpPage() {
+    // If users already exist, this instance is already set up — redirect to login
     const alreadySetUp = await hasUsers();
+    if (alreadySetUp) {
+        redirect("/login");
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-zinc-950 p-4 relative overflow-hidden">
@@ -18,19 +22,11 @@ export default async function LoginPage() {
                         <Image src="/logo.svg" alt="DakSend" width={150} height={36} priority />
                     </div>
                     <CardDescription className="text-zinc-400 text-base">
-                        Enter your email and password to sign in to your self-hosted mailer.
+                        Create your admin account to get started.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <LoginForm />
-                    {!alreadySetUp && (
-                        <p className="mt-4 text-center text-sm text-zinc-500">
-                            No account yet?{" "}
-                            <Link href="/signup" className="text-zinc-300 hover:text-white underline underline-offset-4">
-                                Set up your admin account
-                            </Link>
-                        </p>
-                    )}
+                    <SignUpForm />
                 </CardContent>
             </Card>
         </div>
