@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { emailQueue } from "@/lib/queue";
 import { translateSegmentQuery } from "@/lib/segment-query";
 import { getWarmupRemaining } from "@/lib/warmup";
+import { markCronLastRun } from "@/app/actions/cron-settings";
 
 export async function GET(req: NextRequest) {
     // Verify cron secret
@@ -142,6 +143,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        await markCronLastRun("scheduled").catch(() => {});
         return NextResponse.json({
             success: true,
             checked: dueCampaigns.length,

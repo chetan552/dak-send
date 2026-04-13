@@ -1,5 +1,6 @@
 import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
+import cron from "node-cron";
 import { prisma } from "./prisma";
 import { sendEmail } from "./aws";
 import { incrementWarmupSent } from "./warmup";
@@ -256,4 +257,85 @@ const startWorker = async () => {
     console.log("Email Worker started.");
 };
 
+// ── Internal cron scheduler ────────────────────────────────────────────────
+// Reads cron settings from DB and calls the cron HTTP endpoints directly.
+// Re-reads settings every 5 minutes so changes made in the Settings UI
+// are picked up without restarting the worker.
+
+type CronTaskMap = Record<string, ReturnType<typeof cron.schedule>>;
+const activeTasks: CronTaskMap = {};
+
+const CRON_JOBS = [
+    { key: "scheduled",   path: "/api/cron/scheduled" },
+    { key: "rss",         path: "/api/cron/rss" },
+    { key: "automations", path: "/api/cron/automations" },
+] as const;
+
+async function callCronEndpoint(path: string) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const secret = process.env.CRON_SECRET || "";
+    try {
+        const res = await fetch(`${appUrl}${path}?secret=${encodeURIComponent(secret)}`);
+        if (!res.ok) {
+            const body = await res.text();
+            console.error(`[internal-cron] ${path} returned ${res.status}: ${body}`);
+        }
+    } catch (err) {
+        console.error(`[internal-cron] ${path} failed:`, err);
+    }
+}
+
+async function syncCronSchedules() {
+    for (const job of CRON_JOBS) {
+        try {
+            const [enabledSetting, intervalSetting] = await Promise.all([
+                prisma.setting.findUnique({ where: { key: `cron.${job.key}.enabled` } }),
+                prisma.setting.findUnique({ where: { key: `cron.${job.key}.interval` } }),
+            ]);
+
+            const enabled = enabledSetting?.value === "true";
+            const interval = intervalSetting?.value || null;
+            const existing = activeTasks[job.key];
+
+            if (!enabled) {
+                if (existing) {
+                    existing.stop();
+                    delete activeTasks[job.key];
+                    console.log(`[internal-cron] Stopped: ${job.key}`);
+                }
+                continue;
+            }
+
+            if (!interval || !cron.validate(interval)) {
+                console.warn(`[internal-cron] Invalid interval for ${job.key}: "${interval}"`);
+                continue;
+            }
+
+            // Stop existing task if interval changed
+            if (existing) {
+                existing.stop();
+                delete activeTasks[job.key];
+            }
+
+            const path = job.path;
+            activeTasks[job.key] = cron.schedule(interval, () => {
+                callCronEndpoint(path);
+            });
+            console.log(`[internal-cron] Scheduled ${job.key} at "${interval}"`);
+        } catch (err) {
+            console.error(`[internal-cron] Error syncing ${job.key}:`, err);
+        }
+    }
+}
+
+async function startInternalCron() {
+    await syncCronSchedules();
+    // Re-sync every 5 minutes to pick up settings changes from the UI
+    cron.schedule("*/5 * * * *", () => {
+        syncCronSchedules().catch(err => console.error("[internal-cron] Sync error:", err));
+    });
+    console.log("[internal-cron] Scheduler running (re-syncs every 5 min).");
+}
+
 startWorker();
+startInternalCron();

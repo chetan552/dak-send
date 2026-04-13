@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { emailQueue } from "@/lib/queue";
+import { markCronLastRun } from "@/app/actions/cron-settings";
 
 export async function GET(req: NextRequest) {
     // Verify cron secret
@@ -153,6 +154,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
+        await markCronLastRun("automations").catch(() => {});
         return NextResponse.json({
             success: true,
             processed,

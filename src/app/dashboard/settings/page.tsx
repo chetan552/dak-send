@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Shield, User, Flame, ShieldCheck } from "lucide-react";
+import { Settings, Shield, User, Flame, ShieldCheck, Timer } from "lucide-react";
 import { CreateUserButton } from "@/components/settings/create-user-button";
 import { DeleteUserButton } from "@/components/settings/delete-user-button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,9 @@ import { EditProfileForm } from "@/components/settings/edit-profile-form";
 import { TwoFactorSetup } from "@/components/settings/two-factor-setup";
 import { TwoFactorPolicyControl } from "@/components/settings/two-factor-policy";
 import { get2FAStatus, get2FAPolicy } from "@/app/actions/2fa";
+import { getCronSettings } from "@/app/actions/cron-settings";
+// CronSettings type comes from @/lib/cron-config but is only used via the component prop
+import { CronSettings } from "@/components/settings/cron-settings";
 import Link from "next/link";
 
 export default async function SettingsPage() {
@@ -27,9 +30,10 @@ export default async function SettingsPage() {
     const currentUserRole = session.user?.role || "user";
     const currentUserId = session.user?.id;
 
-    const [twoFAStatus, twoFAPolicy] = await Promise.all([
+    const [twoFAStatus, twoFAPolicy, cronSettings] = await Promise.all([
         get2FAStatus(),
         currentUserRole === "admin" ? get2FAPolicy() : Promise.resolve("optional" as const),
+        currentUserRole === "admin" ? getCronSettings() : Promise.resolve(null),
     ]);
 
     let allUsers: any[] = [];
@@ -183,6 +187,27 @@ export default async function SettingsPage() {
                                 <p className="text-zinc-500 dark:text-zinc-400 text-sm italic col-span-full">No brands created yet.</p>
                             )}
                         </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Cron Jobs */}
+            {currentUserRole === "admin" && cronSettings && (
+                <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
+                            <Timer className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Cron Jobs
+                        </CardTitle>
+                        <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">
+                            Enable the built-in scheduler or copy HTTP endpoints for your external cron service.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <CronSettings
+                            settings={cronSettings}
+                            appUrl={process.env.NEXT_PUBLIC_APP_URL || ""}
+                            cronSecret={process.env.CRON_SECRET || ""}
+                        />
                     </CardContent>
                 </Card>
             )}

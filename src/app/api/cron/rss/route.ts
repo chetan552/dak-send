@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRssFeeds } from "@/app/actions/rss";
+import { markCronLastRun } from "@/app/actions/cron-settings";
 
 export async function GET(req: NextRequest) {
     // Verify cron secret to prevent unauthorized access
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
 
     try {
         const result = await checkRssFeeds();
+        await markCronLastRun("rss").catch(() => {});
         return NextResponse.json(result);
     } catch (error: any) {
         console.error("RSS cron error:", error);

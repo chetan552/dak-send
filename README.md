@@ -4,7 +4,7 @@
 
 **The self-hosted email platform for teams who care about deliverability, data ownership, and price.**
 
-[Features](#features) · [Quick Start](#quick-start) · [REST API](#rest-api-v1) · [n8n Integration](#n8n-integration) · [Deployment](#deployment) · [Q&A Setup Guide](#qa-setup-guide)
+[Features](#features) · [Quick Start](#quick-start) · [REST API](#rest-api-v1) · [n8n Integration](#n8n-integration) · [Deployment](#deployment) · [Q&A Setup Guide](#qa-setup-guide) · [RSS Digest for Drupal](#rss-digest-for-drupal-or-any-cms)
 
 </div>
 
@@ -41,7 +41,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Scheduled sending** — pick a future date/time; a cron dispatcher picks it up and queues delivery
 - **A/B testing** — split-test subject lines or bodies, auto-pick winners from live engagement data
 - **Send-time optimization** — per-subscriber delivery delay based on their historical engagement hour
-- **RSS-to-email** — auto-generate campaign drafts from any RSS feed on a schedule
+- **RSS-to-email** — auto-generate campaign drafts from any RSS feed on a schedule; **Daily Digest Mode** batches all new items from a run into one email instead of one email per item
 
 ### Deliverability
 - **Outlook-safe HTML pipeline** — every email is automatically wrapped in a proper `<!DOCTYPE html>` document with MSO conditionals; CSS styles are inlined via `juice` so Outlook renders them correctly
@@ -61,9 +61,15 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Campaign dashboards** — real-time open rate, click rate, bounce rate, and complaint rate
 - **Per-subscriber engagement history** — aggregate activity rolls up into send-time optimization
 
+### Automations
+- **Drip automations** — multi-step delay + email sequences triggered automatically
+- **Subscriber triggers** — start a sequence when someone joins a list (single opt-in) or confirms (double opt-in)
+- **Inbound Webhook Trigger** — each automation gets a unique URL; any external system can `POST` to it with `{ email, name }` to enroll a subscriber using a per-automation Bearer token
+- **API Trigger** — enroll subscribers into an automation via `POST /api/v1/automations/:id/enroll` using your existing API key; ideal for CRM and no-code tool integrations
+
 ### Integrations & APIs
 - **Transactional email API** — `POST /api/send` for receipts, notifications, and one-off messages
-- **REST API v1** — full CRUD over brands, lists, subscribers, campaigns, and webhooks for external automation
+- **REST API v1** — full CRUD over brands, lists, subscribers, campaigns, webhooks, and automation enrollment
 - **n8n community node** — first-party [`n8n-nodes-daksend`](packages/n8n-nodes-daksend) package with both regular actions and a webhook trigger
 - **Outgoing webhooks** — HMAC-signed event delivery on `subscribe`, `unsubscribe`, `open`, `click`, `bounce`, `complaint`
 - **Incoming SES webhooks** — production-grade SNS signature verification and bounce/complaint processing
@@ -209,7 +215,7 @@ Three cron endpoints drive the time-based features. All require a `?secret=` que
 | Endpoint | Purpose | Recommended Interval |
 |----------|---------|----------------------|
 | `GET /api/cron/scheduled` | Dispatch campaigns whose `scheduledAt` has passed | Every 1 minute |
-| `GET /api/cron/rss` | Poll RSS feeds and draft new campaigns | Every 15–60 minutes |
+| `GET /api/cron/rss` | Poll RSS feeds and draft new campaigns | Every 15–60 min; once daily for digest feeds |
 | `GET /api/cron/automations` | Advance subscribers through automation steps | Every 1–5 minutes |
 
 **crontab example:**
@@ -286,7 +292,30 @@ A full REST API for external integrations lives under `/api/v1`. Authenticate wi
 | Lists | `GET /api/v1/lists` |
 | Subscribers | `GET /api/v1/subscribers`, `POST /api/v1/subscribers`, `GET /api/v1/subscribers/:email`, `PATCH /api/v1/subscribers/:email`, `DELETE /api/v1/subscribers/:email` |
 | Campaigns | `GET /api/v1/campaigns`, `GET /api/v1/campaigns/:id` |
+| Automations | `POST /api/v1/automations/:id/enroll` — enroll a subscriber by email into an API-triggered automation |
 | Webhooks | `GET /api/v1/webhooks`, `POST /api/v1/webhooks`, `GET /api/v1/webhooks/:id`, `PATCH /api/v1/webhooks/:id`, `DELETE /api/v1/webhooks/:id` |
+
+#### Automation enrollment via API
+
+```bash
+curl -X POST https://your-domain.com/api/v1/automations/AUTOMATION_ID/enroll \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "name": "Jane"}'
+```
+
+The automation must have its trigger set to **API Trigger** and be in **Active** status.
+
+#### Automation enrollment via Inbound Webhook
+
+Each Webhook-triggered automation has a unique URL and Bearer token visible on its builder page:
+
+```bash
+curl -X POST https://your-domain.com/api/automations/AUTOMATION_ID/trigger \
+  -H "Authorization: Bearer AUTOMATION_WEBHOOK_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "name": "Jane"}'
+```
 
 ---
 
@@ -685,6 +714,142 @@ Upstash requires TLS. Make sure your `REDIS_URL` uses `rediss://` (double `s`) n
 ```env
 REDIS_URL="rediss://default:your-token@your-instance.upstash.io:6379"
 ```
+
+---
+
+## RSS Digest for Drupal (or any CMS)
+
+A common use case: you publish sermon or article pages on a CMS and want to automatically email subscribers a daily digest of everything new. Here is the end-to-end setup.
+
+### Architecture
+
+```
+Drupal (or any CMS)
+  ├── RSS feed at /sermons/feed         ← Drupal generates this automatically
+  ├── DakSend embed form                ← paste snippet into a block or page
+  └── (no other code needed on site)
+
+DakSend
+  ├── List: "Sermon Daily Digest"
+  ├── RSS Feed (Digest Mode enabled)
+  └── Daily cron → polls RSS → batches all new items → one draft campaign
+```
+
+### Step 1 — Create a subscriber list
+
+Dashboard → your brand → **New List** → name it "Sermon Daily Digest".
+
+### Step 2 — Embed a signup form on your site
+
+Dashboard → Lists → open the list → **Embed Form** → copy the HTML snippet → paste it into a Drupal block (Structure → Block layout → Add custom block) or directly into a page template.
+
+### Step 3 — Expose an RSS feed from Drupal
+
+Drupal 8/9/10 generates RSS feeds out of the box:
+
+- **Site-wide feed**: `/rss.xml`
+- **Per content-type feed via Views**: Structure → Views → find your "Sermons" view (or create one), add an **RSS Feed** display filtered to your Sermon content type, save. The feed URL will be something like `/sermons/feed`.
+
+If you use the [Views module](https://www.drupal.org/project/views) (bundled in Drupal 8+) you can also control which fields appear in the feed (title, body, image URL in the enclosure) from the View's RSS settings.
+
+### Step 4 — Add the RSS feed in DakSend
+
+Dashboard → **RSS Feeds** → **Add RSS Feed**:
+
+| Field | Value |
+|-------|-------|
+| Feed Name | `Sermon Daily Digest` |
+| RSS Feed URL | `https://yoursite.com/sermons/feed` |
+| Brand | your brand |
+| Target Lists | Sermon Daily Digest |
+| **Daily Digest Mode** | **enabled** |
+| Digest Subject | `New Sermons Added — [RssDate]` (or customize) |
+| Item Block Template | leave blank for the default card, or paste custom HTML |
+| Digest Email Wrapper | leave blank for the default wrapper, or paste a fully branded HTML email |
+
+### Step 5 — Schedule the cron (once per day)
+
+```bash
+# Fire at 8 AM UTC every day
+0 8 * * *   curl -fsS "https://your-daksend-url.com/api/cron/rss?secret=YOUR_CRON_SECRET"
+```
+
+Every time this runs, DakSend:
+1. Fetches your RSS feed
+2. Collects all items published since the last run
+3. If any new items exist, renders them into a single digest email and creates a campaign **draft**
+4. The draft appears in the Campaigns list ready to review and send (or schedule)
+
+### Step 6 — Auto-send (optional)
+
+By default, digest campaigns land as drafts so you can review before they go out. To send automatically, schedule the campaign in DakSend after it's created, or combine with the scheduled campaign cron.
+
+### Digest template tags
+
+**In the Item Block template** (renders once per new item):
+
+| Tag | Replaced with |
+|-----|--------------|
+| `[RssTitle]` | Sermon / article title |
+| `[RssLink]` | URL of the page |
+| `[RssContent]` | Short excerpt (200 characters, HTML stripped) |
+| `[RssAuthor]` | Author / preacher name |
+| `[RssDate]` | Publication date (formatted, e.g. "April 13, 2026") |
+| `[RssThumbnail]` | Thumbnail image URL (from RSS `<enclosure>` if present) |
+
+**In the Digest Wrapper and Subject** (renders once per digest email):
+
+| Tag | Replaced with |
+|-----|--------------|
+| `[RssItems]` | All rendered item blocks concatenated |
+| `[RssDate]` | Today's date |
+| `[RssCount]` | Number of new items in this digest |
+| `[RssFeedName]` | Feed name as set in DakSend |
+| `[Unsubscribe]` | Unsubscribe link |
+
+---
+
+### Q&A — RSS Digest
+
+**Q: I added the feed but no campaign was created when the cron ran.**
+
+- Check that the feed is set to **Active** (green badge on the RSS Feeds page)
+- Confirm the Drupal RSS URL is publicly accessible without authentication: `curl https://yoursite.com/sermons/feed`
+- Make sure there is at least one item in the feed that is **newer** than the last time the cron ran. On the first run, DakSend records the newest item as the baseline — the very next run will only include items published after that point. To force a first digest, temporarily clear `lastItemGuid` in the database for that feed row, then run the cron again
+
+**Q: How do I include a sermon thumbnail image in the digest email?**
+
+Drupal can add an image to the RSS enclosure field. In your Sermon View's RSS display, add the image field and set the "Style" to use it as the enclosure (`<enclosure url="..." />`). Then in your Item Block template, add an `<img>` using `[RssThumbnail]`:
+
+```html
+<div style="border-bottom:1px solid #e5e7eb;padding:24px 0;display:flex;gap:16px;">
+  <img src="[RssThumbnail]" width="80" height="80" style="border-radius:8px;object-fit:cover;flex-shrink:0;" alt="" />
+  <div>
+    <h3 style="margin:0 0 6px;"><a href="[RssLink]">[RssTitle]</a></h3>
+    <p style="margin:0;color:#6b7280;font-size:14px;">[RssAuthor] — [RssDate]</p>
+  </div>
+</div>
+```
+
+**Q: Can I send the digest automatically without reviewing the draft?**
+
+Set the campaign's send time to a fixed daily slot. Alternatively, you can extend the RSS cron action to immediately schedule or send campaigns it creates — this would require a small code change in `src/app/actions/rss.ts` (`checkRssFeeds`), changing `status: "draft"` to `status: "sending"` and queuing the send.
+
+**Q: The digest is sending one email per sermon instead of one per day.**
+
+Digest Mode was not enabled when the feed was created. Edit the feed (pencil icon on the RSS Feeds page) and toggle **Daily Digest Mode** on. Also make sure your cron only runs once per day — if it runs every 15 minutes and finds new items each time, it creates multiple digest campaigns.
+
+**Q: How do I use this for a non-Drupal site?**
+
+Any CMS or framework that produces a valid RSS 2.0 or Atom feed works identically. Examples:
+
+| Platform | Default feed URL |
+|----------|-----------------|
+| WordPress | `/feed` or `/feed/rss2` |
+| Ghost | `/rss` |
+| Webflow (Blog) | `/blog/rss.xml` |
+| Jekyll | `/feed.xml` |
+| Custom Next.js | Create a `/api/rss` route that returns valid RSS XML |
 
 ---
 
