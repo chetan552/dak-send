@@ -450,7 +450,40 @@ export default function Home() {
               <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
             </div>
 
-            {/* Feature 5: Send Time Optimization — Large */}
+            {/* Feature 5: A/B Testing */}
+            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-violet-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              {/* A vs B split visual */}
+              <div className="absolute top-5 right-5 w-28 h-28 opacity-20 group-hover:opacity-50 transition-all duration-700 pointer-events-none flex gap-2">
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="text-[9px] font-bold text-violet-400 text-center">A</div>
+                  <div className="flex-1 rounded-lg bg-violet-500/30 border border-violet-500/40 flex flex-col justify-end p-1">
+                    <div className="w-full bg-violet-400/60 rounded-sm" style={{ height: "55%" }} />
+                  </div>
+                  <div className="text-[8px] text-zinc-500 text-center">42%</div>
+                </div>
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="text-[9px] font-bold text-fuchsia-400 text-center">B</div>
+                  <div className="flex-1 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30 flex flex-col justify-end p-1">
+                    <div className="w-full bg-fuchsia-400/40 rounded-sm" style={{ height: "38%" }} />
+                  </div>
+                  <div className="text-[8px] text-zinc-500 text-center">31%</div>
+                </div>
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] font-black text-violet-300 bg-violet-500/20 border border-violet-500/30 rounded-full w-4 h-4 flex items-center justify-center">✓</div>
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center mb-4">
+                  <Layers className="w-5 h-5 text-violet-400" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">A/B Testing</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">Split-test subject lines or email bodies across your list. DakSend auto-picks the winner from live open and click data.</p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-28 h-28 bg-violet-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Feature 6: Send Time Optimization — Large */}
             <div className="md:col-span-2 bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-purple-500/30 transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
