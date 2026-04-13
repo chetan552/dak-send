@@ -29,7 +29,7 @@ export default async function DashboardLayout({
             {/* Desktop Sidebar — hidden on mobile */}
             <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col backdrop-blur-md transition-colors duration-300 flex-shrink-0">
                 <div className="p-6">
-                    <Link href="/">
+                    <Link href="/dashboard">
                         <Image src="/logo.svg" alt="DakSend" width={140} height={34} priority />
                     </Link>
                 </div>
