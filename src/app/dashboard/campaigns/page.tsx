@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { DeleteCampaignButton } from "@/components/campaign/delete-campaign-button";
 import { CancelCampaignButton } from "@/components/campaign/cancel-campaign-button";
 import { DuplicateCampaignButton } from "@/components/campaign/duplicate-campaign-button";
+import { UnscheduleCampaignButton } from "@/components/campaign/unschedule-campaign-button";
 
 export default async function CampaignsPage() {
     const session = await getServerSession(authOptions);
@@ -70,6 +71,11 @@ export default async function CampaignsPage() {
                                 <CardDescription className="text-zinc-500 truncate" title={campaign.subject}>
                                     Subject: {campaign.subject}
                                 </CardDescription>
+                                {campaign.status === 'scheduled' && campaign.scheduledAt && (
+                                    <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1 flex items-center gap-1">
+                                        Sends {new Date(campaign.scheduledAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/50 flex items-center justify-between">
@@ -86,6 +92,9 @@ export default async function CampaignsPage() {
                                         )}
                                         {campaign.status === 'sending' && (
                                             <CancelCampaignButton campaignId={campaign.id} />
+                                        )}
+                                        {campaign.status === 'scheduled' && (
+                                            <UnscheduleCampaignButton campaignId={campaign.id} />
                                         )}
                                         {campaign.status === 'sent' && (
                                             <Link href={`/dashboard/campaigns/${campaign.id}/report`}>

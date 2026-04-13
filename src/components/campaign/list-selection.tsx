@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { SendButton } from "@/components/campaign/send-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users2, Filter, Clock } from "lucide-react";
+import { Users2, Filter, Clock, CalendarClock } from "lucide-react";
+import { scheduleCampaign } from "@/app/actions/send";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaignId: string }) {
     const [listModes, setListModes] = useState<Record<string, "none" | "include" | "exclude">>({});
     const [segmentModes, setSegmentModes] = useState<Record<string, "none" | "include" | "exclude">>({});
     const [useOptimalTime, setUseOptimalTime] = useState(false);
+    const [sendMode, setSendMode] = useState<"now" | "scheduled">("now");
+    const [scheduledAt, setScheduledAt] = useState("");
+    const [scheduling, setScheduling] = useState(false);
+    const router = useRouter();
 
     const handleListModeChange = (listId: string, mode: "none" | "include" | "exclude") => {
         setListModes(prev => ({ ...prev, [listId]: mode }));
@@ -28,8 +35,33 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
 
     const hasSelection = payload.includedLists.length > 0 || payload.includedSegments.length > 0;
 
+    // Min datetime for the picker: 5 minutes from now
+    const minDateTime = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16);
+
+    const handleSchedule = async () => {
+        if (!hasSelection) {
+            toast.error("Please select at least one list or segment to include.");
+            return;
+        }
+        if (!scheduledAt) {
+            toast.error("Please pick a date and time.");
+            return;
+        }
+        setScheduling(true);
+        try {
+            await scheduleCampaign(campaignId, { ...payload, scheduledAt });
+            toast.success("Campaign scheduled!");
+            router.push("/dashboard/campaigns");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to schedule campaign");
+        } finally {
+            setScheduling(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
+            {/* List / segment selection */}
             <div className="space-y-4">
                 {lists.length === 0 && (
                     <div className="p-4 border border-zinc-800 bg-zinc-900/50 rounded-lg text-center text-sm text-zinc-400">
@@ -92,6 +124,7 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
                 ))}
             </div>
 
+            {/* Send-time optimisation */}
             <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-zinc-900/40 flex items-start gap-4">
                 <div className="mt-1">
                     <Clock className="w-5 h-5 text-indigo-500" />
@@ -117,7 +150,66 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
                 </div>
             </div>
 
-            <SendButton campaignId={campaignId} payload={payload} disabled={!hasSelection} />
+            {/* Send mode toggle */}
+            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setSendMode("now")}
+                    className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                        sendMode === "now"
+                            ? "bg-indigo-600 text-white"
+                            : "bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    }`}
+                >
+                    <Clock className="w-4 h-4" /> Send Now
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setSendMode("scheduled")}
+                    className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-l border-zinc-200 dark:border-zinc-800 ${
+                        sendMode === "scheduled"
+                            ? "bg-indigo-600 text-white"
+                            : "bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    }`}
+                >
+                    <CalendarClock className="w-4 h-4" /> Schedule for Later
+                </button>
+            </div>
+
+            {/* Scheduled date/time picker */}
+            {sendMode === "scheduled" && (
+                <div className="p-4 border border-indigo-200 dark:border-indigo-800/50 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/20 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-indigo-800 dark:text-indigo-300">
+                        <CalendarClock className="w-4 h-4" />
+                        Pick a send date and time
+                    </div>
+                    <input
+                        type="datetime-local"
+                        value={scheduledAt}
+                        min={minDateTime}
+                        onChange={(e) => setScheduledAt(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70">
+                        Time is in your browser's local timezone. The "Scheduled Campaigns" cron job must be active (Settings → Cron Jobs) for the campaign to dispatch automatically.
+                    </p>
+                </div>
+            )}
+
+            {/* Action button */}
+            {sendMode === "now" ? (
+                <SendButton campaignId={campaignId} payload={payload} disabled={!hasSelection} />
+            ) : (
+                <button
+                    type="button"
+                    onClick={handleSchedule}
+                    disabled={!hasSelection || !scheduledAt || scheduling}
+                    className="w-full h-12 mt-2 rounded-lg bg-indigo-600 text-white text-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(79,70,229,0.3)]"
+                >
+                    <CalendarClock className="w-5 h-5" />
+                    {scheduling ? "Scheduling…" : "Schedule Campaign"}
+                </button>
+            )}
         </div>
     );
 }

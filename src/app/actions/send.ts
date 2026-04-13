@@ -185,6 +185,78 @@ export async function dispatchCampaign(campaignId: string, data: {
     return { jobCount: jobs.length, warmupTruncated };
 }
 
+export async function scheduleCampaign(campaignId: string, data: {
+    includedLists: string[];
+    excludedLists: string[];
+    includedSegments: string[];
+    excludedSegments: string[];
+    scheduledAt: string; // ISO string from the client
+}) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+
+    const scheduledDate = new Date(data.scheduledAt);
+    if (isNaN(scheduledDate.getTime()) || scheduledDate <= new Date()) {
+        throw new Error("Scheduled time must be in the future");
+    }
+
+    const whereCondition: any = currentUserRole === "admin"
+        ? { id: campaignId }
+        : { id: campaignId, brand: { users: { some: { id: userId } } } };
+
+    const campaign = await prisma.campaign.findFirst({ where: whereCondition });
+    if (!campaign || campaign.status !== "draft") throw new Error("Invalid campaign");
+
+    // Persist the list/segment selections and mark as scheduled
+    await prisma.campaign.update({
+        where: { id: campaignId },
+        data: {
+            status: "scheduled",
+            scheduledAt: scheduledDate,
+            includedLists: {
+                set: data.includedLists.map(id => ({ id })),
+            },
+            excludedLists: {
+                set: data.excludedLists.map(id => ({ id })),
+            },
+            includedSegments: {
+                set: data.includedSegments.map(id => ({ id })),
+            },
+            excludedSegments: {
+                set: data.excludedSegments.map(id => ({ id })),
+            },
+        },
+    });
+
+    revalidatePath("/dashboard/campaigns");
+    return { scheduledAt: scheduledDate.toISOString() };
+}
+
+export async function unscheduleCampaign(campaignId: string) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+
+    const whereCondition: any = currentUserRole === "admin"
+        ? { id: campaignId }
+        : { id: campaignId, brand: { users: { some: { id: userId } } } };
+
+    const campaign = await prisma.campaign.findFirst({ where: whereCondition });
+    if (!campaign || campaign.status !== "scheduled") throw new Error("Campaign is not scheduled");
+
+    await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: "draft", scheduledAt: null },
+    });
+
+    revalidatePath("/dashboard/campaigns");
+}
+
 export async function cancelCampaign(campaignId: string) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;

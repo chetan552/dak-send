@@ -3,13 +3,14 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Clock, FileEdit, Send, RefreshCw, XCircle, FlaskConical, Eye } from "lucide-react";
+import { ArrowLeft, Clock, FileEdit, Send, RefreshCw, XCircle, FlaskConical, Eye, CalendarClock } from "lucide-react";
 import Link from "next/link";
 import { CampaignForm } from "@/components/campaign/campaign-form";
 import { Button } from "@/components/ui/button";
 import { DeleteCampaignButton } from "@/components/campaign/delete-campaign-button";
 import { CancelCampaignButton } from "@/components/campaign/cancel-campaign-button";
 import { DuplicateCampaignButton } from "@/components/campaign/duplicate-campaign-button";
+import { UnscheduleCampaignButton } from "@/components/campaign/unschedule-campaign-button";
 import { TestSendButton } from "@/components/campaign/test-send-button";
 
 export default async function CampaignDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +34,8 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
     });
 
     const isDraft = campaign.status === 'draft';
+    const isScheduled = campaign.status === 'scheduled';
+    const isEditable = isDraft || isScheduled;
     const isFullHtmlDocument = campaign.htmlText.trim().toLowerCase().startsWith('<!doctype html') ||
         campaign.htmlText.trim().toLowerCase().startsWith('<html');
 
@@ -44,6 +47,7 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                 </Link>
                 <span className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 border ${isDraft ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300' :
                     campaign.status === 'sending' ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-500' :
+                    campaign.status === 'scheduled' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400' :
                         campaign.status === 'cancelled' ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400' :
                             'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400'
                     }`}>
@@ -51,7 +55,13 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                     {campaign.status === 'sending' && <RefreshCw className="w-4 h-4 animate-spin" />}
                     {campaign.status === 'cancelled' && <XCircle className="w-4 h-4" />}
                     {campaign.status === 'sent' && <Send className="w-4 h-4" />}
+                    {isScheduled && <CalendarClock className="w-4 h-4" />}
                     {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+                    {isScheduled && campaign.scheduledAt && (
+                        <span className="font-normal opacity-80">
+                            · {new Date(campaign.scheduledAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    )}
                 </span>
             </div>
 
@@ -82,10 +92,27 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                             </Link>
                         </>
                     )}
+                    {isScheduled && (
+                        <>
+                            <Link href={`/dashboard/campaigns/${campaign.id}/preview`}>
+                                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 gap-2">
+                                    <Eye className="w-4 h-4" /> Preview
+                                </Button>
+                            </Link>
+                            <TestSendButton campaignId={campaign.id} />
+                        </>
+                    )}
                     {campaign.status === 'sending' && (
                         <CancelCampaignButton
                             campaignId={campaign.id}
                             className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-yellow-500 h-10 px-4 transition-colors font-medium border border-yellow-500/20 rounded-md flex items-center justify-center pointer-events-auto"
+                        />
+                    )}
+                    {isScheduled && (
+                        <UnscheduleCampaignButton
+                            campaignId={campaign.id}
+                            showText={true}
+                            className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 h-10 px-4 transition-colors font-medium border border-zinc-200 dark:border-zinc-700 rounded-md flex items-center justify-center gap-2 pointer-events-auto"
                         />
                     )}
                     <DuplicateCampaignButton
@@ -107,7 +134,7 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                     <CardDescription className="text-zinc-500 dark:text-zinc-400">Basic information about your email campaign.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isDraft ? (
+                    {isEditable ? (
                         <CampaignForm brands={brands} initialData={campaign} />
                     ) : (
                         <div className="space-y-6">
