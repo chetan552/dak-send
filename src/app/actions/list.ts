@@ -40,6 +40,26 @@ export async function createList(formData: FormData) {
         },
     });
 
+    // Copy custom fields from a source list if requested
+    const copyFromListId = formData.get("copyFromListId") as string | null;
+    if (copyFromListId) {
+        const sourceFields = await prisma.customField.findMany({
+            where: { listId: copyFromListId },
+            orderBy: { createdAt: "asc" },
+        });
+        if (sourceFields.length > 0) {
+            await prisma.customField.createMany({
+                data: sourceFields.map(({ name, type, required, options }) => ({
+                    listId: list.id,
+                    name,
+                    type,
+                    required,
+                    options,
+                })),
+            });
+        }
+    }
+
     revalidatePath(`/dashboard/brands/${brandId}`);
     revalidatePath("/dashboard/lists");
 

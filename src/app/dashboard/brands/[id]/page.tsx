@@ -23,7 +23,7 @@ export default async function BrandPage({ params }: { params: Promise<{ id: stri
         include: {
             lists: {
                 include: {
-                    _count: { select: { subscribers: true } }
+                    _count: { select: { subscribers: true, customFields: true } }
                 },
                 orderBy: { createdAt: 'desc' }
             }
@@ -50,7 +50,7 @@ export default async function BrandPage({ params }: { params: Promise<{ id: stri
                 <div className="flex flex-wrap items-center gap-3">
                     {currentUserRole === 'admin' && <DeleteBrandButton brandId={brand.id} brandName={brand.name} />}
                     <BrandSettingsButton brand={brand} />
-                    <CreateListButton brandId={brand.id} />
+                    <CreateListButton brandId={brand.id} existingLists={brand.lists} />
                 </div>
             </div>
 
@@ -62,7 +62,7 @@ export default async function BrandPage({ params }: { params: Promise<{ id: stri
                         </div>
                         <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">No lists yet</h3>
                         <p className="text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm">Create a mailing list to start collecting subscribers.</p>
-                        <CreateListButton brandId={brand.id} />
+                        <CreateListButton brandId={brand.id} existingLists={brand.lists} />
                     </CardContent>
                 </Card>
             ) : (
