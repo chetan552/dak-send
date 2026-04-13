@@ -25,7 +25,9 @@ export default function Home() {
       <nav className="fixed top-0 w-full border-b border-white/[0.06] bg-black/60 backdrop-blur-2xl z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Image src="/logo.svg" alt="DakSend" width={130} height={32} priority className="brightness-0 invert" />
+            <Link href="/">
+              <Image src="/logo.svg" alt="DakSend" width={130} height={32} priority />
+            </Link>
             <div className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
@@ -128,7 +130,7 @@ export default function Home() {
               {/* Sidebar */}
               <div className="w-56 border-r border-white/[0.06] bg-zinc-950/50 p-4 hidden md:flex flex-col">
                 <div className="flex items-center mb-6 px-2">
-                  <Image src="/logo.svg" alt="DakSend" width={100} height={24} className="brightness-0 invert" />
+                  <Image src="/logo.svg" alt="DakSend" width={100} height={24} />
                 </div>
                 <div className="space-y-0.5 text-sm">
                   <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/10 text-indigo-300 font-medium">
@@ -654,7 +656,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
             <div className="md:col-span-1">
               <div className="mb-4">
-                <Image src="/logo.svg" alt="DakSend" width={120} height={29} className="brightness-0 invert" />
+                <Image src="/logo.svg" alt="DakSend" width={120} height={29} />
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
                 The open-source, self-hosted email marketing platform for modern brands.
