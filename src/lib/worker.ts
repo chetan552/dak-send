@@ -67,9 +67,13 @@ const startWorker = async () => {
                 brandFromEmail,
             );
 
+            const toAddress = subscriberName
+                ? `"${subscriberName.replace(/"/g, '\\"')}" <${subscriberEmail}>`
+                : subscriberEmail;
+
             await sendEmail({
                 FromEmailAddress: `${brandFromName} <${brandFromEmail}>`,
-                Destination: { ToAddresses: [subscriberEmail] },
+                Destination: { ToAddresses: [toAddress] },
                 ReplyToAddresses: brandReplyTo ? [brandReplyTo] : [],
                 Content: {
                     Simple: {
@@ -142,9 +146,13 @@ const startWorker = async () => {
         );
 
         try {
+            const toAddress = subscriberName
+                ? `"${subscriberName.replace(/"/g, '\\"')}" <${subscriberEmail}>`
+                : subscriberEmail;
+
             await sendEmail({
                 FromEmailAddress: `${campaign.brand.fromName || campaign.brand.name} <${campaign.brand.fromEmail}>`,
-                Destination: { ToAddresses: [subscriberEmail] },
+                Destination: { ToAddresses: [toAddress] },
                 ReplyToAddresses: campaign.brand.replyTo ? [campaign.brand.replyTo] : [],
                 Content: {
                     Simple: {
