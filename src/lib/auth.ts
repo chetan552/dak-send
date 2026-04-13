@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { NextAuthOptions } from "next-auth";
 import { headers } from "next/headers";
 import { checkRateLimit, recordFailedAttempt, recordSuccessfulLogin } from "./rate-limit";
+import { verifyTotpCode, matchRecoveryCode } from "./totp";
 
 export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
@@ -21,6 +22,7 @@ export const authOptions: NextAuthOptions = {
             credentials: {
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
+                totp: { label: "Code", type: "text" },
             },
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) {
@@ -30,7 +32,7 @@ export const authOptions: NextAuthOptions = {
                 // Get client IP from request headers
                 const headersList = await headers();
                 const ip =
-                    headersList.get("cf-connecting-ip") ||       // Cloudflare real IP
+                    headersList.get("cf-connecting-ip") ||
                     headersList.get("x-forwarded-for")?.split(",")[0].trim() ||
                     "unknown";
 
@@ -43,6 +45,16 @@ export const authOptions: NextAuthOptions = {
 
                 const user = await prisma.user.findUnique({
                     where: { email: credentials.email },
+                    select: {
+                        id: true,
+                        email: true,
+                        name: true,
+                        role: true,
+                        password: true,
+                        totpEnabled: true,
+                        totpSecret: true,
+                        recoveryCodes: true,
+                    },
                 });
 
                 if (!user) {
@@ -50,15 +62,57 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                const isPasswordValid = await bcrypt.compare(
-                    credentials.password,
-                    user.password,
-                );
-
+                const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
                 if (!isPasswordValid) {
                     recordFailedAttempt(ip);
                     return null;
                 }
+
+                // ── 2FA check ────────────────────────────────────────────────
+                // Determine if 2FA is required for this login
+                const needsTwoFactor = user.totpEnabled;
+                if (!needsTwoFactor) {
+                    // Check global policy: if "required" and user hasn't set up 2FA,
+                    // still allow login so they can reach the setup page.
+                    const policySetting = await prisma.setting.findUnique({
+                        where: { key: "twoFactor.policy" },
+                    });
+                    const policy = policySetting?.value ?? "optional";
+                    if (policy === "required" && !user.totpEnabled) {
+                        // Let them in — they'll be forced to set up 2FA on the settings page.
+                        // (enforced via middleware or settings page redirect is out of scope here)
+                    }
+                }
+
+                if (needsTwoFactor) {
+                    const totpCode = credentials.totp?.trim();
+
+                    if (!totpCode) {
+                        // Signal the login form to show the 2FA step
+                        throw new Error("2FA_REQUIRED");
+                    }
+
+                    // Try TOTP code first
+                    const totpOk = user.totpSecret
+                        ? verifyTotpCode(totpCode, user.totpSecret)
+                        : false;
+
+                    if (!totpOk) {
+                        // Try recovery code
+                        const recoveryIdx = await matchRecoveryCode(totpCode, user.recoveryCodes);
+                        if (recoveryIdx === -1) {
+                            recordFailedAttempt(ip);
+                            throw new Error("Invalid authentication code.");
+                        }
+                        // Consume the recovery code (remove it from the array)
+                        const updatedCodes = user.recoveryCodes.filter((_, i) => i !== recoveryIdx);
+                        await prisma.user.update({
+                            where: { id: user.id },
+                            data: { recoveryCodes: updatedCodes },
+                        });
+                    }
+                }
+                // ─────────────────────────────────────────────────────────────
 
                 // Successful login — clear any tracked failures for this IP
                 recordSuccessfulLogin(ip);

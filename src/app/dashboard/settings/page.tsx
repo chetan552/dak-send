@@ -14,6 +14,9 @@ import { getSystemSettings } from "@/app/actions/settings";
 import { UsersTable } from "@/components/settings/users-table";
 import { ChangePasswordForm } from "@/components/settings/change-password-form";
 import { EditProfileForm } from "@/components/settings/edit-profile-form";
+import { TwoFactorSetup } from "@/components/settings/two-factor-setup";
+import { TwoFactorPolicyControl } from "@/components/settings/two-factor-policy";
+import { get2FAStatus, get2FAPolicy } from "@/app/actions/2fa";
 import Link from "next/link";
 
 export default async function SettingsPage() {
@@ -23,6 +26,11 @@ export default async function SettingsPage() {
 
     const currentUserRole = session.user?.role || "user";
     const currentUserId = session.user?.id;
+
+    const [twoFAStatus, twoFAPolicy] = await Promise.all([
+        get2FAStatus(),
+        currentUserRole === "admin" ? get2FAPolicy() : Promise.resolve("optional" as const),
+    ]);
 
     let allUsers: any[] = [];
     let allBrands: any[] = [];
@@ -103,6 +111,11 @@ export default async function SettingsPage() {
                         <h3 className="text-base font-semibold text-zinc-900 dark:text-white mb-4">Change Password</h3>
                         <ChangePasswordForm />
                     </div>
+                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                        <h3 className="text-base font-semibold text-zinc-900 dark:text-white mb-1">Two-Factor Authentication</h3>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Protect your account with an authenticator app.</p>
+                        <TwoFactorSetup enabled={twoFAStatus.enabled} recoveryCodesLeft={twoFAStatus.recoveryCodesLeft} />
+                    </div>
                 </CardContent>
             </Card>
 
@@ -110,6 +123,19 @@ export default async function SettingsPage() {
                 <div className="grid grid-cols-1 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
                     <SESStats />
                     <AWSConfigForm initialSettings={systemSettings} />
+                    <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
+                                <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Two-Factor Authentication Policy
+                            </CardTitle>
+                            <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">
+                                Control whether 2FA is available or mandatory for all users.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <TwoFactorPolicyControl currentPolicy={twoFAPolicy} />
+                        </CardContent>
+                    </Card>
                 </div>
             )}
 
