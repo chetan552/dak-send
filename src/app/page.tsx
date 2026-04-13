@@ -6,9 +6,11 @@ import {
   ChevronRight,
   Code2,
   Globe,
+  KeyRound,
   Layers,
   Mail,
   MousePointerClick,
+  Rss,
   Send,
   ShieldCheck,
   Sparkles,
@@ -488,6 +490,71 @@ export default function Home() {
                 <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">AI-powered delivery that learns when each subscriber is most engaged, then sends at the perfect moment.</p>
               </div>
               <div className="absolute bottom-0 right-0 w-40 h-40 bg-purple-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Feature 6: Email Deliverability */}
+            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-rose-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              {/* Decorative check badges */}
+              <div className="absolute top-6 right-6 flex flex-col gap-2 opacity-20 group-hover:opacity-50 transition-opacity duration-500 pointer-events-none">
+                {["SPF", "DKIM", "DMARC"].map((label) => (
+                  <div key={label} className="flex items-center gap-1.5 bg-rose-500/20 border border-rose-500/30 rounded-full px-2 py-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                    <span className="text-[9px] font-mono text-rose-300">{label} ✓</span>
+                  </div>
+                ))}
+              </div>
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-rose-500/15 border border-rose-500/20 flex items-center justify-center mb-4">
+                  <ShieldCheck className="w-5 h-5 text-rose-400" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">Inbox Deliverability</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">Automatic SPF, DKIM, and DMARC checks. Outlook-safe HTML pipeline, plain-text alternatives, and RFC-compliant unsubscribe headers built in.</p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-28 h-28 bg-rose-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Feature 7: RSS-to-Email — Large */}
+            <div className="md:col-span-2 bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-orange-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              {/* Decorative feed items */}
+              <div className="absolute top-6 right-8 w-[40%] space-y-2 opacity-20 group-hover:opacity-50 transition-opacity duration-700 pointer-events-none">
+                {["New post: Getting started with...", "New post: 10 tips for better...", "New post: Why self-hosted email..."].map((text, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2" style={{ opacity: 1 - i * 0.25 }}>
+                    <Rss className="w-3 h-3 text-orange-400 flex-shrink-0" />
+                    <span className="text-[9px] text-orange-300 truncate">{text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-orange-500/15 border border-orange-500/20 flex items-center justify-center mb-4">
+                  <Rss className="w-5 h-5 text-orange-400" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">RSS-to-Email</h3>
+                <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">Connect any RSS or Atom feed and DakSend automatically drafts and sends a campaign whenever new content is published. Set it once and forget it.</p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-40 h-40 bg-orange-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Feature 8: Security & 2FA */}
+            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-sky-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              {/* Decorative OTP dots */}
+              <div className="absolute top-6 right-6 flex gap-1.5 opacity-20 group-hover:opacity-50 transition-opacity duration-500 pointer-events-none">
+                {[1, 1, 1, 0, 0, 0].map((filled, i) => (
+                  <div key={i} className={`w-6 h-8 rounded-md border flex items-center justify-center text-xs font-mono font-bold ${filled ? "bg-sky-500/30 border-sky-400/40 text-sky-300" : "bg-zinc-800/50 border-zinc-700/50 text-zinc-600"}`}>
+                    {filled ? "•" : ""}
+                  </div>
+                ))}
+              </div>
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center mb-4">
+                  <KeyRound className="w-5 h-5 text-sky-400" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">Security & 2FA</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">TOTP two-factor auth, brute-force protection, and admin-enforced 2FA policies keep your instance locked down.</p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-28 h-28 bg-sky-500/10 blur-3xl rounded-full pointer-events-none" />
             </div>
           </div>
         </div>
