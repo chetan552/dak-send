@@ -26,7 +26,11 @@ export function LoginForm() {
                 password,
             });
             if (res?.error) {
-                setError("Invalid credentials");
+                setError(
+                    res.error.includes("Too many")
+                        ? res.error
+                        : "Invalid email or password."
+                );
                 setLoading(false);
             } else {
                 router.push("/dashboard");

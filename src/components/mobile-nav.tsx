@@ -24,7 +24,9 @@ export function MobileNav({ userEmail, userName }: MobileNavProps) {
             {/* Mobile top bar - only visible on small screens */}
             <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center">
-                    <Image src="/logo.svg" alt="DakSend" width={120} height={29} priority />
+                    <Link href="/">
+                        <Image src="/logo.svg" alt="DakSend" width={120} height={29} priority />
+                    </Link>
                 </div>
                 <button
                     onClick={() => setIsOpen(!isOpen)}

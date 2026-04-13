@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/components/logout-button";
@@ -28,7 +29,9 @@ export default async function DashboardLayout({
             {/* Desktop Sidebar — hidden on mobile */}
             <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col backdrop-blur-md transition-colors duration-300 flex-shrink-0">
                 <div className="p-6">
-                    <Image src="/logo.svg" alt="DakSend" width={140} height={34} priority />
+                    <Link href="/">
+                        <Image src="/logo.svg" alt="DakSend" width={140} height={34} priority />
+                    </Link>
                 </div>
 
                 <SidebarNav />

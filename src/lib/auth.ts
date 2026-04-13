@@ -4,6 +4,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { NextAuthOptions } from "next-auth";
+import { headers } from "next/headers";
+import { checkRateLimit, recordFailedAttempt, recordSuccessfulLogin } from "./rate-limit";
 
 export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
@@ -25,22 +27,41 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
+                // Get client IP from request headers
+                const headersList = await headers();
+                const ip =
+                    headersList.get("cf-connecting-ip") ||       // Cloudflare real IP
+                    headersList.get("x-forwarded-for")?.split(",")[0].trim() ||
+                    "unknown";
+
+                // Check rate limit before touching the database
+                const { allowed, retryAfterSeconds } = checkRateLimit(ip);
+                if (!allowed) {
+                    console.warn(`Login blocked for IP ${ip} — too many failed attempts. Retry after ${retryAfterSeconds}s`);
+                    throw new Error(`Too many failed attempts. Try again in ${Math.ceil((retryAfterSeconds || 900) / 60)} minutes.`);
+                }
+
                 const user = await prisma.user.findUnique({
                     where: { email: credentials.email },
                 });
 
                 if (!user) {
+                    recordFailedAttempt(ip);
                     return null;
                 }
 
                 const isPasswordValid = await bcrypt.compare(
                     credentials.password,
-                    user.password
+                    user.password,
                 );
 
                 if (!isPasswordValid) {
+                    recordFailedAttempt(ip);
                     return null;
                 }
+
+                // Successful login — clear any tracked failures for this IP
+                recordSuccessfulLogin(ip);
 
                 return {
                     id: user.id,

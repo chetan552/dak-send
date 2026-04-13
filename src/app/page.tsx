@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   BarChart3,
@@ -24,12 +25,7 @@ export default function Home() {
       <nav className="fixed top-0 w-full border-b border-white/[0.06] bg-black/60 backdrop-blur-2xl z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-sm shadow-[0_0_20px_rgba(99,102,241,0.4)]">
-                D
-              </div>
-              <span className="font-semibold text-lg tracking-tight">DakSend</span>
-            </div>
+            <Image src="/logo.svg" alt="DakSend" width={130} height={32} priority className="brightness-0 invert" />
             <div className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
@@ -131,9 +127,8 @@ export default function Home() {
             <div className="flex h-[420px] md:h-[520px]">
               {/* Sidebar */}
               <div className="w-56 border-r border-white/[0.06] bg-zinc-950/50 p-4 hidden md:flex flex-col">
-                <div className="flex items-center gap-2 mb-6 px-2">
-                  <div className="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold">D</div>
-                  <span className="text-sm font-semibold text-zinc-200">DakSend</span>
+                <div className="flex items-center mb-6 px-2">
+                  <Image src="/logo.svg" alt="DakSend" width={100} height={24} className="brightness-0 invert" />
                 </div>
                 <div className="space-y-0.5 text-sm">
                   <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/10 text-indigo-300 font-medium">
@@ -658,11 +653,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
             <div className="md:col-span-1">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-xs shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-                  D
-                </div>
-                <span className="font-semibold text-zinc-200 tracking-tight">DakSend</span>
+              <div className="mb-4">
+                <Image src="/logo.svg" alt="DakSend" width={120} height={29} className="brightness-0 invert" />
               </div>
               <p className="text-sm text-zinc-500 leading-relaxed">
                 The open-source, self-hosted email marketing platform for modern brands.
