@@ -43,6 +43,8 @@ model Brand {
   emailTemplates EmailTemplate[]
   signupForms    SignupForm[]
   webhooks       Webhook[]
+  subscriberEvents SubscriberEvent[]
+  tags             Tag[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 }
@@ -81,11 +83,13 @@ model Subscriber {
   list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
   status    String   @default("subscribed") // subscribed, unsubscribed, bounced, complained
   hasConfirmedGdpr Boolean  @default(false)
-  
+
   customFields SubscriberFieldValue[]
   subscriptionTokens SubscriptionToken[]
   optimalSendHour Int?  // 0-23, computed from open history
-  
+  events      SubscriberEvent[]
+  tags        SubscriberTag[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -259,18 +263,19 @@ model CampaignClick {
 }
 
 model Automation {
-  id            String   @id @default(cuid())
-  name          String
-  brandId       String
-  brand         Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  trigger       String   @default("subscriber_added") // subscriber_added, subscriber_confirmed, webhook, api
-  triggerListId  String?
-  webhookSecret  String?  // Bearer token for inbound webhook trigger
-  status        String   @default("draft") // draft, active, paused
-  steps         AutomationStep[]
-  enrollments   AutomationEnrollment[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  brandId          String
+  brand            Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  trigger          String   @default("subscriber_added") // subscriber_added, subscriber_confirmed, webhook, api, event
+  triggerListId    String?
+  triggerEventName String?  // for "event" trigger: the event name that fires this automation
+  webhookSecret    String?  // Bearer token for inbound webhook trigger
+  status           String   @default("draft") // draft, active, paused
+  steps            AutomationStep[]
+  enrollments      AutomationEnrollment[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model AutomationStep {
@@ -362,4 +367,45 @@ model Webhook {
   updatedAt DateTime @updatedAt
 
   @@index([brandId])
+}
+
+model SubscriberEvent {
+  id           String     @id @default(cuid())
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  brandId      String
+  brand        Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name         String
+  properties   Json       @default("{}")
+  occurredAt   DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+
+  @@index([subscriberId])
+  @@index([brandId, name])
+  @@index([occurredAt])
+}
+
+model Tag {
+  id          String          @id @default(cuid())
+  name        String
+  brandId     String
+  brand       Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  subscribers SubscriberTag[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([name, brandId])
+  @@index([brandId])
+}
+
+model SubscriberTag {
+  id           String     @id @default(cuid())
+  subscriberId String
+  subscriber   Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  tagId        String
+  tag          Tag        @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([subscriberId, tagId])
+  @@index([tagId])
 }

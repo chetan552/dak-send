@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Clock, Mail, ArrowDown, GripVertical, Play, Pause, Loader2, Copy, Check, Webhook, Code2 } from "lucide-react";
+import { Plus, Trash2, Clock, Mail, Play, Pause, Copy, Check, Webhook, Code2, Zap } from "lucide-react";
 import { addStep, updateStep, deleteStep, updateAutomation, deleteAutomation } from "@/app/actions/automation";
 
 interface Step {
@@ -22,6 +22,7 @@ interface AutomationBuilderProps {
         status: string;
         trigger: string;
         triggerListId: string | null;
+        triggerEventName: string | null;
         webhookSecret: string | null;
         activeCount: number;
         completedCount: number;
@@ -69,6 +70,7 @@ export function AutomationBuilder({ automation, appUrl }: AutomationBuilderProps
         subscriber_confirmed: "Subscriber confirms opt-in",
         webhook: "Inbound Webhook",
         api: "API Trigger",
+        event: "Event Trigger",
     };
 
     const copyToClipboard = (text: string, field: string) => {
@@ -282,6 +284,39 @@ export function AutomationBuilder({ automation, appUrl }: AutomationBuilderProps
                                     '  -H "Content-Type: application/json" \\',
                                     "  -d '{\"email\":\"user@example.com\",\"name\":\"Alice\"}' \\",
                                     "  " + apiEnrollUrl,
+                                ].join("\n")}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Event trigger info */}
+                {automation.trigger === "event" && (
+                    <div className="flex items-start gap-3 mt-3">
+                        <div className="w-10 flex-shrink-0" />
+                        <div className="flex-1 p-4 rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-950/20 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-violet-800 dark:text-violet-300">
+                                <Zap className="w-4 h-4" />
+                                Event Trigger
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400">Listening for event:</span>
+                                <code className="text-xs font-mono bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 text-violet-700 dark:text-violet-300">
+                                    {automation.triggerEventName || "(no event name set)"}
+                                </code>
+                            </div>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                This automation enrolls a subscriber automatically when an event with the above name is sent to{" "}
+                                <code className="font-mono">POST /api/v1/events</code>.
+                            </p>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded p-2 font-mono whitespace-pre-wrap break-all">
+                                {[
+                                    "# Send an event to trigger this automation",
+                                    "curl -X POST \\",
+                                    '  -H "x-api-key: <your-api-key>" \\',
+                                    '  -H "Content-Type: application/json" \\',
+                                    `  -d '{"email":"user@example.com","listId":"<listId>","event":"${automation.triggerEventName || "event_name"}","properties":{"key":"value"}}' \\`,
+                                    `  ${appUrl}/api/v1/events`,
                                 ].join("\n")}
                             </div>
                         </div>

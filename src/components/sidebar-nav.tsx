@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Send, Settings, Rss, BarChart3, Zap, LayoutTemplate, FileInput, ImageIcon } from "lucide-react";
+import { LayoutDashboard, Users, Send, Settings, Rss, BarChart3, Zap, LayoutTemplate, FileInput, ImageIcon, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const NAV_ITEMS = [
@@ -10,6 +10,7 @@ export const NAV_ITEMS = [
     { name: "Lists", href: "/dashboard/lists", exact: false, icon: Users },
     { name: "Campaigns", href: "/dashboard/campaigns", exact: false, icon: Send },
     { name: "Automations", href: "/dashboard/automations", exact: false, icon: Zap },
+    { name: "Tags", href: "/dashboard/tags", exact: false, icon: Tag },
     { name: "Templates", href: "/dashboard/templates", exact: false, icon: LayoutTemplate },
     { name: "Media", href: "/dashboard/media", exact: false, icon: ImageIcon },
     { name: "Forms", href: "/dashboard/forms", exact: false, icon: FileInput },

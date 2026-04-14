@@ -69,6 +69,7 @@ export async function createAutomation(data: {
     brandId: string;
     trigger: string;
     triggerListId?: string;
+    triggerEventName?: string;
 }) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
@@ -95,6 +96,7 @@ export async function createAutomation(data: {
             brandId: data.brandId,
             trigger: data.trigger,
             triggerListId: data.triggerListId || null,
+            triggerEventName: data.trigger === "event" ? (data.triggerEventName || null) : null,
             webhookSecret,
             status: "draft",
         },
@@ -109,6 +111,7 @@ export async function updateAutomation(id: string, data: {
     name?: string;
     trigger?: string;
     triggerListId?: string;
+    triggerEventName?: string;
     status?: string;
 }) {
     const session = await getServerSession(authOptions);
