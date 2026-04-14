@@ -380,11 +380,12 @@ interface AttrFieldsRowProps {
     alt: string; setAlt: (v: string) => void;
     width: string; setWidth: (v: string) => void;
     height: string; setHeight: (v: string) => void;
+    className?: string;
 }
 
-export function AttrFieldsRow({ alt, setAlt, width, setWidth, height, setHeight }: AttrFieldsRowProps) {
+export function AttrFieldsRow({ alt, setAlt, width, setWidth, height, setHeight, className }: AttrFieldsRowProps) {
     return (
-        <div className="px-6 py-3 border-t border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div className={className ?? "px-6 py-3 border-t border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/30"}>
             <div className="grid grid-cols-[1fr_110px_110px] gap-3 items-end">
                 <div>
                     <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Alt text</label>

@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { dispatchWebhooks } from "@/lib/webhooks";
 import { computeOptimalHour } from "@/lib/send-time";
 
+// Tracking endpoints must never be cached — each request is a unique event.
+export const dynamic = "force-dynamic";
+
 // 1x1 transparent GIF pixel
 const TRACKING_PIXEL = Buffer.from(
     "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",

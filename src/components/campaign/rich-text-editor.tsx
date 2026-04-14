@@ -439,31 +439,55 @@ function SaveAsTemplateDialog({ open, onClose, html }: { open: boolean; onClose:
     );
 }
 
-function EditImageDialog({ open, onClose, editor }: { open: boolean; onClose: () => void; editor: any | null }) {
+function EditImageDialog({
+    open, onClose, editor, iframeImg, onIframeSave,
+}: {
+    open: boolean;
+    onClose: () => void;
+    editor: any | null;
+    iframeImg?: HTMLImageElement | null;
+    onIframeSave?: () => void;
+}) {
     const [alt, setAlt] = useState('');
     const [width, setWidth] = useState('');
     const [height, setHeight] = useState('');
 
     // Load current attributes whenever the dialog opens
     useEffect(() => {
-        if (!open || !editor) return;
-        const attrs = editor.getAttributes('image') || {};
-        setAlt(attrs.alt || '');
-        setWidth(attrs.width || '');
-        setHeight(attrs.height || '');
-    }, [open, editor]);
+        if (!open) return;
+        if (iframeImg) {
+            setAlt(iframeImg.getAttribute('alt') || '');
+            setWidth(iframeImg.getAttribute('width') || '');
+            setHeight(iframeImg.getAttribute('height') || '');
+        } else if (editor) {
+            const attrs = editor.getAttributes('image') || {};
+            setAlt(attrs.alt || '');
+            setWidth(attrs.width || '');
+            setHeight(attrs.height || '');
+        }
+    }, [open, editor, iframeImg]);
 
     const handleSave = () => {
-        if (!editor) return;
         const a = alt.trim();
         const w = width.trim();
         const h = height.trim();
-        editor.chain().focus().updateAttributes('image', {
-            alt: a,
-            title: a,
-            width: w || null,
-            height: h || null,
-        }).run();
+
+        if (iframeImg) {
+            iframeImg.setAttribute('alt', a);
+            iframeImg.setAttribute('title', a);
+            if (w) iframeImg.setAttribute('width', w);
+            else iframeImg.removeAttribute('width');
+            if (h) iframeImg.setAttribute('height', h);
+            else iframeImg.removeAttribute('height');
+            onIframeSave?.();
+        } else if (editor) {
+            editor.chain().focus().updateAttributes('image', {
+                alt: a,
+                title: a,
+                width: w || null,
+                height: h || null,
+            }).run();
+        }
         onClose();
     };
 
@@ -478,6 +502,7 @@ function EditImageDialog({ open, onClose, editor }: { open: boolean; onClose: ()
                         alt={alt} setAlt={setAlt}
                         width={width} setWidth={setWidth}
                         height={height} setHeight={setHeight}
+                        className="py-2"
                     />
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -656,14 +681,16 @@ interface ToolbarProps {
     onOpenMediaPicker: () => void;
     onEditImage?: () => void;
     isComplexHtml: boolean;
+    iframeImageSelected?: boolean;
     onIframeCommand?: (command: string, value?: string) => void;
     onIframeStyle?: (cssProp: string, cssVal: string) => void;
 }
 
-const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, onEditImage, isComplexHtml, onIframeCommand, onIframeStyle }: ToolbarProps) => {
+const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, onEditImage, isComplexHtml, iframeImageSelected, onIframeCommand, onIframeStyle }: ToolbarProps) => {
     // True when the content is shown inside the iframe (not TipTap, not raw source)
     const iframeMode = isComplexHtml && !isHtmlMode;
-    const isImageSelected = !isHtmlMode && !iframeMode && editor?.isActive('image');
+    const isImageSelected = (!isHtmlMode && !iframeMode && editor?.isActive('image')) ||
+                            (iframeMode && !!iframeImageSelected);
 
     const fontFamilies = [
         { name: 'Default', value: '' },
@@ -1074,6 +1101,8 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
     const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
     const [editImageOpen, setEditImageOpen] = useState(false);
+    // Tracks whichever <img> element the user last clicked in the iframe.
+    const [selectedIframeImg, setSelectedIframeImg] = useState<HTMLImageElement | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     // Tracks the last non-collapsed selection inside the iframe so toolbar
     // commands can restore it after toolbar clicks steal focus.
@@ -1093,6 +1122,14 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const iframeWriting = useRef(false);
     useEffect(() => {
         if (!isHtmlMode && isComplexHtml(value) && iframeRef.current) {
+            // Skip rewriting if the value change came from the iframe itself
+            // (typing, image insertion, etc.). The DOM already reflects the
+            // latest content — rewriting would destroy the cursor position.
+            if (value === lastSelfValue.current) return;
+
+            // External rewrite — clear any previously-selected iframe image
+            setSelectedIframeImg(null);
+
             const doc = iframeRef.current.contentDocument;
             if (doc) {
                 iframeWriting.current = true;
@@ -1158,6 +1195,24 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                                 if (file) iframeUploadHandler.current(file);
                                 return;
                             }
+                        }
+                    });
+
+                    // Track which <img> the user clicked so the "Edit Image"
+                    // toolbar button becomes available in iframe mode.
+                    doc.addEventListener('click', (e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.tagName === 'IMG') {
+                            const img = target as HTMLImageElement;
+                            // Visual selection ring
+                            doc.querySelectorAll('img').forEach(el =>
+                                el.style.removeProperty('outline'));
+                            img.style.outline = '2px solid #3b82f6';
+                            setSelectedIframeImg(img);
+                        } else {
+                            doc.querySelectorAll('img').forEach(el =>
+                                el.style.removeProperty('outline'));
+                            setSelectedIframeImg(null);
                         }
                     });
                 }
@@ -1511,7 +1566,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
     return (
         <div className="w-full relative shadow-sm">
-            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} onEditImage={() => setEditImageOpen(true)} isComplexHtml={isComplexHtml(value)} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
+            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} onEditImage={() => setEditImageOpen(true)} isComplexHtml={isComplexHtml(value)} iframeImageSelected={!!selectedIframeImg} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
 
             {/* HTML Source View */}
             <div className={!isHtmlMode ? "hidden" : "block"}>
@@ -1601,6 +1656,8 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 open={editImageOpen}
                 onClose={() => setEditImageOpen(false)}
                 editor={editor}
+                iframeImg={selectedIframeImg}
+                onIframeSave={syncIframeHtml}
             />
 
             {/* Media Picker Modal */}

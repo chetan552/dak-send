@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dispatchWebhooks } from "@/lib/webhooks";
 
+// Tracking endpoints must never be cached — each request is a unique event.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
     const campaignId = req.nextUrl.searchParams.get("cid");
     const email = req.nextUrl.searchParams.get("email");
