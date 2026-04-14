@@ -20,13 +20,23 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export interface ImageInsertMeta {
+    alt?: string;
+    width?: string;
+    height?: string;
+}
+
 interface MediaPickerProps {
     open: boolean;
     onClose: () => void;
-    onSelect: (url: string, filename: string) => void;
+    onSelect: (url: string, filename: string, meta: ImageInsertMeta) => void;
 }
 
 type Tab = 'library' | 'url';
+
+function deriveDefaultAlt(filename: string): string {
+    return filename.replace(/^\d+-\d+-/, '').replace(/\.[^/.]+$/, '');
+}
 
 export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
     const [tab, setTab] = useState<Tab>('library');
@@ -42,6 +52,11 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
     // --- URL tab state ---
     const [urlInput, setUrlInput] = useState("");
     const [urlPreviewOk, setUrlPreviewOk] = useState<boolean | null>(null);
+
+    // --- Image attribute inputs (shared across tabs) ---
+    const [altText, setAltText] = useState("");
+    const [widthInput, setWidthInput] = useState("");
+    const [heightInput, setHeightInput] = useState("");
 
     const fetchImages = useCallback(async () => {
         setLoading(true);
@@ -64,8 +79,21 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
             setTab('library');
             setUrlInput("");
             setUrlPreviewOk(null);
+            setAltText("");
+            setWidthInput("");
+            setHeightInput("");
         }
     }, [open, fetchImages]);
+
+    // Pre-fill alt text from filename when the user selects a library image
+    useEffect(() => {
+        if (!selected) return;
+        const img = images.find(i => i.url === selected);
+        if (img && !altText.trim()) {
+            setAltText(deriveDefaultAlt(img.filename));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selected]);
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -92,10 +120,16 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
         }
     };
 
+    const buildMeta = (fallbackAlt: string): ImageInsertMeta => ({
+        alt: altText.trim() || fallbackAlt,
+        width: widthInput.trim() || undefined,
+        height: heightInput.trim() || undefined,
+    });
+
     const handleInsertFromLibrary = () => {
         if (!selected) return;
         const img = images.find(i => i.url === selected);
-        if (img) onSelect(img.url, img.filename);
+        if (img) onSelect(img.url, img.filename, buildMeta(deriveDefaultAlt(img.filename)));
     };
 
     const handleInsertFromUrl = () => {
@@ -103,7 +137,7 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
         if (!trimmed) return;
         // derive a simple filename from the URL
         const filename = trimmed.split('/').pop()?.split('?')[0] || 'image';
-        onSelect(trimmed, filename);
+        onSelect(trimmed, filename, buildMeta(deriveDefaultAlt(filename)));
     };
 
     const filtered = search
@@ -243,6 +277,12 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
                             )}
                         </div>
 
+                        <AttrFieldsRow
+                            alt={altText} setAlt={setAltText}
+                            width={widthInput} setWidth={setWidthInput}
+                            height={heightInput} setHeight={setHeightInput}
+                        />
+
                         {/* Footer */}
                         <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-xl">
                             <span className="text-xs text-zinc-400">{images.length} image{images.length !== 1 ? 's' : ''} available</span>
@@ -307,6 +347,12 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
                             </div>
                         </div>
 
+                        <AttrFieldsRow
+                            alt={altText} setAlt={setAltText}
+                            width={widthInput} setWidth={setWidthInput}
+                            height={heightInput} setHeight={setHeightInput}
+                        />
+
                         {/* Footer */}
                         <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-xl">
                             <span className="text-xs text-zinc-400">The image must be publicly accessible for it to display in emails.</span>
@@ -326,6 +372,52 @@ export function MediaPicker({ open, onClose, onSelect }: MediaPickerProps) {
                     </>
                 )}
             </div>
+        </div>
+    );
+}
+
+interface AttrFieldsRowProps {
+    alt: string; setAlt: (v: string) => void;
+    width: string; setWidth: (v: string) => void;
+    height: string; setHeight: (v: string) => void;
+}
+
+export function AttrFieldsRow({ alt, setAlt, width, setWidth, height, setHeight }: AttrFieldsRowProps) {
+    return (
+        <div className="px-6 py-3 border-t border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/30">
+            <div className="grid grid-cols-[1fr_110px_110px] gap-3 items-end">
+                <div>
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Alt text</label>
+                    <Input
+                        type="text"
+                        placeholder="Describe the image"
+                        value={alt}
+                        onChange={(e) => setAlt(e.target.value)}
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                    />
+                </div>
+                <div>
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Width</label>
+                    <Input
+                        type="text"
+                        placeholder="e.g. 300"
+                        value={width}
+                        onChange={(e) => setWidth(e.target.value)}
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                    />
+                </div>
+                <div>
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Height</label>
+                    <Input
+                        type="text"
+                        placeholder="e.g. auto"
+                        value={height}
+                        onChange={(e) => setHeight(e.target.value)}
+                        className="h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
+                    />
+                </div>
+            </div>
+            <p className="mt-1.5 text-[11px] text-zinc-400">Size accepts pixels (<code>300</code>), percent (<code>50%</code>), or <code>auto</code>. Leave blank for the image&apos;s natural size.</p>
         </div>
     );
 }

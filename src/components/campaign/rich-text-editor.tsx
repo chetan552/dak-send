@@ -31,7 +31,7 @@ import dynamic from 'next/dynamic';
 const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
 import { html } from '@codemirror/lang-html';
 import { useTheme } from 'next-themes';
-import { MediaPicker } from '@/components/campaign/media-picker';
+import { MediaPicker, AttrFieldsRow, type ImageInsertMeta } from '@/components/campaign/media-picker';
 
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
@@ -439,6 +439,68 @@ function SaveAsTemplateDialog({ open, onClose, html }: { open: boolean; onClose:
     );
 }
 
+function EditImageDialog({ open, onClose, editor }: { open: boolean; onClose: () => void; editor: any | null }) {
+    const [alt, setAlt] = useState('');
+    const [width, setWidth] = useState('');
+    const [height, setHeight] = useState('');
+
+    // Load current attributes whenever the dialog opens
+    useEffect(() => {
+        if (!open || !editor) return;
+        const attrs = editor.getAttributes('image') || {};
+        setAlt(attrs.alt || '');
+        setWidth(attrs.width || '');
+        setHeight(attrs.height || '');
+    }, [open, editor]);
+
+    const handleSave = () => {
+        if (!editor) return;
+        const a = alt.trim();
+        const w = width.trim();
+        const h = height.trim();
+        editor.chain().focus().updateAttributes('image', {
+            alt: a,
+            title: a,
+            width: w || null,
+            height: h || null,
+        }).run();
+        onClose();
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                <DialogHeader>
+                    <DialogTitle className="text-zinc-900 dark:text-white">Edit Image</DialogTitle>
+                </DialogHeader>
+                <div className="pt-2">
+                    <AttrFieldsRow
+                        alt={alt} setAlt={setAlt}
+                        width={width} setWidth={setWidth}
+                        height={height} setHeight={setHeight}
+                    />
+                </div>
+                <div className="flex gap-2 pt-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-medium transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        className="flex-1 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium transition-colors"
+                    >
+                        Save
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 const COLOR_SWATCHES = [
     // Neutrals
     '#ffffff', '#f4f4f5', '#e4e4e7', '#a1a1aa', '#52525b', '#18181b',
@@ -592,12 +654,13 @@ interface ToolbarProps {
     onClean?: () => void;
     onSaveAsTemplate?: () => void;
     onOpenMediaPicker: () => void;
+    onEditImage?: () => void;
     isComplexHtml: boolean;
     onIframeCommand?: (command: string, value?: string) => void;
     onIframeStyle?: (cssProp: string, cssVal: string) => void;
 }
 
-const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, isComplexHtml, onIframeCommand, onIframeStyle }: ToolbarProps) => {
+const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, onEditImage, isComplexHtml, onIframeCommand, onIframeStyle }: ToolbarProps) => {
     // True when the content is shown inside the iframe (not TipTap, not raw source)
     const iframeMode = isComplexHtml && !isHtmlMode;
     const isImageSelected = !isHtmlMode && !iframeMode && editor?.isActive('image');
@@ -905,33 +968,11 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                                const currentWidth = editor.getAttributes('image').width;
-                                const width = window.prompt('Image width (e.g. 300, 50%, auto):', currentWidth || '');
-                                if (width !== null) {
-                                    editor.chain().focus().updateAttributes('image', { width: width || null }).run();
-                                }
-                            }}
+                            onClick={(e) => { e.preventDefault(); onEditImage?.(); }}
                             className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs gap-1"
-                            title="Resize Image"
+                            title="Edit image alt text and size"
                         >
-                            <Type className="h-3 w-3" /> Width
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                const currentAlt = editor.getAttributes('image').alt;
-                                const alt = window.prompt('Alt text:', currentAlt || '');
-                                if (alt !== null) {
-                                    editor.chain().focus().updateAttributes('image', { alt, title: alt }).run();
-                                }
-                            }}
-                            className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-xs gap-1"
-                            title="Edit Alt Text"
-                        >
-                            <Type className="h-3 w-3" /> Alt
+                            <Type className="h-3 w-3" /> Edit Image
                         </Button>
                     </>
                 )}
@@ -1032,11 +1073,17 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const [dropUploading, setDropUploading] = useState(false);
     const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
     const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+    const [editImageOpen, setEditImageOpen] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     // Tracks the last non-collapsed selection inside the iframe so toolbar
     // commands can restore it after toolbar clicks steal focus.
     const savedIframeSelection = useRef<Range | null>(null);
     const { theme, systemTheme } = useTheme();
+
+    // Ref holding the currently-active drop/paste handler for the iframe doc.
+    // Updated each render so the listeners always see the latest `insertImage`
+    // closure without needing to re-open the iframe document.
+    const iframeUploadHandler = useRef<(file: File) => void>(() => {});
 
     // Write HTML into iframe for visual preview of complex templates
     const iframeWriting = useRef(false);
@@ -1075,6 +1122,35 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                         }
                         // Don't clear on empty/collapsed — the last meaningful range is
                         // needed by toolbar buttons that run after the iframe loses focus.
+                    });
+
+                    // Enable drag-drop uploads
+                    doc.addEventListener('dragover', (e) => {
+                        if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault();
+                        }
+                    });
+                    doc.addEventListener('drop', (e) => {
+                        const files = e.dataTransfer?.files;
+                        if (!files || files.length === 0) return;
+                        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+                        if (imageFiles.length === 0) return;
+                        e.preventDefault();
+                        imageFiles.forEach(file => iframeUploadHandler.current(file));
+                    });
+
+                    // Enable paste-from-clipboard uploads
+                    doc.addEventListener('paste', (e) => {
+                        const items = e.clipboardData?.items;
+                        if (!items) return;
+                        for (const item of Array.from(items)) {
+                            if (item.type.startsWith('image/')) {
+                                e.preventDefault();
+                                const file = item.getAsFile();
+                                if (file) iframeUploadHandler.current(file);
+                                return;
+                            }
+                        }
                     });
                 }
                 // Allow the input listener to fire after initial write
@@ -1265,10 +1341,61 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         }
     }, [value, editor, isHtmlMode, isComplexHtml]);
 
-    // Upload handler for drag-drop and paste
-    const handleDropOrPasteUpload = useCallback(async (file: File) => {
-        if (!editor) return;
+    /**
+     * Insert an image into whichever view is currently active:
+     * - TipTap visual mode → editor.setImage() (width/height round-trip via GlobalAttributes)
+     * - Iframe mode (complex HTML) → insert an <img> at the saved range, then sync
+     * - HTML source mode → no-op (toolbar already disables the image button)
+     */
+    const insertImage = useCallback((src: string, meta: ImageInsertMeta) => {
+        const alt = (meta.alt ?? '').trim();
+        const width = (meta.width ?? '').trim();
+        const height = (meta.height ?? '').trim();
 
+        if (isHtmlMode) return;
+
+        if (!isComplexHtml(value)) {
+            if (!editor) return;
+            editor.chain().focus().setImage({
+                src,
+                alt,
+                title: alt,
+                ...(width ? { width } : {}),
+                ...(height ? { height } : {}),
+            } as any).run();
+            return;
+        }
+
+        // Iframe mode: insert directly into the iframe document
+        const iframeDoc = iframeRef.current?.contentDocument;
+        if (!iframeDoc) return;
+        const img = iframeDoc.createElement('img');
+        img.setAttribute('src', src);
+        if (alt) { img.setAttribute('alt', alt); img.setAttribute('title', alt); }
+        if (width) img.setAttribute('width', width);
+        if (height) img.setAttribute('height', height);
+
+        const range = resolveIframeRange();
+        if (range) {
+            range.deleteContents();
+            range.insertNode(img);
+            // place cursor after the inserted image
+            const sel = iframeDoc.getSelection();
+            if (sel) {
+                const after = iframeDoc.createRange();
+                after.setStartAfter(img);
+                after.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(after);
+            }
+        } else if (iframeDoc.body) {
+            iframeDoc.body.appendChild(img);
+        }
+        syncIframeHtml();
+    }, [editor, isHtmlMode, isComplexHtml, value, resolveIframeRange, syncIframeHtml]);
+
+    // Upload handler for drag-drop and paste — routes through insertImage
+    const handleDropOrPasteUpload = useCallback(async (file: File) => {
         setDropUploading(true);
         try {
             const result = await uploadImageFile(file);
@@ -1276,20 +1403,20 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 alert(result.error);
                 return;
             }
-
             const alt = file.name.replace(/\.[^/.]+$/, '');
-            editor.chain().focus().setImage({
-                src: result.url,
-                alt,
-                title: alt,
-            }).run();
+            insertImage(result.url, { alt });
         } catch (error) {
             console.error('Error uploading dropped/pasted image:', error);
             alert('Failed to upload image.');
         } finally {
             setDropUploading(false);
         }
-    }, [editor]);
+    }, [insertImage]);
+
+    // Keep the iframe drop/paste listeners pointed at the latest uploader closure
+    useEffect(() => {
+        iframeUploadHandler.current = (file: File) => { void handleDropOrPasteUpload(file); };
+    }, [handleDropOrPasteUpload]);
 
     const handleToggleMode = () => {
         userExplicitMode.current = true;
@@ -1355,7 +1482,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
     return (
         <div className="w-full relative shadow-sm">
-            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} isComplexHtml={isComplexHtml(value)} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
+            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} onEditImage={() => setEditImageOpen(true)} isComplexHtml={isComplexHtml(value)} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
 
             {/* HTML Source View */}
             <div className={!isHtmlMode ? "hidden" : "block"}>
@@ -1440,21 +1567,19 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 html={value}
             />
 
+            {/* Edit Image Dialog */}
+            <EditImageDialog
+                open={editImageOpen}
+                onClose={() => setEditImageOpen(false)}
+                editor={editor}
+            />
+
             {/* Media Picker Modal */}
             <MediaPicker
                 open={mediaPickerOpen}
                 onClose={() => setMediaPickerOpen(false)}
-                onSelect={(url, filename) => {
-                    if (!editor) return;
-                    const alt = window.prompt(
-                        'Image alt text (optional, recommended for accessibility):',
-                        filename.replace(/^\d+-\d+-/, '').replace(/\.[^/.]+$/, '')
-                    );
-                    editor.chain().focus().setImage({
-                        src: url,
-                        alt: alt || '',
-                        title: alt || '',
-                    }).run();
+                onSelect={(url, _filename, meta) => {
+                    insertImage(url, meta);
                     setMediaPickerOpen(false);
                 }}
             />
