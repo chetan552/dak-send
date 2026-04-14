@@ -27,14 +27,16 @@ export default async function DashboardLayout({
         <TooltipProvider delayDuration={300}>
         <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex transition-colors duration-300">
             {/* Desktop Sidebar — hidden on mobile */}
-            <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col backdrop-blur-md transition-colors duration-300 flex-shrink-0">
+            <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col backdrop-blur-md transition-colors duration-300 flex-shrink-0 sticky top-0 h-screen">
                 <div className="p-6">
                     <Link href="/dashboard">
                         <Image src="/logo.svg" alt="DakSend" width={140} height={34} priority />
                     </Link>
                 </div>
 
-                <SidebarNav />
+                <div className="flex-1 overflow-y-auto">
+                    <SidebarNav />
+                </div>
 
                 <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
                     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
