@@ -24,12 +24,23 @@ import {
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { saveTemplate } from "@/app/actions/templates";
 import { Extension, Node, Mark, mergeAttributes } from '@tiptap/core';
 import dynamic from 'next/dynamic';
 const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false });
 import { html } from '@codemirror/lang-html';
 import { useTheme } from 'next-themes';
 import { MediaPicker } from '@/components/campaign/media-picker';
+
+declare module '@tiptap/core' {
+    interface Commands<ReturnType> {
+        fontSize: {
+            setFontSize: (fontSize: string) => ReturnType;
+            unsetFontSize: () => ReturnType;
+        };
+    }
+}
 
 const FontSize = Extension.create({
     name: 'fontSize',
@@ -58,6 +69,21 @@ const FontSize = Extension.create({
                 },
             },
         ];
+    },
+    addCommands() {
+        return {
+            setFontSize:
+                (fontSize: string) =>
+                ({ chain }: any) =>
+                    chain().setMark('textStyle', { fontSize }).run(),
+            unsetFontSize:
+                () =>
+                ({ chain }: any) =>
+                    chain()
+                        .setMark('textStyle', { fontSize: null })
+                        .removeEmptyTextStyle()
+                        .run(),
+        };
     },
 });
 
@@ -270,17 +296,311 @@ async function uploadImageFile(file: File): Promise<{ url: string } | { error: s
     return await response.json();
 }
 
+/**
+ * Strip the HTML document wrapper (<!DOCTYPE>, <html>, <head>, <body>) while
+ * preserving body content and any <style> blocks from the <head>.
+ * Uses window.DOMParser explicitly to avoid collision with TipTap's DOMParser import.
+ */
+function cleanHtml(html: string): string {
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Collect <style> blocks from <head>
+    const headStyles = Array.from(doc.querySelectorAll('head style'))
+        .map(el => (el as HTMLStyleElement).outerHTML)
+        .join('\n');
+
+    // Get body content (preserves inline styles, classes, attributes)
+    const bodyContent = doc.body.innerHTML.trim();
+
+    return headStyles ? `${headStyles}\n${bodyContent}` : bodyContent;
+}
+
+const TEMPLATE_CATEGORIES = ['Custom', 'Newsletter', 'Marketing', 'E-commerce', 'Personal', 'Onboarding', 'Events', 'Engagement'];
+
+function SaveAsTemplateDialog({ open, onClose, html }: { open: boolean; onClose: () => void; html: string }) {
+    const [name, setName] = useState('');
+    const [category, setCategory] = useState('Custom');
+    const [description, setDescription] = useState('');
+    const [isPublic, setIsPublic] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
+
+    const reset = () => {
+        setName(''); setCategory('Custom'); setDescription('');
+        setIsPublic(false); setError(''); setSuccess(false);
+    };
+
+    const handleClose = () => { reset(); onClose(); };
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) { setError('Template name is required.'); return; }
+        setSaving(true); setError('');
+        try {
+            await saveTemplate({ name: name.trim(), category, description: description.trim(), html, isPublic });
+            setSuccess(true);
+            setTimeout(() => { handleClose(); }, 1200);
+        } catch (err: any) {
+            setError(err.message || 'Failed to save template.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+            <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                <DialogHeader>
+                    <DialogTitle className="text-zinc-900 dark:text-white">Save as Template</DialogTitle>
+                </DialogHeader>
+                {success ? (
+                    <div className="py-6 text-center">
+                        <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-500/10 flex items-center justify-center mx-auto mb-3">
+                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        <p className="text-zinc-900 dark:text-white font-medium">Template saved!</p>
+                        <p className="text-sm text-zinc-500 mt-1">Available in your Template Library.</p>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSave} className="space-y-4 pt-2">
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Template Name</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="e.g. Monthly Newsletter"
+                                autoFocus
+                                className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Category</label>
+                                <select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                >
+                                    {TEMPLATE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex items-end pb-1">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={isPublic}
+                                        onChange={(e) => setIsPublic(e.target.checked)}
+                                        className="rounded border-zinc-300 dark:border-zinc-600 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Share with team</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Description <span className="text-zinc-400 font-normal">(optional)</span></label>
+                            <input
+                                type="text"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Short description of this template"
+                                className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                            />
+                        </div>
+
+                        {error && (
+                            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                        )}
+
+                        <div className="flex gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={handleClose}
+                                className="flex-1 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="flex-1 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {saving ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Saving…</> : 'Save Template'}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+const COLOR_SWATCHES = [
+    // Neutrals
+    '#ffffff', '#f4f4f5', '#e4e4e7', '#a1a1aa', '#52525b', '#18181b',
+    // Reds
+    '#fef2f2', '#fecaca', '#f87171', '#ef4444', '#dc2626', '#991b1b',
+    // Oranges / Yellows
+    '#fffbeb', '#fde68a', '#fbbf24', '#f59e0b', '#d97706', '#92400e',
+    // Greens
+    '#f0fdf4', '#bbf7d0', '#4ade80', '#22c55e', '#16a34a', '#14532d',
+    // Blues
+    '#eff6ff', '#bfdbfe', '#60a5fa', '#3b82f6', '#2563eb', '#1e40af',
+    // Purples
+    '#faf5ff', '#e9d5ff', '#a78bfa', '#8b5cf6', '#7c3aed', '#5b21b6',
+];
+
+function ColorPickerButton({
+    editor,
+    isHtmlMode,
+    iframeMode = false,
+    onIframeStyle,
+}: {
+    editor: any;
+    isHtmlMode: boolean;
+    iframeMode?: boolean;
+    onIframeStyle?: (cssProp: string, cssVal: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [hexInput, setHexInput] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+
+    const currentColor = (!isHtmlMode && !iframeMode && editor?.getAttributes('textStyle')?.color) || null;
+    const disabled = isHtmlMode || (!editor && !iframeMode);
+
+    // Close on outside click
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as globalThis.Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
+
+    const applyColor = (color: string) => {
+        if (iframeMode) {
+            onIframeStyle?.('color', color);
+        } else {
+            editor?.chain().focus().setColor(color).run();
+        }
+        setOpen(false);
+    };
+
+    const applyHex = () => {
+        const val = hexInput.startsWith('#') ? hexInput : `#${hexInput}`;
+        if (/^#[0-9a-fA-F]{3,6}$/.test(val)) {
+            applyColor(val);
+            setHexInput('');
+        }
+    };
+
+    // Prevent focus theft from iframe on every interactive element in the picker
+    const noFocusTheft = (e: React.MouseEvent) => { if (iframeMode) e.preventDefault(); };
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                type="button"
+                title="Text color"
+                disabled={disabled}
+                onMouseDown={noFocusTheft}
+                onClick={() => !disabled && setOpen(o => !o)}
+                className={`flex flex-col items-center justify-center w-8 h-8 rounded transition-colors disabled:opacity-50 ${open ? 'bg-zinc-200 dark:bg-zinc-800' : 'hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}
+            >
+                <svg className="w-4 h-4 text-zinc-500 dark:text-zinc-400" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M7.27 1.2a.8.8 0 0 1 1.46 0l4.8 10.4a.8.8 0 0 1-1.46.67L10.5 9.6H5.5l-1.57 2.67a.8.8 0 1 1-1.46-.67L7.27 1.2zM6.3 8h3.4L8 4.47 6.3 8z"/>
+                </svg>
+                <span
+                    className="w-4 h-1 rounded-sm mt-0.5"
+                    style={{ backgroundColor: currentColor || '#000000' }}
+                />
+            </button>
+
+            {open && (
+                <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg p-3 w-52">
+                    {/* Swatch grid */}
+                    <div className="grid grid-cols-6 gap-1 mb-3">
+                        {COLOR_SWATCHES.map(color => (
+                            <button
+                                key={color}
+                                type="button"
+                                title={color}
+                                onMouseDown={noFocusTheft}
+                                onClick={() => applyColor(color)}
+                                className={`w-6 h-6 rounded border transition-transform hover:scale-110 ${currentColor?.toLowerCase() === color ? 'ring-2 ring-offset-1 ring-zinc-500 dark:ring-zinc-300' : 'border-zinc-200 dark:border-zinc-700'}`}
+                                style={{ backgroundColor: color }}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Hex input */}
+                    <div className="flex items-center gap-1.5">
+                        <div
+                            className="w-6 h-6 flex-shrink-0 rounded border border-zinc-200 dark:border-zinc-700"
+                            style={{ backgroundColor: hexInput ? (hexInput.startsWith('#') ? hexInput : `#${hexInput}`) : (currentColor || '#000000') }}
+                        />
+                        <input
+                            type="text"
+                            placeholder="#000000"
+                            value={hexInput}
+                            maxLength={7}
+                            onChange={e => setHexInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && applyHex()}
+                            className="flex-1 min-w-0 h-7 px-2 text-xs rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white outline-none focus:ring-1 focus:ring-zinc-400"
+                        />
+                        <button
+                            type="button"
+                            onMouseDown={noFocusTheft}
+                            onClick={applyHex}
+                            className="text-xs px-2 h-7 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium transition-colors"
+                        >
+                            Set
+                        </button>
+                    </div>
+
+                    {/* Remove color */}
+                    {currentColor && (
+                        <button
+                            type="button"
+                            onMouseDown={noFocusTheft}
+                            onClick={() => {
+                                if (!iframeMode) editor?.chain().focus().unsetColor().run();
+                                setOpen(false);
+                            }}
+                            className="mt-2 w-full text-xs text-center py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
+                        >
+                            Remove color
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // Define the toolbar buttons configuration
 interface ToolbarProps {
     editor: any;
     isHtmlMode: boolean;
     onToggleMode: () => void;
     onFormat?: () => void;
+    onClean?: () => void;
+    onSaveAsTemplate?: () => void;
     onOpenMediaPicker: () => void;
+    isComplexHtml: boolean;
+    onIframeCommand?: (command: string, value?: string) => void;
+    onIframeStyle?: (cssProp: string, cssVal: string) => void;
 }
 
-const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker }: ToolbarProps) => {
-    const isImageSelected = !isHtmlMode && editor?.isActive('image');
+const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, isComplexHtml, onIframeCommand, onIframeStyle }: ToolbarProps) => {
+    // True when the content is shown inside the iframe (not TipTap, not raw source)
+    const iframeMode = isComplexHtml && !isHtmlMode;
+    const isImageSelected = !isHtmlMode && !iframeMode && editor?.isActive('image');
 
     const fontFamilies = [
         { name: 'Default', value: '' },
@@ -311,6 +631,10 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
     ];
 
     const handleFontFamilyChange = (value: string) => {
+        if (iframeMode) {
+            if (value && value !== 'Default') onIframeStyle?.('fontFamily', value);
+            return;
+        }
         if (!editor) return;
         if (value && value !== 'Default') {
             editor.chain().focus().setFontFamily(value).run();
@@ -320,12 +644,15 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
     };
 
     const handleFontSizeChange = (value: string) => {
+        if (iframeMode) {
+            if (value && value !== 'Default') onIframeStyle?.('fontSize', value);
+            return;
+        }
         if (!editor) return;
         if (value && value !== 'Default') {
-            editor.chain().focus().setMark('textStyle', { fontSize: value }).run();
+            editor.chain().focus().setFontSize(value).run();
         } else {
-            // Using removeEmptyTextStyle helps clear out empty inline styles
-            editor.chain().focus().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run();
+            editor.chain().focus().unsetFontSize().run();
         }
     };
 
@@ -335,7 +662,7 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
     return (
         <div className="border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-2 flex flex-wrap gap-1 rounded-t-md items-center justify-between sticky top-0 z-10">
             <div className="flex flex-wrap gap-1 items-center">
-                <Select value={currentFontFamily} onValueChange={handleFontFamilyChange} disabled={isHtmlMode || !editor}>
+                <Select value={currentFontFamily} onValueChange={handleFontFamilyChange} disabled={isHtmlMode || (!editor && !iframeMode)}>
                     <SelectTrigger className="w-[120px] h-8 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                         <SelectValue placeholder="Font" />
                     </SelectTrigger>
@@ -348,7 +675,7 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
                     </SelectContent>
                 </Select>
 
-                <Select value={currentFontSize} onValueChange={handleFontSizeChange} disabled={isHtmlMode || !editor}>
+                <Select value={currentFontSize} onValueChange={handleFontSizeChange} disabled={isHtmlMode || (!editor && !iframeMode)}>
                     <SelectTrigger className="w-[80px] h-8 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                         <SelectValue placeholder="Size" />
                     </SelectTrigger>
@@ -364,60 +691,96 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
                 <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
 
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('bold')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleBold().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('bold')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('bold'); return; }
+                        editor?.chain().focus().toggleBold().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <Bold className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('italic')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleItalic().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('italic')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('italic'); return; }
+                        editor?.chain().focus().toggleItalic().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <Italic className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('underline')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleUnderline().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('underline')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('underline'); return; }
+                        editor?.chain().focus().toggleUnderline().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <UnderlineIcon className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('strike')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleStrike().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('strike')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('strikeThrough'); return; }
+                        editor?.chain().focus().toggleStrike().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <Strikethrough className="h-4 w-4" />
                 </Toggle>
 
+                {/* Text Color */}
+                <ColorPickerButton
+                    editor={editor}
+                    isHtmlMode={isHtmlMode}
+                    iframeMode={iframeMode}
+                    onIframeStyle={onIframeStyle}
+                />
+
                 <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
 
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('heading', { level: 2 })}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('heading', { level: 2 })}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('formatBlock', 'h2'); return; }
+                        editor?.chain().focus().toggleHeading({ level: 2 }).run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <Heading2 className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('heading', { level: 3 })}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('heading', { level: 3 })}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('formatBlock', 'h3'); return; }
+                        editor?.chain().focus().toggleHeading({ level: 3 }).run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <Heading3 className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('blockquote')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleBlockquote().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('blockquote')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('formatBlock', 'blockquote'); return; }
+                        editor?.chain().focus().toggleBlockquote().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <Quote className="h-4 w-4" />
@@ -426,17 +789,25 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
                 <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
 
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('bulletList')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleBulletList().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('bulletList')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('insertUnorderedList'); return; }
+                        editor?.chain().focus().toggleBulletList().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <List className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('orderedList')}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().toggleOrderedList().run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('orderedList')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('insertOrderedList'); return; }
+                        editor?.chain().focus().toggleOrderedList().run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                 >
                     <ListOrdered className="h-4 w-4" />
@@ -446,27 +817,39 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
 
                 {/* Text Alignment */}
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive({ textAlign: 'left' })}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().setTextAlign('left').run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive({ textAlign: 'left' })}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('justifyLeft'); return; }
+                        editor?.chain().focus().setTextAlign('left').run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                     title="Align Left"
                 >
                     <AlignLeft className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive({ textAlign: 'center' })}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().setTextAlign('center').run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive({ textAlign: 'center' })}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('justifyCenter'); return; }
+                        editor?.chain().focus().setTextAlign('center').run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                     title="Align Center"
                 >
                     <AlignCenter className="h-4 w-4" />
                 </Toggle>
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive({ textAlign: 'right' })}
-                    disabled={isHtmlMode || !editor}
-                    onPressedChange={() => editor?.chain().focus().setTextAlign('right').run()}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive({ textAlign: 'right' })}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
+                    onPressedChange={() => {
+                        if (iframeMode) { onIframeCommand?.('justifyRight'); return; }
+                        editor?.chain().focus().setTextAlign('right').run();
+                    }}
                     className="data-[state=on]:bg-zinc-200 dark:data-[state=on]:bg-zinc-800 data-[state=on]:text-zinc-900 dark:data-[state=on]:text-white text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                     title="Align Right"
                 >
@@ -476,9 +859,15 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
                 <div className="w-px h-6 bg-zinc-300 dark:bg-zinc-800 mx-1" />
 
                 <Toggle
-                    size="sm" pressed={!isHtmlMode && editor?.isActive('link')}
-                    disabled={isHtmlMode || !editor}
+                    size="sm" pressed={!iframeMode && !isHtmlMode && editor?.isActive('link')}
+                    disabled={isHtmlMode || (!editor && !iframeMode)}
+                    onMouseDown={(e) => { if (iframeMode) e.preventDefault(); }}
                     onPressedChange={() => {
+                        if (iframeMode) {
+                            const url = window.prompt('URL');
+                            if (url) onIframeCommand?.('createLink', url);
+                            return;
+                        }
                         if (!editor) return;
                         const previousUrl = editor.getAttributes('link').href;
                         const url = window.prompt('URL', previousUrl);
@@ -560,6 +949,30 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onOpenMediaPicker
                         Format
                     </Button>
                 )}
+                {onSaveAsTemplate && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.preventDefault(); onSaveAsTemplate(); }}
+                        className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white gap-1.5"
+                        title="Save current HTML as a reusable template"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                        Save as Template
+                    </Button>
+                )}
+                {isComplexHtml && onClean && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.preventDefault(); onClean(); }}
+                        className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 gap-1.5"
+                        title="Remove <!DOCTYPE>, <html>, <head>, <body> wrappers and keep body content + styles"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Clean HTML
+                    </Button>
+                )}
                 <Button
                     variant="ghost"
                     size="sm"
@@ -582,7 +995,13 @@ interface RichTextEditorProps {
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const isComplexHtml = useCallback((htmlStr: string) => {
         const v = (htmlStr || '').trim().toLowerCase();
-        return v.startsWith('<!doctype') || v.startsWith('<html') || v.includes('<body') || (v.includes('<table') && v.includes('width="100%"'));
+        // Full document wrapper
+        if (v.startsWith('<!doctype') || v.startsWith('<html') || v.includes('<body')) return true;
+        // <style> blocks — TipTap strips these, so render in iframe to preserve CSS classes
+        if (/<style[\s>]/i.test(htmlStr)) return true;
+        // Wide table layouts typical of email templates
+        if (v.includes('<table') && v.includes('width="100%"')) return true;
+        return false;
     }, []);
 
     const [isHtmlMode, setIsHtmlMode] = useState(() => isComplexHtml(value));
@@ -612,7 +1031,11 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [dropUploading, setDropUploading] = useState(false);
     const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+    const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    // Tracks the last non-collapsed selection inside the iframe so toolbar
+    // commands can restore it after toolbar clicks steal focus.
+    const savedIframeSelection = useRef<Range | null>(null);
     const { theme, systemTheme } = useTheme();
 
     // Write HTML into iframe for visual preview of complex templates
@@ -643,6 +1066,16 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                             onChangeRef.current(fullHtml);
                         }
                     });
+
+                    // Track selection so toolbar commands can restore it
+                    doc.addEventListener('selectionchange', () => {
+                        const sel = doc.getSelection();
+                        if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+                            savedIframeSelection.current = sel.getRangeAt(0).cloneRange();
+                        }
+                        // Don't clear on empty/collapsed — the last meaningful range is
+                        // needed by toolbar buttons that run after the iframe loses focus.
+                    });
                 }
                 // Allow the input listener to fire after initial write
                 requestAnimationFrame(() => {
@@ -651,6 +1084,81 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
             }
         }
     }, [value, isHtmlMode, isComplexHtml]);
+
+    /** Serialize the iframe's current DOM back to the parent onChange. */
+    const syncIframeHtml = useCallback(() => {
+        const iframeDoc = iframeRef.current?.contentDocument;
+        if (!iframeDoc) return;
+        const doctype = iframeDoc.doctype ? `<!DOCTYPE ${iframeDoc.doctype.name}>\n` : '';
+        const fullHtml = doctype + iframeDoc.documentElement.outerHTML;
+        lastSelfValue.current = fullHtml;
+        onChangeRef.current(fullHtml);
+    }, []);
+
+    /**
+     * Resolve the active range inside the iframe.
+     * For Toggle buttons, onMouseDown prevention keeps focus in the iframe so the
+     * selection is live. For dropdowns/pickers the saved range is the fallback.
+     */
+    const resolveIframeRange = useCallback((): Range | null => {
+        const iframeDoc = iframeRef.current?.contentDocument;
+        const iframeWin = iframeRef.current?.contentWindow;
+        if (!iframeDoc || !iframeWin) return null;
+
+        // Try the live selection first (focus stayed in iframe)
+        const liveSel = iframeDoc.getSelection();
+        if (liveSel && liveSel.rangeCount > 0 && !liveSel.isCollapsed) {
+            return liveSel.getRangeAt(0);
+        }
+
+        // Fall back: restore the saved range and re-focus
+        const saved = savedIframeSelection.current;
+        if (!saved) return null;
+        iframeWin.focus();
+        const sel = iframeDoc.getSelection();
+        if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(saved.cloneRange());
+            if (sel.rangeCount > 0 && !sel.isCollapsed) return sel.getRangeAt(0);
+        }
+        return null;
+    }, []);
+
+    /**
+     * Apply an execCommand to the iframe's document.
+     * Works whether focus stayed in the iframe (Toggle buttons) or not (dropdowns).
+     */
+    const applyIframeCommand = useCallback((command: string, value?: string) => {
+        const iframeDoc = iframeRef.current?.contentDocument;
+        const iframeWin = iframeRef.current?.contentWindow;
+        if (!iframeDoc || !iframeWin) return;
+        // Ensure iframe has focus so execCommand targets the right document
+        iframeWin.focus();
+        const range = resolveIframeRange();
+        if (range) {
+            const sel = iframeDoc.getSelection();
+            if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+        }
+        iframeDoc.execCommand(command, false, value ?? undefined);
+        syncIframeHtml();
+    }, [resolveIframeRange, syncIframeHtml]);
+
+    /**
+     * Wrap the active iframe selection in a <span style="prop: val">.
+     * Used for font-size, font-family, and color in iframe mode.
+     */
+    const applyIframeStyle = useCallback((cssProp: string, cssVal: string) => {
+        const range = resolveIframeRange();
+        if (!range || range.collapsed) return;
+        const iframeDoc = iframeRef.current?.contentDocument;
+        if (!iframeDoc) return;
+        const fragment = range.extractContents();
+        const span = iframeDoc.createElement('span');
+        (span.style as any)[cssProp] = cssVal;
+        span.appendChild(fragment);
+        range.insertNode(span);
+        syncIframeHtml();
+    }, [resolveIframeRange, syncIframeHtml]);
 
     const editor = useEditor({
         extensions: [
@@ -802,6 +1310,19 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         onChange(prettyFormatHtml(value));
     };
 
+    const handleClean = () => {
+        if (!confirm('Remove <!DOCTYPE>, <html>, <head>, and <body> wrappers?\n\nThe body content and all styles will be preserved. The visual preview will still render correctly via the iframe.')) return;
+        const cleaned = cleanHtml(value);
+        lastSelfValue.current = null; // allow mode-detection logic to re-evaluate
+        onChange(cleaned);
+        // cleaned HTML with <style> blocks is still "complex" → stays in iframe view
+        // so styles continue to render correctly. Only switch to TipTap if truly simple.
+        if (!isComplexHtml(cleaned)) {
+            userExplicitMode.current = false;
+            setIsHtmlMode(false);
+        }
+    };
+
     // Drag and drop handlers for the editor container
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -834,7 +1355,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
     return (
         <div className="w-full relative shadow-sm">
-            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onOpenMediaPicker={() => setMediaPickerOpen(true)} />
+            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} isComplexHtml={isComplexHtml(value)} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
 
             {/* HTML Source View */}
             <div className={!isHtmlMode ? "hidden" : "block"}>
@@ -911,6 +1432,13 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
                 }
             `}</style>
+
+            {/* Save as Template Dialog */}
+            <SaveAsTemplateDialog
+                open={saveTemplateOpen}
+                onClose={() => setSaveTemplateOpen(false)}
+                html={value}
+            />
 
             {/* Media Picker Modal */}
             <MediaPicker
