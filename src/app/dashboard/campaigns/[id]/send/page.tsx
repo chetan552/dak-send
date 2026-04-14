@@ -11,6 +11,9 @@ export default async function SendCampaignPage({ params }: { params: Promise<{ i
     const { id } = await params;
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
+
+    if (!userId) redirect("/login");
+
     const currentUserRole = session?.user?.role || "user";
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
