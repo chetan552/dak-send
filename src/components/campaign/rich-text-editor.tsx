@@ -1078,6 +1078,10 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     // Tracks the last non-collapsed selection inside the iframe so toolbar
     // commands can restore it after toolbar clicks steal focus.
     const savedIframeSelection = useRef<Range | null>(null);
+    // Tracks the last cursor position (collapsed OR not) inside the iframe.
+    // Used for image insertion where we need to know *where* to place content
+    // even if the user just clicked without selecting text.
+    const savedIframeCursor = useRef<Range | null>(null);
     const { theme, systemTheme } = useTheme();
 
     // Ref holding the currently-active drop/paste handler for the iframe doc.
@@ -1114,14 +1118,18 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                         }
                     });
 
-                    // Track selection so toolbar commands can restore it
+                    // Track selection so toolbar commands can restore it.
+                    // savedIframeSelection keeps the last non-collapsed range (for
+                    // formatting commands that need a selection). savedIframeCursor
+                    // keeps the latest position of any kind (for image insertion).
                     doc.addEventListener('selectionchange', () => {
                         const sel = doc.getSelection();
-                        if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-                            savedIframeSelection.current = sel.getRangeAt(0).cloneRange();
+                        if (!sel || sel.rangeCount === 0) return;
+                        const r = sel.getRangeAt(0);
+                        savedIframeCursor.current = r.cloneRange();
+                        if (!sel.isCollapsed) {
+                            savedIframeSelection.current = r.cloneRange();
                         }
-                        // Don't clear on empty/collapsed — the last meaningful range is
-                        // needed by toolbar buttons that run after the iframe loses focus.
                     });
 
                     // Enable drag-drop uploads
@@ -1375,11 +1383,31 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         if (width) img.setAttribute('width', width);
         if (height) img.setAttribute('height', height);
 
-        const range = resolveIframeRange();
+        // Pick an insertion range. Prefer the live selection (may have survived
+        // focus loss as a collapsed cursor), fall back to the cursor we saved
+        // via selectionchange, then to the non-collapsed selection used by
+        // formatting commands. Only as a last resort append to body.
+        let range: Range | null = null;
+        const liveSel = iframeDoc.getSelection();
+        if (liveSel && liveSel.rangeCount > 0) {
+            range = liveSel.getRangeAt(0).cloneRange();
+        }
+        if (!range && savedIframeCursor.current) {
+            range = savedIframeCursor.current.cloneRange();
+        }
+        if (!range && savedIframeSelection.current) {
+            range = savedIframeSelection.current.cloneRange();
+        }
+
+        // Ensure the range is still inside the iframe document (it might refer
+        // to a node from a previous doc.write cycle).
+        if (range && !iframeDoc.contains(range.startContainer)) {
+            range = null;
+        }
+
         if (range) {
             range.deleteContents();
             range.insertNode(img);
-            // place cursor after the inserted image
             const sel = iframeDoc.getSelection();
             if (sel) {
                 const after = iframeDoc.createRange();
@@ -1387,12 +1415,13 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 after.collapse(true);
                 sel.removeAllRanges();
                 sel.addRange(after);
+                savedIframeCursor.current = after.cloneRange();
             }
         } else if (iframeDoc.body) {
             iframeDoc.body.appendChild(img);
         }
         syncIframeHtml();
-    }, [editor, isHtmlMode, isComplexHtml, value, resolveIframeRange, syncIframeHtml]);
+    }, [editor, isHtmlMode, isComplexHtml, value, syncIframeHtml]);
 
     // Upload handler for drag-drop and paste — routes through insertImage
     const handleDropOrPasteUpload = useCallback(async (file: File) => {
