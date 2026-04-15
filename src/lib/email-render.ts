@@ -53,8 +53,8 @@ function applyPersonalization(
     preferencesUrl?: string,
 ): string {
     let out = content
-        .replace(/\[Name\]/gi, p.name || "Friend")
-        .replace(/\[Email\]/gi, p.email)
+        .replace(/\[Name\]/gi, escapeHtml(p.name || "Friend"))
+        .replace(/\[Email\]/gi, escapeHtml(p.email))
         .replace(/\[UnsubscribeUrl\]/gi, unsubscribeUrl)
         .replace(/\[Unsubscribe\]/gi, `<a href="${unsubscribeUrl}">Unsubscribe</a>`)
         .replace(/\[PreferencesUrl\]/gi, preferencesUrl || unsubscribeUrl);
@@ -64,7 +64,7 @@ function applyPersonalization(
             const key = Object.keys(p.customFields!).find(
                 (k) => k.toLowerCase() === fieldName.toLowerCase(),
             );
-            return key ? p.customFields![key] : "";
+            return key ? escapeHtml(p.customFields![key]) : "";
         });
     }
 
