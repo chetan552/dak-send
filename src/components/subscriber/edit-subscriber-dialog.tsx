@@ -123,6 +123,13 @@ export function EditSubscriberDialog({ open, setOpen, listId, customFields = [],
                                 <SelectItem value="complained">Complained</SelectItem>
                             </SelectContent>
                         </Select>
+                        {subscriber.status !== "subscribed" && (
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                Setting to <strong>Subscribed</strong> will also remove any brand-level suppression for this email.
+                                If a global suppression exists, you will be notified and can remove it from the{" "}
+                                <a href="/dashboard/deliverability" className="underline text-indigo-600 dark:text-indigo-400">Deliverability</a> page.
+                            </p>
+                        )}
                     </div>
 
                     {customFields.length > 0 && (

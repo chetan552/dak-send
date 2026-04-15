@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { MoreHorizontal, Trash2, UserMinus, Pencil } from "lucide-react";
+import { MoreHorizontal, Trash2, UserMinus, Pencil, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -11,9 +11,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deleteSubscriber, unsubscribeSubscriber } from "@/app/actions/subscriber";
+import { deleteSubscriber, unsubscribeSubscriber, resubscribeSubscriber } from "@/app/actions/subscriber";
 import { useRouter } from "next/navigation";
 import { EditSubscriberDialog } from "@/components/subscriber/edit-subscriber-dialog";
+import { toast } from "sonner";
 
 interface CustomField {
     id: string;
@@ -46,6 +47,26 @@ export function SubscriberActions({ subscriber, listId, customFields = [] }: Sub
             } catch (error) {
                 console.error("Failed to unsubscribe subscriber:", error);
                 alert("Failed to unsubscribe. Please try again.");
+            }
+        });
+    };
+
+    const handleResubscribe = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm("Resubscribe this user? This will set their status back to subscribed and remove any brand-level suppression.")) return;
+
+        startTransition(async () => {
+            try {
+                const result = await resubscribeSubscriber(subscriber.id, listId);
+                if (result.globalSuppression) {
+                    toast.warning("Resubscribed, but a global suppression still exists for this email. Go to Deliverability → Suppression List to remove it before sends will reach them.");
+                } else {
+                    toast.success("Subscriber resubscribed successfully.");
+                }
+                router.refresh();
+            } catch (error: any) {
+                toast.error(error.message || "Failed to resubscribe.");
             }
         });
     };
@@ -86,6 +107,12 @@ export function SubscriberActions({ subscriber, listId, customFields = [] }: Sub
                         <DropdownMenuItem onClick={handleUnsubscribe} disabled={isPending}>
                             <UserMinus className="mr-2 h-4 w-4" />
                             <span>Unsubscribe</span>
+                        </DropdownMenuItem>
+                    )}
+                    {subscriber.status !== "subscribed" && (
+                        <DropdownMenuItem onClick={handleResubscribe} disabled={isPending}>
+                            <UserCheck className="mr-2 h-4 w-4 text-green-600" />
+                            <span className="text-green-600">Resubscribe</span>
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onClick={handleDelete} className="text-red-500 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-500/10" disabled={isPending}>

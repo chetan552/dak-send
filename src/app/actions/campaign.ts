@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import type { BlockEmailDocument } from "@/lib/blocks-to-html";
 
 export async function createCampaignDraft(formData: FormData) {
     const session = await getServerSession(authOptions);
@@ -109,6 +110,38 @@ export async function deleteCampaign(id: string) {
     });
 
     revalidatePath("/dashboard/campaigns");
+}
+
+export async function updateCampaignBlocks(
+    id: string,
+    doc: BlockEmailDocument,
+    compiledHtml: string,
+) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+
+    const whereCondition: any = currentUserRole === "admin"
+        ? { id }
+        : { id, brand: { users: { some: { id: userId } } } };
+
+    const campaign = await prisma.campaign.findFirst({ where: whereCondition });
+    if (!campaign || campaign.status !== "draft") {
+        throw new Error("Campaign not found or cannot be edited");
+    }
+
+    const updated = await prisma.campaign.update({
+        where: { id },
+        data: {
+            htmlText: compiledHtml,
+            contentJson: doc as any,
+        },
+    });
+
+    revalidatePath(`/dashboard/campaigns/${id}`);
+    return updated;
 }
 
 export async function duplicateCampaign(id: string) {

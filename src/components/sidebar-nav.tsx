@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Send, Settings, Rss, BarChart3, Zap, LayoutTemplate, FileInput, ImageIcon, Tag } from "lucide-react";
+import { LayoutDashboard, Users, Send, Settings, Rss, BarChart3, Zap, LayoutTemplate, FileInput, ImageIcon, Tag, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const NAV_ITEMS = [
@@ -15,6 +15,7 @@ export const NAV_ITEMS = [
     { name: "Media", href: "/dashboard/media", exact: false, icon: ImageIcon },
     { name: "Forms", href: "/dashboard/forms", exact: false, icon: FileInput },
     { name: "Analytics", href: "/dashboard/analytics", exact: false, icon: BarChart3 },
+    { name: "Deliverability", href: "/dashboard/deliverability", exact: false, icon: ShieldCheck },
     { name: "RSS Feeds", href: "/dashboard/rss", exact: false, icon: Rss },
     { name: "Settings", href: "/dashboard/settings", exact: false, icon: Settings },
 ];

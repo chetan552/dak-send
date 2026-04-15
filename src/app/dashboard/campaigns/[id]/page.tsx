@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Clock, FileEdit, Send, RefreshCw, XCircle, FlaskConical, Eye, CalendarClock } from "lucide-react";
+import { ArrowLeft, Clock, FileEdit, Send, RefreshCw, XCircle, FlaskConical, Eye, CalendarClock, Blocks } from "lucide-react";
 import Link from "next/link";
 import { CampaignForm } from "@/components/campaign/campaign-form";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,11 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {isDraft && (
                         <>
+                            <Link href={`/dashboard/campaigns/${campaign.id}/builder`}>
+                                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 gap-2">
+                                    <Blocks className="w-4 h-4" /> Block Builder
+                                </Button>
+                            </Link>
                             <Link href={`/dashboard/campaigns/${campaign.id}/ab-test`}>
                                 <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 gap-2">
                                     <FlaskConical className="w-4 h-4" /> A/B Test

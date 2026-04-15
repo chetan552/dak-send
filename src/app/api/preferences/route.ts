@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Public subscriber preference center
+// ---------------------------------------------------------------------------
+// GET — render the preference center HTML page
+//       ?i=<subscriberId>
+//       ?action=unsubscribe_all&i=<subscriberId>  (one-click unsubscribe all)
+// ---------------------------------------------------------------------------
+
 export async function GET(req: NextRequest) {
     const subscriberId = req.nextUrl.searchParams.get("i");
+    const action = req.nextUrl.searchParams.get("action");
 
     if (!subscriberId) {
         return new NextResponse("Missing subscriber ID", { status: 400 });
@@ -15,140 +21,341 @@ export async function GET(req: NextRequest) {
             list: {
                 include: {
                     brand: {
-                        include: {
-                            lists: {
-                                include: {
-                                    _count: { select: { subscribers: true } }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                        include: { lists: true },
+                    },
+                },
+            },
+        },
     });
 
     if (!subscriber) {
         return new NextResponse("Subscriber not found", { status: 404 });
     }
 
-    // Get all lists this subscriber is subscribed to under the same brand
+    // ── Unsubscribe-all shortcut ─────────────────────────────────────────────
+    if (action === "unsubscribe_all") {
+        await prisma.subscriber.updateMany({
+            where: { email: subscriber.email, list: { brandId: subscriber.list.brand.id } },
+            data: { status: "unsubscribed", pausedUntil: null },
+        });
+        return new NextResponse(getConfirmHtml("Unsubscribed", "You have been unsubscribed from all emails from " + subscriber.list.brand.name + "."), {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+        });
+    }
+
+    // ── Build per-list subscription state ───────────────────────────────────
+    const brandId = subscriber.list.brand.id;
+    const brandName = subscriber.list.brand.name;
     const brandLists = subscriber.list.brand.lists;
-    const subscriberLists = await prisma.subscriber.findMany({
-        where: { email: subscriber.email, list: { brandId: subscriber.list.brand.id } },
-        include: { list: true }
+
+    const subscriberListRecords = await prisma.subscriber.findMany({
+        where: { email: subscriber.email, list: { brandId } },
+        select: { listId: true, status: true },
     });
 
-    const subscribedListIds = new Set(subscriberLists.filter(s => s.status === 'subscribed').map(s => s.listId));
+    const listStatusMap = new Map(subscriberListRecords.map(s => [s.listId, s.status]));
+
+    // ── Pause state ──────────────────────────────────────────────────────────
+    // pausedUntil is per-subscriber record; use the current one as the source
+    // of truth (they are all synced via the pause action).
+    const now = new Date();
+    const isPaused = subscriber.pausedUntil != null && subscriber.pausedUntil > now;
+    const pausedUntilStr = isPaused
+        ? subscriber.pausedUntil!.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+        : "";
 
     const html = `<!DOCTYPE html>
-<html><head><title>Email Preferences</title>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Email Preferences — ${esc(brandName)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:system-ui,-apple-system,sans-serif;background:#f9fafb;color:#333;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-.card{background:white;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.06);max-width:500px;width:100%;overflow:hidden;}
-.header{padding:32px;border-bottom:1px solid #f3f4f6;text-align:center;}
-.header h1{font-size:1.5rem;font-weight:700;margin-bottom:4px;}
-.header p{color:#6b7280;font-size:.875rem;}
-.lists{padding:24px 32px;}
-.list-item{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid #f3f4f6;}
-.list-item:last-child{border-bottom:none;}
-.list-name{font-weight:500;font-size:.9375rem;}
-.toggle{position:relative;width:44px;height:24px;cursor:pointer;}
-.toggle input{opacity:0;width:0;height:0;}
-.toggle .slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#e5e7eb;border-radius:12px;transition:.2s;}
-.toggle input:checked+.slider{background:#3b82f6;}
-.toggle .slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
-.toggle input:checked+.slider:before{transform:translateX(20px);}
-.footer{padding:16px 32px;border-top:1px solid #f3f4f6;text-align:center;}
-.btn{background:#3b82f6;color:white;border:none;padding:10px 24px;border-radius:8px;font-weight:600;cursor:pointer;font-size:.875rem;}
-.btn:hover{background:#2563eb;}
-.unsub-all{font-size:.75rem;color:#ef4444;text-decoration:none;margin-top:12px;display:inline-block;}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f4f4f5;color:#18181b;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:#fff;border-radius:16px;box-shadow:0 4px 32px rgba(0,0,0,.08);max-width:480px;width:100%;overflow:hidden;}
+.header{padding:28px 32px 24px;border-bottom:1px solid #f0f0f0;text-align:center;}
+.brand{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#71717a;margin-bottom:8px;}
+.header h1{font-size:1.375rem;font-weight:700;color:#18181b;}
+.header p{color:#71717a;font-size:.875rem;margin-top:4px;}
+.section{padding:20px 32px;}
+.section+.section{border-top:1px solid #f4f4f5;}
+.section-label{font-size:.6875rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#a1a1aa;margin-bottom:12px;}
+.list-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;}
+.list-row:not(:last-child){border-bottom:1px solid #f4f4f5;}
+.list-name{font-size:.9375rem;font-weight:500;color:#18181b;}
+.toggle{position:relative;width:42px;height:24px;cursor:pointer;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.slider{position:absolute;inset:0;background:#e4e4e7;border-radius:12px;transition:.18s;}
+.toggle input:checked+.slider{background:#2563eb;}
+.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.toggle input:checked+.slider:before{transform:translateX(18px);}
+.pause-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.pause-btn{padding:8px 4px;border-radius:8px;border:1.5px solid #e4e4e7;background:#fff;font-size:.8125rem;font-weight:600;color:#3f3f46;cursor:pointer;transition:.15s;text-align:center;}
+.pause-btn:hover{border-color:#2563eb;color:#2563eb;background:#eff6ff;}
+.paused-banner{background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.paused-banner span{font-size:.875rem;color:#713f12;font-weight:500;}
+.resume-btn{padding:6px 14px;border-radius:6px;border:none;background:#fff;color:#2563eb;font-size:.8125rem;font-weight:600;cursor:pointer;border:1.5px solid #bfdbfe;transition:.15s;}
+.resume-btn:hover{background:#eff6ff;}
+.footer-row{padding:16px 32px 20px;border-top:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.save-btn{flex:1;padding:10px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:.875rem;font-weight:600;cursor:pointer;transition:.15s;}
+.save-btn:hover{background:#1d4ed8;}
+.save-btn:disabled{opacity:.5;cursor:not-allowed;}
+.unsub-all{font-size:.75rem;color:#ef4444;text-decoration:none;white-space:nowrap;}
 .unsub-all:hover{text-decoration:underline;}
-.msg{text-align:center;padding:20px;color:#059669;font-weight:500;}
-</style></head>
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(40px);background:#18181b;color:#fff;padding:10px 20px;border-radius:8px;font-size:.875rem;font-weight:500;opacity:0;transition:.25s;pointer-events:none;z-index:100;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+@media(prefers-color-scheme:dark){
+body{background:#09090b;color:#fafafa;}
+.card{background:#18181b;box-shadow:0 4px 32px rgba(0,0,0,.4);}
+.header{border-bottom-color:#27272a;}
+.header h1{color:#fafafa;}
+.header p,.brand{color:#a1a1aa;}
+.section+.section{border-top-color:#27272a;}
+.list-row:not(:last-child){border-bottom-color:#27272a;}
+.list-name{color:#fafafa;}
+.slider{background:#3f3f46;}
+.pause-btn{background:#27272a;border-color:#3f3f46;color:#d4d4d8;}
+.pause-btn:hover{border-color:#3b82f6;color:#60a5fa;background:#1e3a5f;}
+.footer-row{border-top-color:#27272a;}
+.list-row:not(:last-child){border-bottom-color:#27272a;}
+}
+</style>
+</head>
 <body>
 <div class="card">
-<div class="header">
-<h1>📧 Email Preferences</h1>
-<p>Manage your subscriptions for ${subscriber.list.brand.name}</p>
+  <div class="header">
+    <div class="brand">${esc(brandName)}</div>
+    <h1>Email Preferences</h1>
+    <p>Manage your subscriptions for <strong>${esc(subscriber.email)}</strong></p>
+  </div>
+
+  <!-- Lists -->
+  ${brandLists.length > 0 ? `
+  <div class="section">
+    <div class="section-label">Your Lists</div>
+    ${brandLists.map(l => {
+        const status = listStatusMap.get(l.id) || "unsubscribed";
+        const checked = status === "subscribed" ? "checked" : "";
+        return `<div class="list-row">
+      <span class="list-name">${esc(l.name)}</span>
+      <label class="toggle" title="${checked ? "Unsubscribe from" : "Subscribe to"} ${esc(l.name)}">
+        <input type="checkbox" class="list-toggle" data-list-id="${esc(l.id)}" ${checked}>
+        <span class="slider"></span>
+      </label>
+    </div>`;
+    }).join("")}
+  </div>` : ""}
+
+  <!-- Pause -->
+  <div class="section">
+    <div class="section-label">Pause Emails</div>
+    ${isPaused ? `
+    <div class="paused-banner">
+      <span>⏸ Emails paused until ${esc(pausedUntilStr)}</span>
+      <button class="resume-btn" id="resumeBtn">Resume</button>
+    </div>` : `
+    <p style="font-size:.8125rem;color:#71717a;margin-bottom:10px;">Take a break without losing your subscriptions.</p>
+    <div class="pause-grid">
+      <button class="pause-btn" data-days="30">Pause 30 days</button>
+      <button class="pause-btn" data-days="60">Pause 60 days</button>
+      <button class="pause-btn" data-days="90">Pause 90 days</button>
+    </div>`}
+  </div>
+
+  <!-- Footer actions -->
+  <div class="footer-row">
+    <button class="save-btn" id="saveBtn">Save Preferences</button>
+    <a class="unsub-all" href="/api/preferences?action=unsubscribe_all&i=${esc(subscriberId)}">Unsubscribe from all</a>
+  </div>
 </div>
-<form id="prefForm" method="POST" action="/api/preferences">
-<input type="hidden" name="subscriberEmail" value="${subscriber.email}" />
-<input type="hidden" name="brandId" value="${subscriber.list.brand.id}" />
-<div class="lists">
-${brandLists.map(l => `
-<div class="list-item">
-<span class="list-name">${l.name}</span>
-<label class="toggle">
-<input type="checkbox" name="lists" value="${l.id}" ${subscribedListIds.has(l.id) ? 'checked' : ''} />
-<span class="slider"></span>
-</label>
-</div>`).join('')}
-</div>
-<div class="footer">
-<button type="submit" class="btn">Save Preferences</button><br>
-<a href="/api/preferences?action=unsubscribe_all&email=${encodeURIComponent(subscriber.email)}&brandId=${subscriber.list.brand.id}" class="unsub-all">Unsubscribe from all</a>
-</div>
-</form>
-<div id="msg" class="msg" style="display:none;">Preferences saved!</div>
-</div>
+<div class="toast" id="toast"></div>
+
 <script>
-document.getElementById('prefForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const fd = new FormData(this);
-  await fetch('/api/preferences', { method: 'POST', body: fd });
-  this.style.display='none';
-  document.getElementById('msg').style.display='block';
-});
+(function() {
+  var subscriberId = ${JSON.stringify(subscriberId)};
+  var brandId = ${JSON.stringify(brandId)};
+
+  function showToast(msg, color) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = color || '#18181b';
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 2800);
+  }
+
+  // Save preferences
+  document.getElementById('saveBtn').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    var selectedLists = Array.from(document.querySelectorAll('.list-toggle:checked')).map(function(el) { return el.dataset.listId; });
+    fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save_prefs', subscriberId: subscriberId, brandId: brandId, selectedLists: selectedLists })
+    }).then(function(r) { return r.json(); }).then(function() {
+      showToast('Preferences saved!', '#166534');
+    }).catch(function() {
+      showToast('Something went wrong. Please try again.', '#991b1b');
+    }).finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Save Preferences';
+    });
+  });
+
+  // Pause buttons
+  Array.from(document.querySelectorAll('.pause-btn')).forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var days = this.dataset.days;
+      this.textContent = 'Pausing…';
+      fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'pause', subscriberId: subscriberId, brandId: brandId, days: parseInt(days, 10) })
+      }).then(function(r) { return r.json(); }).then(function() {
+        showToast('Emails paused for ' + days + ' days.', '#1e3a5f');
+        setTimeout(function() { location.reload(); }, 1000);
+      }).catch(function() {
+        showToast('Something went wrong.', '#991b1b');
+      });
+    });
+  });
+
+  // Resume button
+  var resumeBtn = document.getElementById('resumeBtn');
+  if (resumeBtn) {
+    resumeBtn.addEventListener('click', function() {
+      this.textContent = 'Resuming…';
+      fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'resume', subscriberId: subscriberId, brandId: brandId })
+      }).then(function(r) { return r.json(); }).then(function() {
+        showToast('Emails resumed!', '#166534');
+        setTimeout(function() { location.reload(); }, 900);
+      }).catch(function() {
+        showToast('Something went wrong.', '#991b1b');
+      });
+    });
+  }
+})();
 </script>
-</body></html>`;
+</body>
+</html>`;
 
     return new NextResponse(html, {
         status: 200,
-        headers: { "Content-Type": "text/html" }
+        headers: { "Content-Type": "text/html" },
     });
 }
 
+// ---------------------------------------------------------------------------
+// POST — handle preference actions (JSON body)
+//
+// { action: "save_prefs", subscriberId, brandId, selectedLists: string[] }
+// { action: "pause",      subscriberId, brandId, days: 30|60|90 }
+// { action: "resume",     subscriberId, brandId }
+// ---------------------------------------------------------------------------
+
 export async function POST(req: NextRequest) {
+    let body: Record<string, any>;
     try {
-        const formData = await req.formData();
-        const subscriberEmail = formData.get("subscriberEmail") as string;
-        const brandId = formData.get("brandId") as string;
-        const selectedLists = formData.getAll("lists") as string[];
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-        if (!subscriberEmail || !brandId) {
-            return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
-        }
+    const { action, subscriberId, brandId } = body;
 
-        // Get all lists under this brand
-        const brandLists = await prisma.list.findMany({
-            where: { brandId }
-        });
+    if (!subscriberId || !brandId) {
+        return NextResponse.json({ error: "Missing subscriberId or brandId" }, { status: 400 });
+    }
 
-        for (const list of brandLists) {
-            const isSelected = selectedLists.includes(list.id);
+    // Verify the subscriber exists and belongs to this brand
+    const subscriber = await prisma.subscriber.findUnique({
+        where: { id: subscriberId },
+        select: { email: true, list: { select: { brandId: true } } },
+    });
 
-            if (isSelected) {
-                // Subscribe (upsert)
-                await prisma.subscriber.upsert({
-                    where: { email_listId: { email: subscriberEmail, listId: list.id } },
-                    update: { status: "subscribed" },
-                    create: { email: subscriberEmail, listId: list.id, status: "subscribed" }
-                });
-            } else {
-                // Unsubscribe (update if exists)
-                await prisma.subscriber.updateMany({
-                    where: { email: subscriberEmail, listId: list.id },
-                    data: { status: "unsubscribed" }
-                });
+    if (!subscriber || subscriber.list.brandId !== brandId) {
+        return NextResponse.json({ error: "Subscriber not found" }, { status: 404 });
+    }
+
+    const email = subscriber.email;
+
+    try {
+        if (action === "save_prefs") {
+            const selectedLists: string[] = Array.isArray(body.selectedLists) ? body.selectedLists : [];
+
+            const brandLists = await prisma.list.findMany({ where: { brandId }, select: { id: true } });
+
+            for (const list of brandLists) {
+                if (selectedLists.includes(list.id)) {
+                    await prisma.subscriber.upsert({
+                        where: { email_listId: { email, listId: list.id } },
+                        update: { status: "subscribed" },
+                        create: { email, listId: list.id, status: "subscribed" },
+                    });
+                } else {
+                    await prisma.subscriber.updateMany({
+                        where: { email, listId: list.id },
+                        data: { status: "unsubscribed" },
+                    });
+                }
             }
+
+            return NextResponse.json({ success: true });
         }
 
-        return NextResponse.json({ success: true });
+        if (action === "pause") {
+            const days = typeof body.days === "number" && [30, 60, 90].includes(body.days) ? body.days : 30;
+            const pausedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+            // Apply pausedUntil to ALL subscriber records for this email under this brand
+            await prisma.subscriber.updateMany({
+                where: { email, list: { brandId } },
+                data: { pausedUntil },
+            });
+
+            return NextResponse.json({ success: true, pausedUntil: pausedUntil.toISOString() });
+        }
+
+        if (action === "resume") {
+            await prisma.subscriber.updateMany({
+                where: { email, list: { brandId } },
+                data: { pausedUntil: null },
+            });
+
+            return NextResponse.json({ success: true });
+        }
+
+        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+
     } catch (error) {
-        console.error("Preference update error:", error);
+        console.error("Preference POST error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
+}
+
+// ---------------------------------------------------------------------------
+// HTML helpers
+// ---------------------------------------------------------------------------
+
+function getConfirmHtml(title: string, message: string): string {
+    return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>${title}</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f4f4f5;color:#18181b;}
+.card{text-align:center;padding:3rem;border-radius:12px;background:white;box-shadow:0 2px 16px rgba(0,0,0,.08);max-width:400px;}
+h1{font-size:1.375rem;margin:0 0 .5rem;}p{margin:0;color:#71717a;font-size:.9375rem;}</style></head>
+<body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`;
+}
+
+function esc(str: string): string {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }

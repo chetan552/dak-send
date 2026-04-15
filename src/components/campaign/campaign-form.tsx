@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/campaign/rich-text-editor";
 import { TemplatePicker } from "@/components/campaign/template-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Blocks, Code2 } from "lucide-react";
 import { createCampaignDraft, updateCampaignDraft } from "@/app/actions/campaign";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface CampaignFormProps {
     brands: any[];
@@ -19,6 +20,9 @@ interface CampaignFormProps {
 export function CampaignForm({ brands, initialData }: CampaignFormProps) {
     const [loading, setLoading] = useState(false);
     const [htmlContent, setHtmlContent] = useState(initialData?.htmlText || "");
+    const [editorMode, setEditorMode] = useState<"html" | "blocks">(
+        initialData ? (initialData.contentJson ? "blocks" : "html") : "blocks"
+    );
     const router = useRouter();
 
     // Load template HTML from sessionStorage (set by Template Library)
@@ -37,14 +41,19 @@ export function CampaignForm({ brands, initialData }: CampaignFormProps) {
         setLoading(true);
         try {
             const formData = new FormData(e.currentTarget);
-            formData.set("htmlText", htmlContent);
+            // For block builder mode on a new campaign, use placeholder HTML; blocks are set in the builder
+            formData.set("htmlText", editorMode === "blocks" && !initialData ? "<p>Draft</p>" : htmlContent);
 
             if (initialData) {
                 await updateCampaignDraft(initialData.id, formData);
                 router.push("/dashboard/campaigns");
             } else {
                 const campaign = await createCampaignDraft(formData);
-                router.push(`/dashboard/campaigns/${campaign.id}`);
+                if (editorMode === "blocks") {
+                    router.push(`/dashboard/campaigns/${campaign.id}/builder`);
+                } else {
+                    router.push(`/dashboard/campaigns/${campaign.id}`);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -81,16 +90,69 @@ export function CampaignForm({ brands, initialData }: CampaignFormProps) {
                 <Input id="subject" name="subject" defaultValue={initialData?.subject} placeholder="Don't miss out on our biggest sale of the year!" required className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm" />
             </div>
 
-            <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-2">
-                    <Label htmlFor="htmlText" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>
-                    {!initialData && <TemplatePicker onSelect={setHtmlContent} />}
+            {/* Editor mode toggle — only shown when creating a new campaign */}
+            {!initialData && (
+                <div className="space-y-2">
+                    <Label className="text-zinc-700 dark:text-zinc-300">Editor Type</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setEditorMode("blocks")}
+                            className={cn(
+                                "flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-all",
+                                editorMode === "blocks"
+                                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
+                                    : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                            )}
+                        >
+                            <Blocks className={cn("w-5 h-5 mt-0.5 flex-shrink-0", editorMode === "blocks" ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400")} />
+                            <div>
+                                <p className={cn("text-sm font-semibold", editorMode === "blocks" ? "text-indigo-700 dark:text-indigo-300" : "text-zinc-700 dark:text-zinc-300")}>Block Builder</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Drag-and-drop visual blocks</p>
+                            </div>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setEditorMode("html")}
+                            className={cn(
+                                "flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-all",
+                                editorMode === "html"
+                                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
+                                    : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                            )}
+                        >
+                            <Code2 className={cn("w-5 h-5 mt-0.5 flex-shrink-0", editorMode === "html" ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400")} />
+                            <div>
+                                <p className={cn("text-sm font-semibold", editorMode === "html" ? "text-indigo-700 dark:text-indigo-300" : "text-zinc-700 dark:text-zinc-300")}>HTML Editor</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Rich text or raw HTML</p>
+                            </div>
+                        </button>
+                    </div>
                 </div>
-                <RichTextEditor
-                    value={htmlContent}
-                    onChange={setHtmlContent}
-                />
-            </div>
+            )}
+
+            {/* Email content — only shown in HTML mode (or when editing an existing HTML campaign) */}
+            {(editorMode === "html" || !!initialData) && (
+                <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-2">
+                        <Label htmlFor="htmlText" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>
+                        {!initialData && <TemplatePicker onSelect={setHtmlContent} />}
+                    </div>
+                    <RichTextEditor
+                        value={htmlContent}
+                        onChange={setHtmlContent}
+                    />
+                </div>
+            )}
+
+            {/* Block builder placeholder — shown when block mode is active on a new campaign */}
+            {editorMode === "blocks" && !initialData && (
+                <div className="rounded-lg border-2 border-dashed border-indigo-200 dark:border-indigo-800/50 bg-indigo-50/50 dark:bg-indigo-950/20 p-8 text-center">
+                    <Blocks className="w-10 h-10 text-indigo-400 dark:text-indigo-500 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Block Builder opens after saving</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Fill in the name, brand, and subject above, then click Save Draft to open the visual editor.</p>
+                </div>
+            )}
 
             <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/50 flex justify-end">
                 <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700 gap-2">

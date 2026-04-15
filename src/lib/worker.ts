@@ -47,8 +47,13 @@ const startWorker = async () => {
                 return;
             }
 
+            const trackingBaseUrlAuto = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
             const unsubscribeUrl = jobUnsubscribeUrl ||
-                `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/unsubscribe?i=${encodeURIComponent(subscriberId || "")}&l=${encodeURIComponent(listId || "")}`;
+                `${trackingBaseUrlAuto}/api/unsubscribe?i=${encodeURIComponent(subscriberId || "")}&l=${encodeURIComponent(listId || "")}`;
+
+            const preferencesUrl = subscriberId
+                ? `${trackingBaseUrlAuto}/api/preferences?i=${encodeURIComponent(subscriberId)}`
+                : undefined;
 
             const rendered = renderEmail({
                 html,
@@ -60,6 +65,7 @@ const startWorker = async () => {
                     customFields: customFields || {},
                 },
                 unsubscribeUrl,
+                preferencesUrl,
                 // Automations don't have a campaign-level tracking ID
             });
 
@@ -113,6 +119,7 @@ const startWorker = async () => {
 
         const trackingBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
         const unsubscribeUrl = `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriberId)}&l=${encodeURIComponent(listId)}`;
+        const preferencesUrl = `${trackingBaseUrl}/api/preferences?i=${encodeURIComponent(subscriberId)}`;
 
         // Fetch custom fields for this subscriber scoped to the list being sent to
         const subscriberCustomFields = await prisma.subscriberFieldValue.findMany({
@@ -139,6 +146,7 @@ const startWorker = async () => {
                 baseUrl: trackingBaseUrl,
             },
             unsubscribeUrl,
+            preferencesUrl,
         });
 
         const { listUnsubscribe, listUnsubscribePost } = buildUnsubscribeHeaders(

@@ -41,6 +41,7 @@ model Brand {
   automations Automation[]
   warmup      DomainWarmup?
   emailTemplates EmailTemplate[]
+  suppressions   SuppressionList[]
   signupForms    SignupForm[]
   webhooks       Webhook[]
   subscriberEvents SubscriberEvent[]
@@ -86,7 +87,8 @@ model Subscriber {
 
   customFields SubscriberFieldValue[]
   subscriptionTokens SubscriptionToken[]
-  optimalSendHour Int?  // 0-23, computed from open history
+  optimalSendHour Int?       // 0-23, computed from open history
+  pausedUntil DateTime?      // if set and > now, subscriber is skipped in campaign sends
   events      SubscriberEvent[]
   tags        SubscriberTag[]
 
@@ -104,6 +106,7 @@ model Campaign {
   subject     String
   htmlText    String   @db.Text
   plainText   String?  @db.Text
+  contentJson Json?    // Block-based editor JSON; null means HTML editor was used
   brandId     String
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   status      String   @default("draft") // draft, queuing, sending, sent
@@ -383,6 +386,20 @@ model SubscriberEvent {
   @@index([subscriberId])
   @@index([brandId, name])
   @@index([occurredAt])
+}
+
+model SuppressionList {
+  id        String   @id @default(cuid())
+  email     String
+  reason    String   @default("manual") // manual, bounce, complaint
+  brandId   String?  // null = global (all brands), set = brand-scoped
+  brand     Brand?   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([email, brandId])
+  @@index([email])
+  @@index([brandId])
 }
 
 model Tag {

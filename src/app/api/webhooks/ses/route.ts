@@ -76,6 +76,12 @@ async function processBounce(email: string) {
         where: { subscriberEmail: email, status: 'sent' },
         data: { status: 'bounced' }
     });
+    // Auto-add to global suppression list so this address is never mailed again
+    await prisma.suppressionList.upsert({
+        where: { email_brandId: { email, brandId: null as any } },
+        update: {},
+        create: { email, reason: 'bounce', brandId: null },
+    }).catch(() => {/* ignore if already exists */});
 }
 
 /**
@@ -89,6 +95,7 @@ async function processBounce(email: string) {
  */
 async function processComplaint(email: string, campaignId?: string) {
     let listIds: string[] | null = null;
+    let brandId: string | null = null;
 
     if (campaignId) {
         // Best case: we know exactly which campaign triggered the complaint
@@ -97,6 +104,7 @@ async function processComplaint(email: string, campaignId?: string) {
             select: { brandId: true },
         });
         if (campaign) {
+            brandId = campaign.brandId;
             listIds = await getListIdsForBrand(campaign.brandId);
             await prisma.campaignSend.updateMany({
                 where: { campaignId, subscriberEmail: email, status: 'sent' },
@@ -116,6 +124,8 @@ async function processComplaint(email: string, campaignId?: string) {
             const brandIds = [...new Set(sends.map(s => s.campaign.brandId))];
             const allLists = await Promise.all(brandIds.map(getListIdsForBrand));
             listIds = allLists.flat();
+            // Use the first brand found for suppression scoping
+            brandId = brandIds[0] ?? null;
 
             await prisma.campaignSend.updateMany({
                 where: { subscriberEmail: email, status: 'sent' },
@@ -130,6 +140,14 @@ async function processComplaint(email: string, campaignId?: string) {
             where: { email, listId: { in: listIds } },
             data: { status: 'complained' },
         });
+        // Brand-scoped suppression so future campaigns from this brand skip the address
+        if (brandId) {
+            await prisma.suppressionList.upsert({
+                where: { email_brandId: { email, brandId } },
+                update: {},
+                create: { email, reason: 'complaint', brandId },
+            }).catch(() => {});
+        }
     } else {
         // No tracked campaign found (e.g. welcome/confirmation email) — mark globally
         // so the address is suppressed everywhere rather than keep spamming.
@@ -137,6 +155,11 @@ async function processComplaint(email: string, campaignId?: string) {
             where: { email },
             data: { status: 'complained' },
         });
+        await prisma.suppressionList.upsert({
+            where: { email_brandId: { email, brandId: null as any } },
+            update: {},
+            create: { email, reason: 'complaint', brandId: null },
+        }).catch(() => {});
     }
 }
 

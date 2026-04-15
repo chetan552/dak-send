@@ -299,6 +299,15 @@ export async function updateSubscriberAction(formData: FormData) {
         }
     });
 
+    // When manually resubscribing, remove brand-scoped suppression so dispatch
+    // doesn't skip them. Global suppressions (brandId=null) stay — only admins
+    // can remove those via the Deliverability page.
+    if (status === "subscribed") {
+        await prisma.suppressionList.deleteMany({
+            where: { email, brandId: list.brandId },
+        });
+    }
+
     // Handle custom fields
     if (Object.keys(customFieldsData).length > 0) {
         const listCustomFields = await prisma.customField.findMany({
@@ -328,4 +337,49 @@ export async function updateSubscriberAction(formData: FormData) {
     }
 
     revalidatePath(`/dashboard/lists/${listId}`);
+}
+
+/**
+ * Resubscribe a subscriber: sets status → "subscribed", clears pausedUntil,
+ * removes any brand-scoped suppression entry.
+ *
+ * Returns { globalSuppression: true } if a global suppression still exists
+ * for this email — the caller should warn the admin to remove it manually
+ * from the Deliverability page before sends will reach this address.
+ */
+export async function resubscribeSubscriber(subscriberId: string, listId: string) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+    if (!userId) throw new Error("Unauthorized");
+
+    const whereCondition: any = currentUserRole === "admin"
+        ? { id: listId }
+        : { id: listId, brand: { users: { some: { id: userId } } } };
+
+    const list = await prisma.list.findFirst({ where: whereCondition });
+    if (!list) throw new Error("List not found or unauthorized");
+
+    const subscriber = await prisma.subscriber.findFirst({
+        where: { id: subscriberId, listId },
+    });
+    if (!subscriber) throw new Error("Subscriber not found");
+
+    await prisma.subscriber.update({
+        where: { id: subscriberId },
+        data: { status: "subscribed", pausedUntil: null },
+    });
+
+    // Remove brand-scoped suppression
+    await prisma.suppressionList.deleteMany({
+        where: { email: subscriber.email, brandId: list.brandId },
+    });
+
+    // Check if a global suppression remains (admin-only to remove)
+    const globalSuppression = await prisma.suppressionList.findFirst({
+        where: { email: subscriber.email, brandId: null },
+    });
+
+    revalidatePath(`/dashboard/lists/${listId}`);
+    return { globalSuppression: !!globalSuppression };
 }

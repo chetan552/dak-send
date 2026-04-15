@@ -120,10 +120,29 @@ export async function dispatchCampaign(campaignId: string, data: {
         throw new Error("No active subscribers found in selected criteria.");
     }
 
+    // 4. Remove suppressed emails (global + brand-scoped)
+    const suppressed = await prisma.suppressionList.findMany({
+        where: {
+            email: { in: finalEmails },
+            OR: [{ brandId: null }, { brandId: campaign.brandId }],
+        },
+        select: { email: true },
+    });
+    const suppressedSet = new Set(suppressed.map(s => s.email));
+    const unsuppressedEmails = finalEmails.filter(e => !suppressedSet.has(e));
+
+    const fetchTime = new Date();
     let subscribers = await prisma.subscriber.findMany({
-        where: { email: { in: finalEmails }, status: "subscribed" },
+        where: {
+            email: { in: unsuppressedEmails },
+            status: "subscribed",
+            OR: [
+                { pausedUntil: null },
+                { pausedUntil: { lt: fetchTime } },
+            ],
+        },
         distinct: ['email'],
-        select: { id: true, email: true, name: true, listId: true, optimalSendHour: true }
+        select: { id: true, email: true, name: true, listId: true, optimalSendHour: true },
     });
 
     // Enforce domain warmup daily limit
