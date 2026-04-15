@@ -15,7 +15,7 @@ interface RssFeedEditProps {
     onClose: () => void;
 }
 
-const ITEM_TAGS = ["[RssTitle]", "[RssLink]", "[RssContent]", "[RssAuthor]", "[RssDate]", "[RssThumbnail]"];
+const ITEM_TAGS = ["[RssTitle]", "[RssLink]", "[RssContent]", "[RssDescription]", "[RssAuthor]", "[RssDate]", "[RssThumbnail]"];
 const WRAPPER_TAGS = ["[RssItems]", "[RssDate]", "[RssCount]", "[RssFeedName]", "[Unsubscribe]"];
 
 export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {

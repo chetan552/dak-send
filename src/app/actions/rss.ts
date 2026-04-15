@@ -228,6 +228,7 @@ function renderItemBlock(template: string, item: {
     link?: string;
     contentSnippet?: string;
     content?: string;
+    description?: string; // raw <description> field (may contain HTML)
     creator?: string;
     author?: string;
     pubDate?: string;
@@ -237,13 +238,21 @@ function renderItemBlock(template: string, item: {
     const dateStr = item.pubDate
         ? new Date(item.pubDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
         : (item.isoDate ? new Date(item.isoDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "");
-    const snippet = (item.contentSnippet || item.content || "").slice(0, 200).trim();
-    const cleanSnippet = snippet.replace(/<[^>]*>/g, "");
+
+    // [RssContent] — plain-text excerpt (first 200 chars, strips HTML).
+    // Falls back to description if neither contentSnippet nor content:encoded is present.
+    const rawSnippet = item.contentSnippet || item.content || item.description || "";
+    const snippet = rawSnippet.replace(/<[^>]*>/g, "").slice(0, 200).trim();
+
+    // [RssDescription] — full HTML from the <description> field, or content:encoded
+    // if description is absent. Safe to use directly in email HTML templates.
+    const fullDescription = item.description || item.content || "";
 
     return template
         .replace(/\[RssTitle\]/gi, item.title || "Untitled")
         .replace(/\[RssLink\]/gi, item.link || "#")
-        .replace(/\[RssContent\]/gi, cleanSnippet)
+        .replace(/\[RssContent\]/gi, snippet)
+        .replace(/\[RssDescription\]/gi, fullDescription)
         .replace(/\[RssAuthor\]/gi, item.creator || (item as any).author || "")
         .replace(/\[RssDate\]/gi, dateStr)
         .replace(/\[RssThumbnail\]/gi, item.enclosure?.url || "");
