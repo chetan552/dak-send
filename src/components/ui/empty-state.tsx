@@ -1,6 +1,5 @@
 import * as React from "react";
 import type { LucideIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
@@ -13,22 +12,26 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
     return (
-        <Card
+        <div
             className={cn(
-                "border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30",
+                "surface-card relative overflow-hidden",
                 className,
             )}
         >
-            <CardContent className="flex flex-col items-center justify-center p-12 text-center animate-in fade-in duration-500">
-                <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
-                    <Icon className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.5] dark:opacity-[0.35] [background-image:linear-gradient(to_right,rgb(228_228_231)_1px,transparent_1px),linear-gradient(to_bottom,rgb(228_228_231)_1px,transparent_1px)] dark:[background-image:linear-gradient(to_right,rgb(39_39_42)_1px,transparent_1px),linear-gradient(to_bottom,rgb(39_39_42)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_center,black_25%,transparent_75%)]"
+            />
+            <div className="relative flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-500">
+                <div className="w-10 h-10 rounded-md bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-center mb-4">
+                    <Icon className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">{title}</h3>
+                <h3 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-white mb-1.5">{title}</h3>
                 {description && (
-                    <p className="text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm">{description}</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm">{description}</p>
                 )}
                 {action}
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

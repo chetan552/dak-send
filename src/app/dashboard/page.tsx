@@ -1,13 +1,14 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, ExternalLink, Users, Send, MailOpen, MousePointerClick, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CreateBrandButton } from "@/components/brand/create-brand-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 export default async function DashboardPage() {
     const session = await getServerSession(authOptions);
@@ -28,17 +29,14 @@ export default async function DashboardPage() {
         orderBy: { createdAt: 'desc' }
     });
 
-    // If there are no brands, show the empty state / brand creation flow
     if (brands.length === 0) {
         return (
-            <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="page-title mb-1">Dashboard</h1>
-                        <p className="page-subtitle">Overview of your sending activity.</p>
-                    </div>
-                    {currentUserRole === 'admin' && <CreateBrandButton />}
-                </div>
+            <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <PageHeader
+                    title="Dashboard"
+                    description="Overview of your sending activity."
+                    action={currentUserRole === 'admin' ? <CreateBrandButton /> : undefined}
+                />
                 <EmptyState
                     icon={Building2}
                     title="No brands yet"
@@ -53,7 +51,6 @@ export default async function DashboardPage() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // KPI queries (run in parallel)
     const [totalSubscribers, sendsStats, recentCampaigns] = await Promise.all([
         prisma.subscriber.count({
             where: {
@@ -121,106 +118,86 @@ export default async function DashboardPage() {
     ];
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="page-title mb-1">Dashboard</h1>
-                    <p className="page-subtitle">Overview of your sending activity across all brands.</p>
-                </div>
-                {currentUserRole === 'admin' && <CreateBrandButton />}
+        <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <PageHeader
+                title="Dashboard"
+                description="Overview of your sending activity across all brands."
+                action={currentUserRole === 'admin' ? <CreateBrandButton /> : undefined}
+            />
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {kpis.map((kpi, i) => (
+                    <StatCard
+                        key={kpi.label}
+                        label={kpi.label}
+                        value={kpi.value}
+                        hint={kpi.hint}
+                        icon={kpi.icon}
+                        tint={kpi.tint}
+                        delay={i * 80}
+                    />
+                ))}
             </div>
 
-            {/* KPI Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {kpis.map((kpi, i) => {
-                    const Icon = kpi.icon;
-                    return (
-                        <Card
-                            key={kpi.label}
-                            className="bg-white dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 shadow-sm animate-in fade-in slide-in-from-bottom-4"
-                            style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
-                        >
-                            <CardContent className="p-5">
-                                <div className="flex items-start justify-between mb-3">
-                                    <span className="text-xs font-medium uppercase tracking-wider text-zinc-500">{kpi.label}</span>
-                                    <Icon className={`w-4 h-4 ${kpi.tint}`} />
-                                </div>
-                                <div className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tabular-nums">
-                                    {kpi.value}
-                                </div>
-                                <p className="text-xs text-zinc-500 mt-1">{kpi.hint}</p>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-            </div>
-
-            {/* Two-column: Recent campaigns + Brands */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Recent Campaigns */}
-                <Card className="lg:col-span-2 bg-white dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
-                        <CardTitle className="section-title">Recent campaigns</CardTitle>
+                <section className="surface-card lg:col-span-2 p-5">
+                    <div className="flex items-center justify-between mb-2">
+                        <h2 className="section-title">Recent campaigns</h2>
                         <Link href="/dashboard/campaigns">
-                            <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                            <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 px-2">
                                 View all <ArrowRight className="w-3 h-3" />
                             </Button>
                         </Link>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                        {recentCampaigns.length === 0 ? (
-                            <div className="text-sm text-zinc-500 py-8 text-center">
-                                No campaigns yet.{" "}
-                                <Link href="/dashboard/campaigns/new" className="text-primary hover:underline">
-                                    Create your first one →
-                                </Link>
-                            </div>
-                        ) : (
-                            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
-                                {recentCampaigns.map((campaign) => (
-                                    <li key={campaign.id}>
-                                        <Link
-                                            href={`/dashboard/campaigns/${campaign.id}`}
-                                            className="flex items-center justify-between gap-4 py-3 group"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-medium text-sm text-zinc-900 dark:text-white truncate group-hover:text-primary transition-colors">
-                                                    {campaign.name}
-                                                </p>
-                                                <p className="text-xs text-zinc-500 truncate mt-0.5">
-                                                    {campaign.brand.name} · {campaign._count.sends.toLocaleString()} sends
-                                                </p>
-                                            </div>
-                                            <StatusBadge status={campaign.status} />
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </CardContent>
-                </Card>
+                    </div>
+                    {recentCampaigns.length === 0 ? (
+                        <div className="text-sm text-zinc-500 dark:text-zinc-400 py-8 text-center">
+                            No campaigns yet.{" "}
+                            <Link href="/dashboard/campaigns/new" className="text-primary hover:underline">
+                                Create your first one →
+                            </Link>
+                        </div>
+                    ) : (
+                        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800/60 -mx-1">
+                            {recentCampaigns.map((campaign) => (
+                                <li key={campaign.id}>
+                                    <Link
+                                        href={`/dashboard/campaigns/${campaign.id}`}
+                                        className="flex items-center justify-between gap-4 py-3 px-1 group"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-medium text-sm text-zinc-900 dark:text-white truncate group-hover:text-primary transition-colors">
+                                                {campaign.name}
+                                            </p>
+                                            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                                                {campaign.brand.name} · {campaign._count.sends.toLocaleString()} sends
+                                            </p>
+                                        </div>
+                                        <StatusBadge status={campaign.status} />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
 
-                {/* Brands picker */}
-                <Card className="bg-white dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800">
-                    <CardHeader className="pb-4">
-                        <CardTitle className="section-title">Your brands</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 space-y-2">
+                <section className="surface-card p-5">
+                    <h2 className="section-title mb-3">Your brands</h2>
+                    <div className="space-y-1">
                         {brands.slice(0, 6).map((brand) => (
                             <Link
                                 key={brand.id}
                                 href={`/dashboard/brands/${brand.id}`}
-                                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors group"
+                                className="flex items-center justify-between gap-3 px-2 py-2 -mx-1 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group"
                             >
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-8 h-8 rounded-md bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center flex-shrink-0">
-                                        <span className="font-bold text-xs text-zinc-900 dark:text-white">{brand.name[0]?.toUpperCase()}</span>
+                                    <div className="w-8 h-8 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 flex items-center justify-center flex-shrink-0">
+                                        <span className="font-semibold text-xs text-zinc-700 dark:text-zinc-200">{brand.name[0]?.toUpperCase()}</span>
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium text-zinc-900 dark:text-white truncate group-hover:text-primary transition-colors">
                                             {brand.name}
                                         </p>
-                                        <p className="text-xs text-zinc-500 truncate">
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                                             {brand._count.lists} lists · {brand._count.campaigns} campaigns
                                         </p>
                                     </div>
@@ -229,12 +206,12 @@ export default async function DashboardPage() {
                             </Link>
                         ))}
                         {brands.length > 6 && (
-                            <p className="text-xs text-zinc-500 text-center pt-2">
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center pt-2">
                                 +{brands.length - 6} more
                             </p>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </section>
             </div>
         </div>
     );

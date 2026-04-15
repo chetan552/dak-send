@@ -127,16 +127,28 @@
 
 @layer components {
   .page-title {
-    @apply text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white;
+    @apply text-[22px] sm:text-[28px] font-semibold tracking-[-0.02em] text-zinc-900 dark:text-white;
   }
   .page-subtitle {
-    @apply text-sm sm:text-base text-zinc-500 dark:text-zinc-400;
+    @apply text-sm text-zinc-500 dark:text-zinc-400;
   }
   .section-title {
-    @apply text-lg font-semibold tracking-tight text-zinc-900 dark:text-white;
+    @apply text-[15px] font-semibold tracking-[-0.01em] text-zinc-900 dark:text-white;
   }
   .section-subtitle {
     @apply text-sm text-zinc-500 dark:text-zinc-400;
+  }
+  .stat-label {
+    @apply text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400;
+  }
+  .stat-value {
+    @apply text-[26px] sm:text-[30px] font-semibold tabular-nums tracking-[-0.03em] text-zinc-900 dark:text-white;
+  }
+  .surface-card {
+    @apply bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-lg;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-300;
   }
 }
 

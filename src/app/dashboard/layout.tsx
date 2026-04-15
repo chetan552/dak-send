@@ -62,10 +62,7 @@ export default async function DashboardLayout({
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col relative overflow-hidden">
-                {/* Subtle background glow */}
-                <div className="absolute top-0 right-[-10%] w-[50%] h-[50%] bg-blue-500/5 blur-[150px] rounded-full pointer-events-none" />
-                {/* Add top padding on mobile for the fixed top bar, bottom padding for bottom nav */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-16 md:pt-8 pb-20 md:pb-8 z-10">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-16 md:pt-8 pb-20 md:pb-8">
                     {children}
                 </div>
             </main>

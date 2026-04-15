@@ -24,9 +24,12 @@ interface EmbedFormProps {
     listId: string;
     requireGdpr?: boolean;
     customFields?: CustomField[];
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    hideTrigger?: boolean;
 }
 
-export function EmbedForm({ listId, requireGdpr = false, customFields = [] }: EmbedFormProps) {
+export function EmbedForm({ listId, requireGdpr = false, customFields = [], open, onOpenChange, hideTrigger = false }: EmbedFormProps) {
     const [copied, setCopied] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -88,13 +91,15 @@ ${requireGdpr ? `  <div style="margin-bottom: 1rem; display: flex; align-items: 
     };
 
     return (
-        <Dialog>
-            <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                    <Code className="h-4 w-4" />
-                    Embed Form
-                </Button>
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            {!hideTrigger && (
+                <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                        <Code className="h-4 w-4" />
+                        Embed Form
+                    </Button>
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Embed Form</DialogTitle>
