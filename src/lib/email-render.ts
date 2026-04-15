@@ -27,6 +27,12 @@ export interface RenderEmailInput {
     };
     /** Full unsubscribe URL for this subscriber+list combination. */
     unsubscribeUrl: string;
+    /**
+     * Optional link to the subscriber preference center.
+     * When provided, the [PreferencesUrl] merge tag is replaced and the
+     * auto-injected footer shows both "Unsubscribe" and "Manage Preferences".
+     */
+    preferencesUrl?: string;
 }
 
 export interface RenderedEmail {
@@ -44,12 +50,14 @@ function applyPersonalization(
     content: string,
     p: RenderEmailInput["personalization"],
     unsubscribeUrl: string,
+    preferencesUrl?: string,
 ): string {
     let out = content
         .replace(/\[Name\]/gi, p.name || "Friend")
         .replace(/\[Email\]/gi, p.email)
         .replace(/\[UnsubscribeUrl\]/gi, unsubscribeUrl)
-        .replace(/\[Unsubscribe\]/gi, `<a href="${unsubscribeUrl}">Unsubscribe</a>`);
+        .replace(/\[Unsubscribe\]/gi, `<a href="${unsubscribeUrl}">Unsubscribe</a>`)
+        .replace(/\[PreferencesUrl\]/gi, preferencesUrl || unsubscribeUrl);
 
     if (p.customFields) {
         out = out.replace(/\[CustomField:([^\]]+)\]/gi, (_match, fieldName: string) => {
@@ -68,10 +76,10 @@ function applyPersonalization(
 // ---------------------------------------------------------------------------
 
 export function renderEmail(input: RenderEmailInput): RenderedEmail {
-    const { subject, personalization, tracking, unsubscribeUrl } = input;
+    const { subject, personalization, tracking, unsubscribeUrl, preferencesUrl } = input;
 
     // 1. Personalization on raw HTML first (before any wrapping/DOM parsing)
-    const html = applyPersonalization(input.html, personalization, unsubscribeUrl);
+    const html = applyPersonalization(input.html, personalization, unsubscribeUrl, preferencesUrl);
 
     // 2. Parse with cheerio to work on DOM instead of fragile regexes.
     // Third arg `false` = don't auto-wrap in <html>/<body> (cheerio 1.x).
@@ -89,10 +97,10 @@ export function renderEmail(input: RenderEmailInput): RenderedEmail {
             .replace("{{preview}}", "")     // could add preview text later
             .replace("{{content}}", bodyContent);
         const $w = cheerio.load(wrapped, null, true);
-        return finishPipeline($w, input, subject, tracking, unsubscribeUrl, personalization);
+        return finishPipeline($w, input, subject, tracking, unsubscribeUrl, personalization, preferencesUrl);
     }
 
-    return finishPipeline($, input, subject, tracking, unsubscribeUrl, personalization);
+    return finishPipeline($, input, subject, tracking, unsubscribeUrl, personalization, preferencesUrl);
 }
 
 function finishPipeline(
@@ -102,6 +110,7 @@ function finishPipeline(
     tracking: RenderEmailInput["tracking"],
     unsubscribeUrl: string,
     personalization: RenderEmailInput["personalization"],
+    preferencesUrl?: string,
 ): RenderedEmail {
     // 4. Tracking pixel — only for real sends, not test sends
     if (tracking) {
@@ -125,11 +134,14 @@ function finishPipeline(
         $("body").html()?.includes(unsubscribeUrl);
 
     if (!hasUnsubscribeLink) {
+        const prefsLink = preferencesUrl
+            ? ` &middot; <a href="${preferencesUrl}" style="color:#666;text-decoration:underline;">Manage Preferences</a>`
+            : "";
         const footer = `
 <br>
 <div style="text-align:center;font-size:12px;color:#666;padding:16px 0;">
   <p style="margin:0 0 4px;">You are receiving this email because you subscribed to our list.</p>
-  <p style="margin:0;"><a href="${unsubscribeUrl}" style="color:#666;text-decoration:underline;">Unsubscribe</a></p>
+  <p style="margin:0;"><a href="${unsubscribeUrl}" style="color:#666;text-decoration:underline;">Unsubscribe</a>${prefsLink}</p>
 </div>`;
         $("body").append(footer);
     }
@@ -145,7 +157,7 @@ function finishPipeline(
     // 8. Plain text alternative
     let text: string;
     if (input.plainText && input.plainText.trim()) {
-        text = applyPersonalization(input.plainText, personalization, unsubscribeUrl);
+        text = applyPersonalization(input.plainText, personalization, unsubscribeUrl, preferencesUrl);
     } else {
         text = htmlToText(finalHtml, {
             wordwrap: 78,
