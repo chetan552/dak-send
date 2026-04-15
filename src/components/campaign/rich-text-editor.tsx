@@ -750,8 +750,8 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
     const currentFontSize = editor?.getAttributes('textStyle')?.fontSize || '';
 
     return (
-        <div className="border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-2 flex flex-wrap gap-1 rounded-t-md items-center justify-between sticky top-0 z-10">
-            <div className="flex flex-wrap gap-1 items-center">
+        <div className="border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 p-2 flex gap-1 rounded-t-md items-start justify-between sticky top-0 z-10">
+            <div className="flex flex-wrap gap-1 items-center flex-1 min-w-0">
                 <Select value={currentFontFamily} onValueChange={handleFontFamilyChange} disabled={isHtmlMode || (!editor && !iframeMode)}>
                     <SelectTrigger className="w-[120px] h-8 text-xs bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                         <SelectValue placeholder="Font" />
@@ -1005,16 +1005,17 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                 )}
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0 ml-1">
                 {isHtmlMode && onFormat && (
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={(e) => { e.preventDefault(); onFormat(); }}
-                        className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white gap-1.5"
+                        className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white gap-1.5 px-2"
+                        title="Format HTML"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h8m-8 6h16"></path></svg>
-                        Format
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h8m-8 6h16"></path></svg>
+                        <span className="hidden sm:inline">Format</span>
                     </Button>
                 )}
                 {onSaveAsTemplate && (
@@ -1022,11 +1023,11 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                         variant="ghost"
                         size="sm"
                         onClick={(e) => { e.preventDefault(); onSaveAsTemplate(); }}
-                        className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white gap-1.5"
+                        className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white gap-1.5 px-2"
                         title="Save current HTML as a reusable template"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                        Save as Template
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                        <span className="hidden sm:inline">Save as Template</span>
                     </Button>
                 )}
                 {isComplexHtml && onClean && (
@@ -1034,21 +1035,22 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                         variant="ghost"
                         size="sm"
                         onClick={(e) => { e.preventDefault(); onClean(); }}
-                        className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 gap-1.5"
+                        className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 gap-1.5 px-2"
                         title="Remove <!DOCTYPE>, <html>, <head>, <body> wrappers and keep body content + styles"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        Clean HTML
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <span className="hidden sm:inline">Clean HTML</span>
                     </Button>
                 )}
                 <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => { e.preventDefault(); onToggleMode(); }}
-                    className={isHtmlMode ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"}
+                    className={`gap-1.5 px-2 ${isHtmlMode ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"}`}
+                    title={isHtmlMode ? "View Visual editor" : "View HTML source"}
                 >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                    {isHtmlMode ? "View Visual" : "View Source"}
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    <span className="hidden sm:inline">{isHtmlMode ? "View Visual" : "View Source"}</span>
                 </Button>
             </div>
         </div >

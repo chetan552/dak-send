@@ -20,12 +20,14 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
     const [brandId, setBrandId] = useState(brands[0]?.id || "");
     const [trigger, setTrigger] = useState("subscriber_added");
     const [triggerListId, setTriggerListId] = useState("");
+    const [triggerEventName, setTriggerEventName] = useState("");
     const [error, setError] = useState("");
 
     const selectedBrand = brands.find((b) => b.id === brandId);
     const lists = selectedBrand?.lists || [];
 
     const requiresListTrigger = trigger === "subscriber_added" || trigger === "subscriber_confirmed";
+    const requiresEventName = trigger === "event";
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,10 +36,17 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
         if (!name.trim()) { setError("Name is required"); return; }
         if (!brandId) { setError("Select a brand"); return; }
         if (requiresListTrigger && !triggerListId) { setError("Select a trigger list"); return; }
+        if (requiresEventName && !triggerEventName.trim()) { setError("Event name is required"); return; }
 
         startTransition(async () => {
             try {
-                const automation = await createAutomation({ name, brandId, trigger, triggerListId: requiresListTrigger ? triggerListId : undefined });
+                const automation = await createAutomation({
+                    name,
+                    brandId,
+                    trigger,
+                    triggerListId: requiresListTrigger ? triggerListId : undefined,
+                    triggerEventName: requiresEventName ? triggerEventName.trim() : undefined,
+                });
                 router.push(`/dashboard/automations/${automation.id}`);
             } catch (err: any) {
                 setError(err.message || "Failed to create automation");
@@ -101,13 +110,14 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
                             </label>
                             <select
                                 value={trigger}
-                                onChange={(e) => { setTrigger(e.target.value); setTriggerListId(""); }}
+                                onChange={(e) => { setTrigger(e.target.value); setTriggerListId(""); setTriggerEventName(""); }}
                                 className="w-full px-3 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                             >
                                 <option value="subscriber_added">Subscriber joins list (single opt-in)</option>
                                 <option value="subscriber_confirmed">Subscriber confirms opt-in (double opt-in)</option>
                                 <option value="webhook">Inbound Webhook — external system POSTs to a unique URL</option>
                                 <option value="api">API Trigger — enroll via REST API using your API key</option>
+                                <option value="event">Event Trigger — fires when a named event is tracked via API</option>
                             </select>
                             <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                                 Choose when this automation should start for each subscriber.
@@ -134,6 +144,25 @@ export function NewAutomationForm({ brands }: { brands: Brand[] }) {
                                     No lists found for this brand. Create a list first.
                                 </p>
                             )}
+                        </div>
+                        )}
+
+                        {requiresEventName && (
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                                Event Name
+                            </label>
+                            <input
+                                type="text"
+                                value={triggerEventName}
+                                onChange={(e) => setTriggerEventName(e.target.value)}
+                                placeholder="e.g. placed_order, completed_onboarding"
+                                className="w-full px-3 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            />
+                            <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                                This automation fires when an event with this exact name is sent to{" "}
+                                <code className="font-mono">POST /api/v1/events</code>.
+                            </p>
                         </div>
                         )}
 
