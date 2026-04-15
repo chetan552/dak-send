@@ -33,7 +33,9 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Signup forms & landing pages** — visual form builder with public `/f/[slug]` pages and embeddable widgets
 
 ### Campaigns
+- **Block-based email builder** — drag-and-drop visual editor with 8 block types (Text, Heading, Image, Button, Divider, Spacer, Two Columns, Raw HTML); compiles to Outlook-safe table HTML; undo/redo history; full-screen live preview
 - **Rich-text + HTML editor** — TipTap WYSIWYG with raw HTML source mode via CodeMirror
+- **Editor choice at creation** — choose Block Builder or HTML Editor when creating a campaign; existing campaigns auto-detect which mode was used
 - **Template library** — save, reuse, and fork email templates across campaigns and automations
 - **Image library & uploads** — host and reuse images directly from the editor
 - **Multi-client preview** — in-app rendering simulation for Gmail, Outlook, and Apple Mail
@@ -51,9 +53,10 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Feedback-ID header** — `Feedback-ID` header is set on all campaign sends for Gmail Postmaster Tools attribution
 - **`Precedence: bulk` header** — correctly classifies campaigns as bulk mail to mailbox providers
 - **Domain warmup** — 14-day ramp-up schedule that enforces daily send caps with automatic campaign truncation
-- **Deliverability monitoring** — SPF, DKIM, DMARC, and MX health checks per sending domain
-- **Bounce & complaint handling** — SES → SNS webhooks with HMAC signature verification; brand-scoped complaint routing via email tags
-- **Suppression** — auto-unsubscribe on hard bounces; complaint suppression scoped per brand
+- **Deliverability dashboard** — per-brand subscriber health breakdown (subscribed / unsubscribed / bounced / complained counts) with color-coded bounce and complaint rate badges against industry thresholds; recent issues log
+- **Suppression list** — global and brand-scoped suppression entries; hard bounces are auto-suppressed globally, complaints are auto-suppressed per brand via SES notifications; manual add/remove with reason and note; suppressed addresses are filtered at dispatch time even if still subscribed
+- **Bounce & complaint handling** — SES → SNS webhooks with HMAC signature verification; brand-scoped complaint routing via email tags; auto-populates suppression list
+- **Resubscribe** — one-click resubscribe for any unsubscribed/bounced/complained subscriber; clears brand-scoped suppression and `pausedUntil` in one action; warns if a global suppression still blocks delivery
 
 ### Tracking & analytics
 - **Open tracking** — transparent pixel injection with per-send logs
@@ -61,15 +64,23 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Campaign dashboards** — real-time open rate, click rate, bounce rate, and complaint rate
 - **Per-subscriber engagement history** — aggregate activity rolls up into send-time optimization
 
+### Subscriber & list management
+- **Subscriber tags** — create free-form tags per brand and apply them to individual subscribers; use `has_tag` in segment rules for tag-based targeting
+- **Subscriber pause** — subscribers can pause emails for 30, 60, or 90 days from the preference center; paused subscribers are skipped at dispatch time
+- **Preference center** — public `/preferences?i=<id>` page where subscribers manage per-list opt-ins, pause emails, and unsubscribe from everything; `[PreferencesUrl]` merge tag auto-inserts the link; footer auto-injects "Manage Preferences" link alongside "Unsubscribe"
+
 ### Automations
 - **Drip automations** — multi-step delay + email sequences triggered automatically
 - **Subscriber triggers** — start a sequence when someone joins a list (single opt-in) or confirms (double opt-in)
+- **Event-based triggers** — fire an automation when a named subscriber event is tracked via the `/api/v1/events` endpoint (e.g. `purchase`, `login`, `trial_started`)
 - **Inbound Webhook Trigger** — each automation gets a unique URL; any external system can `POST` to it with `{ email, name }` to enroll a subscriber using a per-automation Bearer token
 - **API Trigger** — enroll subscribers into an automation via `POST /api/v1/automations/:id/enroll` using your existing API key; ideal for CRM and no-code tool integrations
 
 ### Integrations & APIs
 - **Transactional email API** — `POST /api/send` for receipts, notifications, and one-off messages
 - **REST API v1** — full CRUD over brands, lists, subscribers, campaigns, webhooks, and automation enrollment
+- **Subscriber events API** — `POST /api/v1/events` to track named events against a subscriber; triggers event-based automations and feeds segment rules
+- **Tags API** — `GET/POST/DELETE /api/v1/tags` and `GET/POST/DELETE /api/v1/subscribers/:email/tags` for programmatic tag management
 - **n8n community node** — first-party [`n8n-nodes-daksend`](packages/n8n-nodes-daksend) package with both regular actions and a webhook trigger
 - **Outgoing webhooks** — HMAC-signed event delivery on `subscribe`, `unsubscribe`, `open`, `click`, `bounce`, `complaint`
 - **Incoming SES webhooks** — production-grade SNS signature verification and bounce/complaint processing
@@ -99,7 +110,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 | 2FA | otplib (TOTP) + qrcode |
 | Email rendering | cheerio (DOM), juice (CSS inliner), html-to-text |
 | UI | Tailwind CSS v4, Radix UI, shadcn/ui, Lucide Icons |
-| Editor | TipTap v3 (rich text) + CodeMirror 6 (HTML source) |
+| Editor | TipTap v3 (rich text) + CodeMirror 6 (HTML source) + custom block builder (@dnd-kit) |
 | Deployment | PM2 (`ecosystem.config.js`) or Vercel + separate worker host |
 
 ---
@@ -278,7 +289,7 @@ Point your SES → SNS topic at:
 POST https://your-domain.com/api/webhooks/ses
 ```
 
-SNS signature verification is enforced. Hard bounces suppress globally; complaints are scoped to the originating brand via the `campaign_id` email tag.
+SNS signature verification is enforced. Hard bounces mark the subscriber globally and add a global suppression entry; complaints are scoped to the originating brand via the `campaign_id` email tag and add a brand-scoped suppression entry. Both are visible in the Deliverability dashboard.
 
 ---
 
@@ -291,6 +302,9 @@ A full REST API for external integrations lives under `/api/v1`. Authenticate wi
 | Brands | `GET /api/v1/brands` |
 | Lists | `GET /api/v1/lists` |
 | Subscribers | `GET /api/v1/subscribers`, `POST /api/v1/subscribers`, `GET /api/v1/subscribers/:email`, `PATCH /api/v1/subscribers/:email`, `DELETE /api/v1/subscribers/:email` |
+| Subscriber Tags | `GET /api/v1/subscribers/:email/tags`, `POST /api/v1/subscribers/:email/tags`, `DELETE /api/v1/subscribers/:email/tags` |
+| Events | `POST /api/v1/events` — track a named event against a subscriber; triggers event-based automations |
+| Tags | `GET /api/v1/tags`, `POST /api/v1/tags`, `DELETE /api/v1/tags` |
 | Campaigns | `GET /api/v1/campaigns`, `GET /api/v1/campaigns/:id` |
 | Automations | `POST /api/v1/automations/:id/enroll` — enroll a subscriber by email into an API-triggered automation |
 | Webhooks | `GET /api/v1/webhooks`, `POST /api/v1/webhooks`, `GET /api/v1/webhooks/:id`, `PATCH /api/v1/webhooks/:id`, `DELETE /api/v1/webhooks/:id` |
@@ -315,6 +329,38 @@ curl -X POST https://your-domain.com/api/automations/AUTOMATION_ID/trigger \
   -H "Authorization: Bearer AUTOMATION_WEBHOOK_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "name": "Jane"}'
+```
+
+#### Track a subscriber event
+
+Fire a named event against a subscriber to trigger event-based automations and feed segment rules:
+
+```bash
+curl -X POST https://your-domain.com/api/v1/events \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "listId": "your-list-id",
+    "event": "purchase",
+    "properties": { "plan": "pro", "amount": 99 }
+  }'
+```
+
+Any automation with trigger type **Event Trigger** and matching event name will automatically enroll the subscriber.
+
+#### Manage subscriber tags
+
+```bash
+# Add a tag (by name — created automatically if it doesn't exist)
+curl -X POST https://your-domain.com/api/v1/subscribers/user@example.com/tags \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"tagName": "vip", "listId": "your-list-id"}'
+
+# List tags on a subscriber
+curl https://your-domain.com/api/v1/subscribers/user@example.com/tags?listId=your-list-id \
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 ---
@@ -378,7 +424,7 @@ pm2 start ecosystem.config.js
 │   │   │   ├── webhooks/     # Incoming SES/SNS handlers
 │   │   │   ├── send/         # Transactional email API
 │   │   │   └── subscribe/    # Public signup API
-│   │   ├── dashboard/        # Authenticated dashboard pages
+│   │   ├── dashboard/        # Authenticated dashboard pages (incl. Deliverability, Tags)
 │   │   ├── login/            # Auth pages
 │   │   ├── signup/           # First-run admin signup
 │   │   └── f/[slug]/         # Public landing page forms
@@ -392,7 +438,8 @@ pm2 start ecosystem.config.js
 │       ├── totp.ts           # TOTP / 2FA helpers
 │       ├── rate-limit.ts     # In-memory login brute-force protection
 │       ├── warmup.ts         # Domain warmup enforcement
-│       ├── segment-query.ts  # Segment rule evaluator
+│       ├── segment-query.ts  # Segment rule evaluator (supports tags + events)
+│       ├── blocks-to-html.ts # Block-based email compiler (JSON → table HTML)
 │       └── webhooks.ts       # Outgoing webhook dispatcher
 ├── prisma/schema.prisma
 ├── public/
