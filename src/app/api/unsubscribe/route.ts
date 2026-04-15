@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
 import { dispatchWebhooks } from "@/lib/webhooks";
+import { redisRateLimit } from "@/lib/redis-rate-limit";
 
 // ---------------------------------------------------------------------------
 // Shared helper — used by both GET and POST
@@ -50,6 +51,9 @@ async function fetchSubscriber(subscriberId: string, listId: string) {
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
+    const limited = await redisRateLimit(req, "unsubscribe", 20, 60);
+    if (limited) return limited;
+
     const searchParams = req.nextUrl.searchParams;
     const subscriberId = searchParams.get("i");
     const listId = searchParams.get("l");
@@ -69,7 +73,7 @@ export async function GET(req: NextRequest) {
         const list = subscriber!.list;
 
         if (alreadyUnsubscribed) {
-            if (list.unsubscribeConfirmationUrl) {
+            if (list.unsubscribeConfirmationUrl && isSafeUrl(list.unsubscribeConfirmationUrl)) {
                 return NextResponse.redirect(list.unsubscribeConfirmationUrl, { status: 302 });
             }
             return new NextResponse(
@@ -104,7 +108,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        if (list.unsubscribeConfirmationUrl) {
+        if (list.unsubscribeConfirmationUrl && isSafeUrl(list.unsubscribeConfirmationUrl)) {
             return NextResponse.redirect(list.unsubscribeConfirmationUrl, { status: 302 });
         }
 
@@ -136,6 +140,9 @@ export async function GET(req: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
+    const limited = await redisRateLimit(req, "unsubscribe", 20, 60);
+    if (limited) return limited;
+
     const searchParams = req.nextUrl.searchParams;
     const subscriberId = searchParams.get("i");
     const listId = searchParams.get("l");
@@ -163,6 +170,20 @@ export async function POST(req: NextRequest) {
         console.error("One-click unsubscribe error:", error);
         // Still 200 — we don't want ISPs retrying
         return new NextResponse(null, { status: 200 });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Allow only http/https redirect targets (rejects javascript:, data:, etc.) */
+function isSafeUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+        return false;
     }
 }
 

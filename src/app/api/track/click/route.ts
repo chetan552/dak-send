@@ -14,6 +14,16 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Missing URL" }, { status: 400 });
     }
 
+    // Only allow http/https to prevent javascript: / data: URI redirects
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+        }
+    } catch {
+        return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+    }
+
     if (campaignId && email) {
         try {
             await prisma.campaignSend.updateMany({

@@ -171,6 +171,18 @@ export async function handleSnsPayload(payload: any): Promise<{ status: number; 
 
     // Handle SNS Subscription Confirmation
     if (payload.Type === 'SubscriptionConfirmation' && payload.SubscribeURL) {
+        // Validate URL is a legitimate AWS SNS endpoint before fetching (SSRF guard)
+        try {
+            const subUrl = new URL(payload.SubscribeURL);
+            const isAwsHost = subUrl.hostname.endsWith(".amazonaws.com");
+            const isHttps = subUrl.protocol === "https:";
+            if (!isAwsHost || !isHttps) {
+                console.warn("SNS SubscribeURL rejected — not an AWS endpoint:", subUrl.hostname);
+                return { status: 400, body: { error: "Invalid SubscribeURL" } };
+            }
+        } catch {
+            return { status: 400, body: { error: "Malformed SubscribeURL" } };
+        }
         console.log("Confirming SNS subscription:", payload.SubscribeURL);
         await fetch(payload.SubscribeURL);
         return { status: 200, body: { message: "Subscription confirmed" } };

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
@@ -55,8 +56,8 @@ export async function POST(request: Request) {
         const uploadsDir = getUploadsDir();
         await mkdir(uploadsDir, { recursive: true });
 
-        // Generate a unique filename
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        // Generate a unique filename using cryptographically secure random bytes
+        const uniqueSuffix = randomBytes(16).toString("hex");
         const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, ''); // Sanitize filename
         const filename = `${uniqueSuffix}-${originalName}`;
         const filePath = join(uploadsDir, filename);

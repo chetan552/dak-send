@@ -4,15 +4,11 @@ import { emailQueue } from "@/lib/queue";
 import { translateSegmentQuery } from "@/lib/segment-query";
 import { getWarmupRemaining } from "@/lib/warmup";
 import { markCronLastRun } from "@/app/actions/cron-settings";
+import { verifyCronSecret } from "../_auth";
 
 export async function GET(req: NextRequest) {
-    // Verify cron secret
-    const secret = req.nextUrl.searchParams.get("secret");
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (cronSecret && secret !== cronSecret) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    const authError = verifyCronSecret(req);
+    if (authError) return authError;
 
     try {
         // Find campaigns that are scheduled and due

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { redisRateLimit } from "@/lib/redis-rate-limit";
 
 // ---------------------------------------------------------------------------
 // GET — render the preference center HTML page
@@ -8,6 +9,9 @@ import { prisma } from "@/lib/prisma";
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
+    const limited = await redisRateLimit(req, "preferences", 30, 60);
+    if (limited) return limited;
+
     const subscriberId = req.nextUrl.searchParams.get("i");
     const action = req.nextUrl.searchParams.get("action");
 
@@ -260,6 +264,9 @@ body{background:#09090b;color:#fafafa;}
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
+    const limited = await redisRateLimit(req, "preferences", 30, 60);
+    if (limited) return limited;
+
     let body: Record<string, any>;
     try {
         body = await req.json();

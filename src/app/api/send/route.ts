@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
 
@@ -16,7 +17,10 @@ export async function POST(req: NextRequest) {
             where: { key: "API_KEY" }
         });
 
-        if (!apiKeySetting || apiKeySetting.value !== apiKey) {
+        const keysMatch = apiKeySetting &&
+            apiKey.length === apiKeySetting.value.length &&
+            timingSafeEqual(Buffer.from(apiKey), Buffer.from(apiKeySetting.value));
+        if (!keysMatch) {
             return NextResponse.json({ error: "Invalid API key" }, { status: 403 });
         }
 

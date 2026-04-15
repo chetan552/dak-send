@@ -151,9 +151,10 @@ function compileHeading(block: HeadingBlock): string {
     const padding = p.padding || "16px 24px 8px";
     const sizes: Record<number, number> = { 1: 32, 2: 24, 3: 20 };
     const sz = sizes[level] || 24;
+    // Headings are plain text — escape to prevent HTML injection
     return `<tr>
   <td align="${align}" style="padding:${padding};font-family:Arial,sans-serif;font-size:${sz}px;font-weight:bold;line-height:1.2;color:${color};">
-    ${p.content}
+    ${escapeHtml(p.content)}
   </td>
 </tr>`;
 }
@@ -248,9 +249,15 @@ function compileColumns(block: ColumnsBlock): string {
 
 function compileHtml(block: HtmlBlock): string {
     const padding = block.props.padding || "0 24px";
+    // Strip dangerous tags/attributes while preserving safe email HTML
+    const safeHtml = block.props.html
+        .replace(/<(script|iframe|object|embed|form|base|meta|link)[^>]*>[\s\S]*?<\/\1>/gi, "")
+        .replace(/<(script|iframe|object|embed|form|base|meta|link)(\s[^>]*)?\/?>/gi, "")
+        .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "")
+        .replace(/\s+href\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, "");
     return `<tr>
   <td style="padding:${padding};">
-    ${block.props.html}
+    ${safeHtml}
   </td>
 </tr>`;
 }

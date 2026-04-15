@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -17,7 +18,10 @@ export async function requireApiKey(req: NextRequest): Promise<NextResponse | nu
 
     const setting = await prisma.setting.findUnique({ where: { key: "API_KEY" } });
 
-    if (!setting || setting.value !== key) {
+    const keysMatch = setting &&
+        key.length === setting.value.length &&
+        timingSafeEqual(Buffer.from(key), Buffer.from(setting.value));
+    if (!keysMatch) {
         return NextResponse.json({ error: "Invalid API key." }, { status: 403 });
     }
 

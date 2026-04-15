@@ -284,6 +284,21 @@ export async function POST(req: NextRequest) {
 
         // Handle redirect or JSON response
         if (redirectUrl) {
+            // Only allow http/https redirects to prevent open-redirect abuse
+            let safeRedirect = false;
+            try {
+                const parsed = new URL(redirectUrl);
+                safeRedirect = parsed.protocol === "http:" || parsed.protocol === "https:";
+            } catch {
+                // Relative URLs are fine too
+                safeRedirect = redirectUrl.startsWith("/");
+            }
+            if (!safeRedirect) {
+                return NextResponse.json({ error: "Invalid redirect URL" }, {
+                    status: 400,
+                    headers: { "Access-Control-Allow-Origin": "*" }
+                });
+            }
             return NextResponse.redirect(redirectUrl, {
                 status: 302,
                 headers: { "Access-Control-Allow-Origin": "*" }

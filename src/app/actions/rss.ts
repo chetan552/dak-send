@@ -244,9 +244,15 @@ function renderItemBlock(template: string, item: {
     const rawSnippet = item.contentSnippet || item.content || item.description || "";
     const snippet = rawSnippet.replace(/<[^>]*>/g, "").slice(0, 200).trim();
 
-    // [RssDescription] — full HTML from the <description> field, or content:encoded
-    // if description is absent. Safe to use directly in email HTML templates.
-    const fullDescription = item.description || item.content || "";
+    // [RssDescription] — HTML from the <description> field, sanitized to strip
+    // dangerous tags (script, iframe, form, object, embed) and event-handler
+    // attributes before embedding in email templates.
+    const rawDescription = item.description || item.content || "";
+    const fullDescription = rawDescription
+        .replace(/<(script|iframe|object|embed|form|base|meta|link)[^>]*>[\s\S]*?<\/\1>/gi, "")
+        .replace(/<(script|iframe|object|embed|form|base|meta|link)(\s[^>]*)?\/?>/gi, "")
+        .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "")
+        .replace(/\s+href\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, "");
 
     return template
         .replace(/\[RssTitle\]/gi, item.title || "Untitled")
@@ -298,6 +304,8 @@ export async function checkRssFeeds() {
             const newestItem = newItems[0];
             const newestGuid = newestItem.guid || newestItem.link || newestItem.title || "";
             const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+            // Sanitize feed name to prevent email header injection (strip newlines/CRLFs)
+            const safeFeedName = feed.name.replace(/[\r\n]/g, " ");
 
             if (feed.digestMode) {
                 // ── DIGEST MODE: one email listing ALL new items ──────────────────
@@ -311,16 +319,16 @@ export async function checkRssFeeds() {
                     .replace(/\[RssItems\]/gi, renderedItems)
                     .replace(/\[RssDate\]/gi, today)
                     .replace(/\[RssCount\]/gi, String(newItems.length))
-                    .replace(/\[RssFeedName\]/gi, feed.name);
+                    .replace(/\[RssFeedName\]/gi, safeFeedName);
 
                 const subject = subjectTemplate
                     .replace(/\[RssDate\]/gi, today)
                     .replace(/\[RssCount\]/gi, String(newItems.length))
-                    .replace(/\[RssFeedName\]/gi, feed.name);
+                    .replace(/\[RssFeedName\]/gi, safeFeedName);
 
                 await prisma.campaign.create({
                     data: {
-                        name: `[Digest] ${feed.name} — ${today}`,
+                        name: `[Digest] ${safeFeedName} — ${today}`,
                         subject,
                         htmlText: htmlContent,
                         brandId: feed.brandId,
@@ -341,8 +349,8 @@ export async function checkRssFeeds() {
 
                 await prisma.campaign.create({
                     data: {
-                        name: `[RSS] ${newestItem.title || feed.name}`,
-                        subject: newestItem.title || `New from ${feed.name}`,
+                        name: `[RSS] ${newestItem.title || safeFeedName}`,
+                        subject: newestItem.title || `New from ${safeFeedName}`,
                         htmlText: htmlContent,
                         brandId: feed.brandId,
                         status: "draft",
