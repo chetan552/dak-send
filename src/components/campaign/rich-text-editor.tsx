@@ -1030,6 +1030,16 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                         <span className="hidden sm:inline">Save as Template</span>
                     </Button>
                 )}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.preventDefault(); onToggleMode(); }}
+                    className={`gap-1.5 px-2 ${isHtmlMode ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"}`}
+                    title={isHtmlMode ? "View Visual editor" : "View HTML source"}
+                >
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    <span className="hidden sm:inline">{isHtmlMode ? "View Visual" : "View Source"}</span>
+                </Button>
                 {isComplexHtml && onClean && (
                     <Button
                         variant="ghost"
@@ -1042,16 +1052,7 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                         <span className="hidden sm:inline">Clean HTML</span>
                     </Button>
                 )}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.preventDefault(); onToggleMode(); }}
-                    className={`gap-1.5 px-2 ${isHtmlMode ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"}`}
-                    title={isHtmlMode ? "View Visual editor" : "View HTML source"}
-                >
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                    <span className="hidden sm:inline">{isHtmlMode ? "View Visual" : "View Source"}</span>
-                </Button>
+                
             </div>
         </div >
     );
