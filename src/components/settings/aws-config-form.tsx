@@ -91,11 +91,15 @@ export function AWSConfigForm({ initialSettings }: AWSConfigFormProps) {
                             <Input
                                 id="sendRate"
                                 type="number"
+                                min={1}
                                 value={settings.SEND_RATE || ""}
                                 onChange={(e) => setSettings({ ...settings, SEND_RATE: e.target.value })}
                                 placeholder="14"
                                 className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus:ring-amber-500/20 focus:border-amber-500"
                             />
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                Stay at or below your SES max (shown above). Lower values trade throughput for stability. Requires a worker restart to take effect.
+                            </p>
                         </div>
                     </div>
                     <div className="pt-2 flex items-center gap-4">
