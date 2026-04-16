@@ -8,6 +8,40 @@ import { writeAuditLog } from "@/lib/audit";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+type SubscriberStatus = "subscribed" | "unsubscribed" | "bounced" | "complained";
+
+function normalizeStatus(raw: string | undefined): SubscriberStatus | undefined {
+    if (!raw) return undefined;
+    switch (raw.trim().toLowerCase()) {
+        case "active":
+        case "subscribed":
+        case "opt-in":
+        case "optin":
+        case "confirmed":
+        case "yes":
+            return "subscribed";
+        case "unsubscribed":
+        case "inactive":
+        case "opt-out":
+        case "optout":
+        case "no":
+            return "unsubscribed";
+        case "bounced":
+        case "hard bounce":
+        case "hardbounce":
+        case "soft bounce":
+        case "softbounce":
+        case "invalid":
+            return "bounced";
+        case "complained":
+        case "spam":
+        case "abuse":
+            return "complained";
+        default:
+            return undefined; // unknown value — ignore, use default
+    }
+}
+
 export type ImportResult = {
     created: number;
     updated: number;
@@ -43,7 +77,7 @@ export async function importSubscribersAction(formData: FormData): Promise<Impor
         throw new Error("List not found or unauthorized");
     }
 
-    const rawRows = JSON.parse(subscribersJsonStr) as { email: string, name?: string, customFields?: Record<string, string> }[];
+    const rawRows = JSON.parse(subscribersJsonStr) as { email: string, name?: string, status?: string, customFields?: Record<string, string> }[];
 
     const result: ImportResult = {
         created: 0,
@@ -52,7 +86,7 @@ export async function importSubscribersAction(formData: FormData): Promise<Impor
     };
 
     // Normalize + dedupe by email (last write wins for same address in one upload).
-    const byEmail = new Map<string, { email: string; name?: string; customFields?: Record<string, string> }>();
+    const byEmail = new Map<string, { email: string; name?: string; status?: string; customFields?: Record<string, string> }>();
     for (const row of rawRows) {
         const email = (row.email || "").trim().toLowerCase();
         if (!email || !EMAIL_REGEX.test(email)) {
@@ -78,52 +112,83 @@ export async function importSubscribersAction(formData: FormData): Promise<Impor
     const listCustomFields = await prisma.customField.findMany({ where: { listId } });
     const validCustomFieldIds = new Set(listCustomFields.map(cf => cf.id));
 
-    for (const sub of byEmail.values()) {
-        const existingId = existingByEmail.get(sub.email);
+    const newSubs = Array.from(byEmail.values()).filter(s => !existingByEmail.has(s.email));
+    const existingSubs = Array.from(byEmail.values()).filter(s => existingByEmail.has(s.email));
 
+    result.skipped.existing = updateExisting ? 0 : existingSubs.length;
+
+    // --- Batch-create new subscribers (single query) ---
+    const CHUNK = 500;
+    for (let i = 0; i < newSubs.length; i += CHUNK) {
+        const chunk = newSubs.slice(i, i + CHUNK);
         try {
-            let subscriberId: string;
+            const { count } = await prisma.subscriber.createMany({
+                data: chunk.map(s => ({
+                    email: s.email,
+                    name: s.name?.trim() || null,
+                    listId,
+                    hasConfirmedGdpr: list.requireGdpr,
+                    ...(normalizeStatus(s.status) ? { status: normalizeStatus(s.status) } : {}),
+                })),
+                skipDuplicates: true,
+            });
+            result.created += count;
+        } catch (e) {
+            console.warn("Batch create failed for chunk starting at", i, e);
+            result.skipped.errored += chunk.length;
+        }
+    }
 
-            if (existingId) {
-                if (!updateExisting) {
-                    result.skipped.existing++;
-                    continue;
-                }
-                // Update name only — never touch status (preserves unsubscribed/bounced/complained).
+    // --- Update existing subscribers in parallel (name + custom fields only; status untouched) ---
+    if (updateExisting && existingSubs.length > 0) {
+        await Promise.all(existingSubs.map(async sub => {
+            const existingId = existingByEmail.get(sub.email)!;
+            try {
+                const statusUpdate = normalizeStatus(sub.status);
                 await prisma.subscriber.update({
                     where: { id: existingId },
-                    data: { name: sub.name?.trim() || undefined },
-                });
-                subscriberId = existingId;
-                result.updated++;
-            } else {
-                const created = await prisma.subscriber.create({
                     data: {
-                        email: sub.email,
-                        name: sub.name?.trim() || null,
-                        listId,
-                        hasConfirmedGdpr: list.requireGdpr,
+                        name: sub.name?.trim() || undefined,
+                        ...(statusUpdate ? { status: statusUpdate } : {}),
                     },
                 });
-                subscriberId = created.id;
-                result.created++;
+                result.updated++;
+            } catch (e) {
+                console.warn("Failed updating subscriber", sub.email, e);
+                result.skipped.errored++;
             }
+        }));
+    }
 
-            if (sub.customFields) {
-                for (const [cfId, fieldValue] of Object.entries(sub.customFields)) {
-                    if (!validCustomFieldIds.has(cfId)) continue;
-                    if (fieldValue === undefined || fieldValue === null || fieldValue === "") continue;
+    // --- Custom fields: process in parallel for subscribers that have them ---
+    const subsWithCustomFields = Array.from(byEmail.values()).filter(
+        s => s.customFields && Object.keys(s.customFields).length > 0
+    );
+
+    if (subsWithCustomFields.length > 0) {
+        // Re-fetch IDs for newly created subscribers (we didn't get them from createMany).
+        const allCreatedRows = await prisma.subscriber.findMany({
+            where: { listId, email: { in: subsWithCustomFields.map(s => s.email) } },
+            select: { id: true, email: true },
+        });
+        const idByEmail = new Map(allCreatedRows.map(r => [r.email, r.id]));
+
+        await Promise.all(subsWithCustomFields.map(async sub => {
+            const subscriberId = idByEmail.get(sub.email);
+            if (!subscriberId || !sub.customFields) return;
+            for (const [cfId, fieldValue] of Object.entries(sub.customFields)) {
+                if (!validCustomFieldIds.has(cfId) || !fieldValue) continue;
+                try {
                     await prisma.subscriberFieldValue.upsert({
                         where: { subscriberId_customFieldId: { subscriberId, customFieldId: cfId } },
                         update: { value: String(fieldValue) },
                         create: { subscriberId, customFieldId: cfId, value: String(fieldValue) },
                     });
+                } catch (e) {
+                    console.warn("Failed upserting custom field", sub.email, cfId, e);
                 }
             }
-        } catch (e) {
-            console.warn("Failed inserting subscriber", sub.email, e);
-            result.skipped.errored++;
-        }
+        }));
     }
 
     revalidatePath(`/dashboard/lists/${listId}`);

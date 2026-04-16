@@ -20,10 +20,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const IGNORE = "__ignore__";
 const EMAIL_FIELD = "__email__";
 const NAME_FIELD = "__name__";
+const STATUS_FIELD = "__status__";
 
 type ParsedRow = Record<string, string>;
 
-type Mapping = Record<string, string>; // csvColumn -> EMAIL_FIELD | NAME_FIELD | customFieldId | IGNORE
+type Mapping = Record<string, string>; // csvColumn -> EMAIL_FIELD | NAME_FIELD | STATUS_FIELD | customFieldId | IGNORE
 
 type PreviewStats = {
     total: number;
@@ -52,6 +53,10 @@ function autoMap(columns: string[], customFields: CustomField[]): Mapping {
             nameAssigned = true;
             continue;
         }
+        if (lower === "status" || lower === "subscriber status" || lower === "state") {
+            mapping[col] = STATUS_FIELD;
+            continue;
+        }
         const cf = customFields.find(c => c.name.toLowerCase() === lower);
         if (cf) {
             mapping[col] = cf.id;
@@ -69,20 +74,25 @@ function autoMap(columns: string[], customFields: CustomField[]): Mapping {
     return mapping;
 }
 
-function buildSubscribers(rows: ParsedRow[], mapping: Mapping): { email: string; name?: string; customFields?: Record<string, string> }[] {
+function buildSubscribers(rows: ParsedRow[], mapping: Mapping): { email: string; name?: string; status?: string; customFields?: Record<string, string> }[] {
     const emailCol = Object.keys(mapping).find(c => mapping[c] === EMAIL_FIELD);
     const nameCol = Object.keys(mapping).find(c => mapping[c] === NAME_FIELD);
-    const cfCols = Object.entries(mapping).filter(([, v]) => v !== EMAIL_FIELD && v !== NAME_FIELD && v !== IGNORE);
+    const statusCol = Object.keys(mapping).find(c => mapping[c] === STATUS_FIELD);
+    const cfCols = Object.entries(mapping).filter(([, v]) => v !== EMAIL_FIELD && v !== NAME_FIELD && v !== STATUS_FIELD && v !== IGNORE);
 
     if (!emailCol) return [];
 
     return rows.map(row => {
-        const out: { email: string; name?: string; customFields?: Record<string, string> } = {
+        const out: { email: string; name?: string; status?: string; customFields?: Record<string, string> } = {
             email: (row[emailCol] || "").trim(),
         };
         if (nameCol) {
             const n = (row[nameCol] || "").trim();
             if (n) out.name = n;
+        }
+        if (statusCol) {
+            const s = (row[statusCol] || "").trim();
+            if (s) out.status = s;
         }
         if (cfCols.length > 0) {
             const cf: Record<string, string> = {};
@@ -372,8 +382,8 @@ export function ImportCsvButton({ listId, requireGdpr = false, customFields = []
                                         <Select value={mapping[col] || IGNORE} onValueChange={(v) => {
                                             setMapping(prev => {
                                                 const next = { ...prev };
-                                                // Email and Name must be unique — clear any other column holding them.
-                                                if (v === EMAIL_FIELD || v === NAME_FIELD) {
+                                                // Email, Name and Status must be unique — clear any other column holding them.
+                                                if (v === EMAIL_FIELD || v === NAME_FIELD || v === STATUS_FIELD) {
                                                     for (const k of Object.keys(next)) {
                                                         if (next[k] === v && k !== col) next[k] = IGNORE;
                                                     }
@@ -388,6 +398,7 @@ export function ImportCsvButton({ listId, requireGdpr = false, customFields = []
                                             <SelectContent className="bg-zinc-950 border-zinc-800 text-white">
                                                 <SelectItem value={EMAIL_FIELD}>Email</SelectItem>
                                                 <SelectItem value={NAME_FIELD}>Name</SelectItem>
+                                                <SelectItem value={STATUS_FIELD}>Status</SelectItem>
                                                 {customFields.map(cf => (
                                                     <SelectItem key={cf.id} value={cf.id}>{cf.name}</SelectItem>
                                                 ))}

@@ -58,7 +58,7 @@ export async function createSegment(data: { listId: string, name: string, descri
 export async function deleteSegment(id: string, listId: string) {
     await verifyListAccess(listId);
 
-    await prisma.segment.delete({
+    await prisma.segment.deleteMany({
         where: { id, listId }
     });
 
