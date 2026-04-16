@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SubscriberActions } from "@/components/subscriber/subscriber-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,17 +11,52 @@ import { toast } from "sonner";
 import { Pagination } from "@/components/ui/pagination";
 import { StatusBadge } from "@/components/ui/status-badge";
 
+type StatusFilter = "all" | "subscribed" | "unsubscribed" | "bounced" | "complained";
+
+interface StatusCounts {
+    all: number;
+    subscribed: number;
+    unsubscribed: number;
+    bounced: number;
+    complained: number;
+}
+
 interface SubscribersTableProps {
     listId: string;
     subscribers: any[];
     customFields: any[];
     currentPage: number;
     totalPages: number;
+    statusFilter?: StatusFilter;
+    counts?: StatusCounts;
 }
 
-export function SubscribersTable({ listId, subscribers, customFields, currentPage, totalPages }: SubscribersTableProps) {
+const FILTER_TABS: { value: StatusFilter; label: string; activeClass: string; countClass: string }[] = [
+    { value: "all",          label: "All",             activeClass: "border-zinc-400 text-white",          countClass: "bg-zinc-600 text-white" },
+    { value: "subscribed",   label: "Subscribed",      activeClass: "border-green-500 text-green-400",     countClass: "bg-green-500/20 text-green-400" },
+    { value: "unsubscribed", label: "Unsubscribed",    activeClass: "border-red-500 text-red-400",         countClass: "bg-red-500/20 text-red-400" },
+    { value: "bounced",      label: "Bounced",         activeClass: "border-amber-500 text-amber-400",     countClass: "bg-amber-500/20 text-amber-400" },
+    { value: "complained",   label: "Marked as spam",  activeClass: "border-orange-500 text-orange-400",   countClass: "bg-orange-500/20 text-orange-400" },
+];
+
+export function SubscribersTable({ listId, subscribers, customFields, currentPage, totalPages, statusFilter = "all", counts }: SubscribersTableProps) {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+
+    const handleStatusFilter = (value: StatusFilter) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value === "all") {
+            params.delete("status");
+        } else {
+            params.set("status", value);
+        }
+        params.delete("page"); // reset to page 1 on filter change
+        setSelectedIds([]);
+        router.push(`${pathname}?${params.toString()}`);
+    };
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
@@ -58,6 +94,31 @@ export function SubscribersTable({ listId, subscribers, customFields, currentPag
 
     return (
         <div>
+            {counts && (
+                <div className="flex items-center gap-1 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800/60 overflow-x-auto">
+                    {FILTER_TABS.map(tab => {
+                        const count = counts[tab.value];
+                        const isActive = statusFilter === tab.value;
+                        return (
+                            <button
+                                key={tab.value}
+                                onClick={() => handleStatusFilter(tab.value)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+                                    isActive
+                                        ? `${tab.activeClass} bg-zinc-800/60`
+                                        : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40"
+                                }`}
+                            >
+                                {tab.label}
+                                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isActive ? tab.countClass : "bg-zinc-800 text-zinc-400"}`}>
+                                    {count.toLocaleString()}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {selectedIds.length > 0 && (
                 <div className="sticky top-0 z-20 flex items-center justify-between bg-rose-50/95 dark:bg-rose-950/40 backdrop-blur px-4 py-2.5 border-b border-rose-100 dark:border-rose-900/40">
                     <span className="text-sm font-medium text-rose-800 dark:text-rose-300">

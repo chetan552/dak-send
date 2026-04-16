@@ -17,11 +17,18 @@ import { DeleteListButton } from "@/components/list/delete-list-button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 
+const VALID_STATUSES = ["subscribed", "unsubscribed", "bounced", "complained"] as const;
+type StatusFilter = typeof VALID_STATUSES[number] | "all";
+
 export default async function ListPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
     const { id } = await params;
     const resolvedSearchParams = await searchParams;
     const pageParam = resolvedSearchParams?.page;
+    const statusParam = resolvedSearchParams?.status;
     const currentPage = typeof pageParam === 'string' ? parseInt(pageParam, 10) : 1;
+    const statusFilter: StatusFilter = (typeof statusParam === 'string' && (VALID_STATUSES as readonly string[]).includes(statusParam))
+        ? statusParam as StatusFilter
+        : "all";
     const SUBSCRIBERS_PER_PAGE = 50;
 
     const session = await getServerSession(authOptions);
@@ -30,11 +37,31 @@ export default async function ListPage({ params, searchParams }: { params: Promi
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
         : { id, brand: { users: { some: { id: userId } } } };
-    const totalSubscribers = await prisma.subscriber.count({
-        where: { listId: id }
-    });
 
-    const totalPages = Math.ceil(totalSubscribers / Math.max(1, SUBSCRIBERS_PER_PAGE));
+    const statusWhere = statusFilter !== "all" ? { status: statusFilter } : {};
+
+    const [totalSubscribers, statusCounts] = await Promise.all([
+        prisma.subscriber.count({ where: { listId: id } }),
+        prisma.subscriber.groupBy({
+            by: ["status"],
+            where: { listId: id },
+            _count: { _all: true },
+        }),
+    ]);
+
+    const counts = {
+        all: totalSubscribers,
+        subscribed: 0,
+        unsubscribed: 0,
+        bounced: 0,
+        complained: 0,
+    };
+    for (const row of statusCounts) {
+        if (row.status in counts) counts[row.status as keyof typeof counts] = row._count._all;
+    }
+
+    const filteredTotal = statusFilter === "all" ? totalSubscribers : counts[statusFilter];
+    const totalPages = Math.ceil(filteredTotal / Math.max(1, SUBSCRIBERS_PER_PAGE));
     const validCurrentPage = Math.max(1, Math.min(currentPage, Math.max(1, totalPages)));
 
     const list = (await prisma.list.findFirst({
@@ -44,10 +71,11 @@ export default async function ListPage({ params, searchParams }: { params: Promi
             customFields: true,
             segments: true,
             subscribers: {
+                where: statusWhere,
                 orderBy: { createdAt: 'desc' },
                 skip: (validCurrentPage - 1) * SUBSCRIBERS_PER_PAGE,
                 take: SUBSCRIBERS_PER_PAGE,
-                include: { customFields: true } // Fetch subscriber's custom field values
+                include: { customFields: true }
             }
         }
     })) as any;
@@ -113,6 +141,8 @@ export default async function ListPage({ params, searchParams }: { params: Promi
                                 customFields={list.customFields}
                                 currentPage={validCurrentPage}
                                 totalPages={totalPages}
+                                statusFilter={statusFilter}
+                                counts={counts}
                             />
                         </Card>
                     )}
