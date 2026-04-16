@@ -141,10 +141,12 @@ const startWorker = async () => {
                 email: subscriberEmail,
                 customFields: customFieldMap,
             },
-            tracking: {
+            tracking: (campaign.trackOpens || campaign.trackClicks) ? {
                 campaignId,
                 baseUrl: trackingBaseUrl,
-            },
+                trackOpens: campaign.trackOpens,
+                trackClicks: campaign.trackClicks,
+            } : undefined,
             unsubscribeUrl,
             preferencesUrl,
         });

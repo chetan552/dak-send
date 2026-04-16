@@ -27,7 +27,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Copy custom fields** — when creating a new list, copy the custom field schema from any existing list in one click
 - **Delete lists** — permanently remove a list and all its subscribers, fields, and segments (with confirmation prompt)
 - **CSV import/export** — bulk import subscribers with custom field mapping; export any list to CSV
-- **GDPR consent tracking** — per-subscriber consent flags, confirmation timestamps, and preference center
+- **GDPR consent tracking** — per-subscriber consent flag, timestamp, IP address, and source (`form`, `api`, `confirm`, `import`); immutable audit log of consent events, data exports, and admin deletions
 - **Double opt-in** — optional per-list confirmation flow with branded confirmation emails
 - **Subscriber preference center** — public `/preferences` page where recipients manage their own subscriptions
 - **Signup forms & landing pages** — visual form builder with public `/f/[slug]` pages and embeddable widgets
@@ -59,8 +59,9 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Resubscribe** — one-click resubscribe for any unsubscribed/bounced/complained subscriber; clears brand-scoped suppression and `pausedUntil` in one action; warns if a global suppression still blocks delivery
 
 ### Tracking & analytics
-- **Open tracking** — transparent pixel injection with per-send logs
-- **Click tracking** — link wrapping through a redirect proxy
+- **Open tracking** — transparent pixel injection with per-send logs; can be disabled per campaign at send time
+- **Click tracking** — link wrapping through a redirect proxy; can be disabled per campaign at send time
+- **Per-campaign tracking toggles** — choose at send time whether opens and/or clicks are tracked; setting is persisted on the campaign record for audit purposes
 - **Campaign dashboards** — real-time open rate, click rate, bounce rate, and complaint rate
 - **Per-subscriber engagement history** — aggregate activity rolls up into send-time optimization
 
@@ -228,6 +229,18 @@ Three cron endpoints drive the time-based features. All require a `?secret=` que
 | `GET /api/cron/scheduled` | Dispatch campaigns whose `scheduledAt` has passed | Every 1 minute |
 | `GET /api/cron/rss` | Poll RSS feeds and draft new campaigns | Every 15–60 min; once daily for digest feeds |
 | `GET /api/cron/automations` | Advance subscribers through automation steps | Every 1–5 minutes |
+| `GET /api/cron/retention` | Purge old bounced/unsubscribed subscribers and campaign analytics per GDPR data retention policy | Once daily |
+
+The retention cron uses thresholds configurable in the `Setting` table:
+
+| Key | Default | Effect |
+|-----|---------|--------|
+| `RETENTION_BOUNCED_DAYS` | 90 | Delete bounced subscribers older than N days |
+| `RETENTION_UNSUBSCRIBED_DAYS` | 365 | Delete unsubscribed subscribers older than N days |
+| `RETENTION_CAMPAIGN_SENDS_DAYS` | 730 | Delete `CampaignSend` records older than N days |
+| `RETENTION_CAMPAIGN_CLICKS_DAYS` | 730 | Delete `CampaignClick` records older than N days |
+
+Set any threshold to `0` to disable that purge. Each run is logged to the `AuditLog` table.
 
 **crontab example:**
 
@@ -235,6 +248,7 @@ Three cron endpoints drive the time-based features. All require a `?secret=` que
 * * * * * curl -fsS "https://your-domain.com/api/cron/scheduled?secret=YOUR_CRON_SECRET"
 */2 * * * * curl -fsS "https://your-domain.com/api/cron/automations?secret=YOUR_CRON_SECRET"
 */30 * * * * curl -fsS "https://your-domain.com/api/cron/rss?secret=YOUR_CRON_SECRET"
+0 3 * * * curl -fsS "https://your-domain.com/api/cron/retention?secret=YOUR_CRON_SECRET"
 ```
 
 **Vercel `vercel.json`:**
@@ -244,7 +258,8 @@ Three cron endpoints drive the time-based features. All require a `?secret=` que
   "crons": [
     { "path": "/api/cron/scheduled?secret=YOUR_CRON_SECRET", "schedule": "* * * * *" },
     { "path": "/api/cron/automations?secret=YOUR_CRON_SECRET", "schedule": "*/2 * * * *" },
-    { "path": "/api/cron/rss?secret=YOUR_CRON_SECRET", "schedule": "*/30 * * * *" }
+    { "path": "/api/cron/rss?secret=YOUR_CRON_SECRET", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/retention?secret=YOUR_CRON_SECRET", "schedule": "0 3 * * *" }
   ]
 }
 ```
@@ -267,7 +282,7 @@ curl -X POST https://your-domain.com/api/send \
   }'
 ```
 
-Set your API key via the Settings page or directly in the `Setting` table (`key = "apiKey"`).
+Generate or rotate your API key via **Dashboard → Settings → Transactional API Key**. Keys are stored as bcrypt hashes; the plaintext is shown once upon generation. Legacy plaintext keys already in the `Setting` table continue to work until rotated.
 
 ### Public subscribe — `POST /api/subscribe`
 
@@ -406,7 +421,7 @@ pm2 start ecosystem.config.js
 - [ ] SES sender domain verified with SPF, DKIM, and DMARC records
 - [ ] SES production access requested (out of sandbox)
 - [ ] Worker process running (`pm2 ls`)
-- [ ] Cron endpoints scheduled
+- [ ] Cron endpoints scheduled (including `/api/cron/retention` for data retention)
 - [ ] SNS topic pointing to `/api/webhooks/ses` for bounce/complaint processing
 
 ---
@@ -481,8 +496,18 @@ npm run lint         # Run ESLint
 - Outgoing webhook URLs are validated against SSRF attacks
 - Incoming SNS notifications are verified against AWS's public certificate chain
 - Outgoing webhook payloads are signed with HMAC-SHA256
-- Transactional and REST APIs require an API key
+- Transactional and REST API keys are stored as **bcrypt hashes** (cost 12); plaintext is shown once at generation time and never stored
 - Cron endpoints require a shared secret query parameter
+
+### GDPR
+
+- Subscriber consent is recorded with timestamp, source (`form` / `confirm` / `api` / `import`), and IP address
+- Hard delete (right to erasure) cascades all subscriber data
+- CSV export for data portability; all exports are logged
+- Immutable `AuditLog` table records consent events, exports, deletions, and API key rotations
+- Per-campaign open/click tracking toggles — disable either at send time
+- Data retention cron (`/api/cron/retention`) automatically purges bounced/unsubscribed subscribers and old analytics records on configurable schedules
+- AWS region is operator-configurable, allowing EU-resident deployments for data residency
 
 ---
 

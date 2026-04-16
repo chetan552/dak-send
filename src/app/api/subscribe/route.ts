@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/aws";
 import { randomBytes } from "crypto";
 import { dispatchWebhooks } from "@/lib/webhooks";
 import { redis } from "@/lib/queue";
+import { writeAuditLog } from "@/lib/audit";
 
 const RATE_LIMIT_WINDOW_SEC = 60;
 const MAX_REQUESTS_PER_WINDOW = 10;
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
         }
 
         const isDoubleOptIn = list.optIn === "double";
+        const consentNow = hasConsent ? new Date() : undefined;
 
         // Add or update subscriber
         const subscriber = await prisma.subscriber.upsert({
@@ -127,16 +129,36 @@ export async function POST(req: NextRequest) {
             update: {
                 name: name || undefined,
                 status: isDoubleOptIn ? "pending" : "subscribed",
-                ...(hasConsent && { hasConfirmedGdpr: true })
+                ...(hasConsent && {
+                    hasConfirmedGdpr: true,
+                    consentTimestamp: consentNow,
+                    consentIp: ip !== "unknown" ? ip.split(",")[0].trim() : null,
+                    consentSource: "form",
+                }),
             },
             create: {
                 email,
                 listId,
                 name: name || null,
                 status: isDoubleOptIn ? "pending" : "subscribed",
-                hasConfirmedGdpr: hasConsent
+                hasConfirmedGdpr: hasConsent,
+                ...(hasConsent && {
+                    consentTimestamp: consentNow,
+                    consentIp: ip !== "unknown" ? ip.split(",")[0].trim() : null,
+                    consentSource: "form",
+                }),
             }
         });
+
+        if (hasConsent) {
+            writeAuditLog({
+                action: "consent_recorded",
+                entityType: "subscriber",
+                entityId: subscriber.id,
+                actorIp: ip !== "unknown" ? ip.split(",")[0].trim() : undefined,
+                meta: { email, listId, source: "form", doubleOptIn: isDoubleOptIn },
+            });
+        }
 
         // Handle custom fields
         if (Object.keys(customFieldInputs).length > 0) {

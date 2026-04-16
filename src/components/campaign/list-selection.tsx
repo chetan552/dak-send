@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SendButton } from "@/components/campaign/send-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users2, Filter, Clock, CalendarClock } from "lucide-react";
+import { Users2, Filter, Clock, CalendarClock, Eye, MousePointerClick } from "lucide-react";
 import { scheduleCampaign } from "@/app/actions/send";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -12,6 +12,8 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
     const [listModes, setListModes] = useState<Record<string, "none" | "include" | "exclude">>({});
     const [segmentModes, setSegmentModes] = useState<Record<string, "none" | "include" | "exclude">>({});
     const [useOptimalTime, setUseOptimalTime] = useState(false);
+    const [trackOpens, setTrackOpens] = useState(true);
+    const [trackClicks, setTrackClicks] = useState(true);
     const [sendMode, setSendMode] = useState<"now" | "scheduled">("now");
     const [scheduledAt, setScheduledAt] = useState("");
     const [scheduling, setScheduling] = useState(false);
@@ -31,6 +33,8 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
         includedSegments: Object.keys(segmentModes).filter(k => segmentModes[k] === "include"),
         excludedSegments: Object.keys(segmentModes).filter(k => segmentModes[k] === "exclude"),
         useOptimalTime,
+        trackOpens,
+        trackClicks,
     };
 
     const hasSelection = payload.includedLists.length > 0 || payload.includedSegments.length > 0;
@@ -150,6 +154,37 @@ export function ListSelectionForm({ lists, campaignId }: { lists: any[], campaig
                             <div className="w-11 h-6 bg-zinc-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </label>
                     </div>
+                </div>
+            </div>
+
+            {/* Tracking toggles */}
+            <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-zinc-900/40 space-y-3">
+                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Tracking (GDPR)</p>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-zinc-400" />
+                        <div>
+                            <p className="text-sm font-medium text-zinc-900 dark:text-white">Track Opens</p>
+                            <p className="text-xs text-zinc-500">Inserts a 1×1 pixel to detect when recipients open the email.</p>
+                        </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                        <input type="checkbox" className="sr-only peer" checked={trackOpens} onChange={e => setTrackOpens(e.target.checked)} />
+                        <div className="w-11 h-6 bg-zinc-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <MousePointerClick className="w-4 h-4 text-zinc-400" />
+                        <div>
+                            <p className="text-sm font-medium text-zinc-900 dark:text-white">Track Clicks</p>
+                            <p className="text-xs text-zinc-500">Wraps links with a redirect to measure click-through rates.</p>
+                        </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                        <input type="checkbox" className="sr-only peer" checked={trackClicks} onChange={e => setTrackClicks(e.target.checked)} />
+                        <div className="w-11 h-6 bg-zinc-200 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
                 </div>
             </div>
 

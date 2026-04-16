@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
+import bcrypt from "bcryptjs";
 
 // Transactional email API with API key auth
 export async function POST(req: NextRequest) {
@@ -17,9 +18,14 @@ export async function POST(req: NextRequest) {
             where: { key: "API_KEY" }
         });
 
-        const keysMatch = apiKeySetting &&
-            apiKey.length === apiKeySetting.value.length &&
-            timingSafeEqual(Buffer.from(apiKey), Buffer.from(apiKeySetting.value));
+        let keysMatch = false;
+        if (apiKeySetting) {
+            const isBcrypt = apiKeySetting.value.startsWith("$2b$") || apiKeySetting.value.startsWith("$2a$");
+            keysMatch = isBcrypt
+                ? await bcrypt.compare(apiKey, apiKeySetting.value)
+                : apiKey.length === apiKeySetting.value.length &&
+                  timingSafeEqual(Buffer.from(apiKey), Buffer.from(apiKeySetting.value));
+        }
         if (!keysMatch) {
             return NextResponse.json({ error: "Invalid API key" }, { status: 403 });
         }

@@ -20,10 +20,13 @@ export interface RenderEmailInput {
      * When provided, open-tracking pixel and click-tracking wrapping are
      * applied. Omit (or pass undefined) for test sends so they don't
      * pollute analytics.
+     * trackOpens/trackClicks default to true when not specified.
      */
     tracking?: {
         campaignId: string;
         baseUrl: string;
+        trackOpens?: boolean;
+        trackClicks?: boolean;
     };
     /** Full unsubscribe URL for this subscriber+list combination. */
     unsubscribeUrl: string;
@@ -113,13 +116,13 @@ function finishPipeline(
     preferencesUrl?: string,
 ): RenderedEmail {
     // 4. Tracking pixel — only for real sends, not test sends
-    if (tracking) {
+    if (tracking && tracking.trackOpens !== false) {
         const pixel = `<img src="${tracking.baseUrl}/api/track/open?cid=${tracking.campaignId}&email=${encodeURIComponent(personalization.email)}" width="1" height="1" border="0" alt="" style="height:1px;width:1px;min-height:1px;" />`;
         $("body").append(pixel);
     }
 
     // 5. Click-tracking href rewrite using DOM (not regex)
-    if (tracking) {
+    if (tracking && tracking.trackClicks !== false) {
         $('a[href]').each((_i, el) => {
             const href = $(el).attr("href") || "";
             if (!href.startsWith("http")) return;

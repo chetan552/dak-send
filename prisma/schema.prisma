@@ -84,6 +84,9 @@ model Subscriber {
   list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
   status    String   @default("subscribed") // subscribed, unsubscribed, bounced, complained
   hasConfirmedGdpr Boolean  @default(false)
+  consentTimestamp DateTime? // When GDPR consent was recorded
+  consentIp        String?   // IP address at time of consent
+  consentSource    String?   // How consent was collected: form, api, import, confirm
 
   customFields SubscriberFieldValue[]
   subscriptionTokens SubscriptionToken[]
@@ -119,7 +122,9 @@ model Campaign {
   clicks      CampaignClick[]
   abTestVariants AbTestVariant[]
   rssItemGuid String?   // For RSS-generated campaigns, to prevent duplicates
-  
+  trackOpens  Boolean  @default(true)  // GDPR: can be disabled per campaign
+  trackClicks Boolean  @default(true)  // GDPR: can be disabled per campaign
+
   scheduledAt DateTime?
   sentAt      DateTime?
   createdAt   DateTime @default(now())
@@ -425,4 +430,19 @@ model SubscriberTag {
 
   @@unique([subscriberId, tagId])
   @@index([tagId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // consent_recorded, data_exported, subscriber_deleted, api_key_rotated, retention_run
+  entityType String? // subscriber, campaign, setting
+  entityId   String? // ID of the affected entity
+  actorId    String? // User ID who performed the action (null = system/cron)
+  actorIp    String? // IP of the actor
+  meta       Json    @default("{}") // extra context (email, listId, reason, count, etc.)
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }

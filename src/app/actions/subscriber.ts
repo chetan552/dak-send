@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function importSubscribersAction(formData: FormData) {
     const session = await getServerSession(authOptions);
@@ -116,8 +117,15 @@ export async function deleteSubscriber(id: string, listId: string) {
 
     if (!list) throw new Error("Unauthorized");
 
-    await prisma.subscriber.delete({
-        where: { id }
+    const sub = await prisma.subscriber.findUnique({ where: { id }, select: { email: true } });
+    await prisma.subscriber.delete({ where: { id } });
+
+    writeAuditLog({
+        action: "subscriber_deleted",
+        entityType: "subscriber",
+        entityId: id,
+        actorId: userId,
+        meta: { email: sub?.email, listId },
     });
 
     revalidatePath(`/dashboard/lists/${listId}`);
@@ -145,6 +153,14 @@ export async function deleteSubscribers(listId: string, subscriberIds: string[])
             listId,
             id: { in: subscriberIds }
         }
+    });
+
+    writeAuditLog({
+        action: "subscriber_deleted",
+        entityType: "subscriber",
+        entityId: listId,
+        actorId: userId,
+        meta: { listId, count: subscriberIds.length, ids: subscriberIds },
     });
 
     revalidatePath(`/dashboard/lists/${listId}`);

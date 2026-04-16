@@ -36,6 +36,8 @@ export async function dispatchCampaign(campaignId: string, data: {
     includedSegments: string[];
     excludedSegments: string[];
     useOptimalTime?: boolean;
+    trackOpens?: boolean;
+    trackClicks?: boolean;
 }) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
@@ -162,12 +164,13 @@ export async function dispatchCampaign(campaignId: string, data: {
         );
     }
 
-    // Update campaign status AND relations
-    // Disconnect old and connect new
+    // Update campaign status, tracking flags, AND relations
     await prisma.campaign.update({
         where: { id: campaignId },
         data: {
             status: "sending",
+            trackOpens: data.trackOpens ?? true,
+            trackClicks: data.trackClicks ?? true,
             includedLists: { set: data.includedLists.map((id: string) => ({ id })) },
             excludedLists: { set: data.excludedLists.map((id: string) => ({ id })) },
             includedSegments: { set: data.includedSegments.map((id: string) => ({ id })) },
@@ -210,6 +213,8 @@ export async function scheduleCampaign(campaignId: string, data: {
     includedSegments: string[];
     excludedSegments: string[];
     scheduledAt: string; // ISO string from the client
+    trackOpens?: boolean;
+    trackClicks?: boolean;
 }) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
@@ -229,12 +234,14 @@ export async function scheduleCampaign(campaignId: string, data: {
     const campaign = await prisma.campaign.findFirst({ where: whereCondition });
     if (!campaign || campaign.status !== "draft") throw new Error("Invalid campaign");
 
-    // Persist the list/segment selections and mark as scheduled
+    // Persist the list/segment selections, tracking flags, and mark as scheduled
     await prisma.campaign.update({
         where: { id: campaignId },
         data: {
             status: "scheduled",
             scheduledAt: scheduledDate,
+            trackOpens: data.trackOpens ?? true,
+            trackClicks: data.trackClicks ?? true,
             includedLists: {
                 set: data.includedLists.map(id => ({ id })),
             },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/aws";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
     const token = req.nextUrl.searchParams.get("token");
@@ -24,10 +25,32 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Token has expired. Please subscribe again." }, { status: 410 });
         }
 
-        // Confirm the subscriber
+        const confirmIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
+        const clientIp = confirmIp ? confirmIp.split(",")[0].trim() : undefined;
+
+        // Confirm the subscriber and stamp consent audit fields
         await prisma.subscriber.update({
             where: { id: subToken.subscriberId },
-            data: { status: "subscribed" }
+            data: {
+                status: "subscribed",
+                hasConfirmedGdpr: true,
+                consentTimestamp: new Date(),
+                consentIp: clientIp ?? null,
+                consentSource: "confirm",
+            }
+        });
+
+        writeAuditLog({
+            action: "consent_recorded",
+            entityType: "subscriber",
+            entityId: subToken.subscriberId,
+            actorIp: clientIp,
+            meta: {
+                email: subToken.subscriber.email,
+                listId: subToken.listId,
+                source: "confirm",
+                doubleOptIn: true,
+            },
         });
 
         // Clean up the used token

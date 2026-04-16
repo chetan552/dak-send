@@ -5,6 +5,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { SESClient, GetSendQuotaCommand, GetSendStatisticsCommand } from "@aws-sdk/client-ses";
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "crypto";
+import bcrypt from "bcryptjs";
+import { writeAuditLog } from "@/lib/audit";
 
 async function isAdmin() {
     const session = await getServerSession(authOptions);
@@ -31,6 +34,36 @@ export async function updateSystemSettings(data: Record<string, string>) {
 
     revalidatePath("/dashboard/settings");
     return { success: true };
+}
+
+/**
+ * Generate a new API key, hash it with bcrypt, store the hash.
+ * Returns the plaintext key once — callers must show it to the user immediately.
+ * Subsequent calls rotate the key.
+ */
+export async function rotateApiKey() {
+    const session = await getServerSession(authOptions);
+    if (session?.user?.role !== "admin") throw new Error("Unauthorized");
+
+    const plaintext = randomBytes(32).toString("hex");
+    const hash = await bcrypt.hash(plaintext, 12);
+
+    await prisma.setting.upsert({
+        where: { key: "API_KEY" },
+        update: { value: hash },
+        create: { key: "API_KEY", value: hash },
+    });
+
+    writeAuditLog({
+        action: "api_key_rotated",
+        entityType: "setting",
+        entityId: "API_KEY",
+        actorId: session.user.id,
+        meta: {},
+    });
+
+    revalidatePath("/dashboard/settings");
+    return { plaintext };
 }
 
 export async function getSESQuota() {

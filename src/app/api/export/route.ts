@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
@@ -64,6 +65,15 @@ export async function GET(req: NextRequest) {
         headers.join(","),
         ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
     ].join("\n");
+
+    writeAuditLog({
+        action: "data_exported",
+        entityType: "subscriber",
+        entityId: listId,
+        actorId: userId,
+        actorIp: req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? undefined,
+        meta: { listId, listName: list.name, count: subscribers.length },
+    });
 
     return new NextResponse(csvContent, {
         status: 200,
