@@ -3,7 +3,7 @@ import type { ICredentialType, INodeProperties } from "n8n-workflow";
 export class DakSendApi implements ICredentialType {
     name = "dakSendApi";
     displayName = "DakSend API";
-    documentationUrl = "https://github.com/your-org/dak-send";
+    documentationUrl = "https://github.com/chetan552/dak-send";
 
     properties: INodeProperties[] = [
         {

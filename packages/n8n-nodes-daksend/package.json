@@ -9,13 +9,13 @@
     "newsletter"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/your-org/dak-send",
+  "homepage": "https://github.com/chetan552/dak-send",
   "author": {
     "name": "DakSend"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/dak-send"
+    "url": "https://github.com/chetan552/dak-send"
   },
   "main": "dist/index.js",
   "scripts": {

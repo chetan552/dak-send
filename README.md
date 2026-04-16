@@ -21,6 +21,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 ## Features
 
 ### Subscriber & list management
+
 - **Multi-brand architecture** — unlimited sender identities, each with isolated lists, campaigns, templates, and SES configuration
 - **Lists & segments** — rule-based segmentation over email, status, custom fields, engagement, and tags
 - **Custom fields** — define arbitrary fields per list and use them in personalization (`[CustomField:FirstName]`, etc.)
@@ -33,6 +34,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Signup forms & landing pages** — visual form builder with public `/f/[slug]` pages and embeddable widgets
 
 ### Campaigns
+
 - **Block-based email builder** — drag-and-drop visual editor with 8 block types (Text, Heading, Image, Button, Divider, Spacer, Two Columns, Raw HTML); compiles to Outlook-safe table HTML; undo/redo history; full-screen live preview
 - **Rich-text + HTML editor** — TipTap WYSIWYG with raw HTML source mode via CodeMirror
 - **Editor choice at creation** — choose Block Builder or HTML Editor when creating a campaign; existing campaigns auto-detect which mode was used
@@ -46,6 +48,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **RSS-to-email** — auto-generate campaign drafts from any RSS feed on a schedule; **Daily Digest Mode** batches all new items from a run into one email instead of one email per item
 
 ### Deliverability
+
 - **Outlook-safe HTML pipeline** — every email is automatically wrapped in a proper `<!DOCTYPE html>` document with MSO conditionals; CSS styles are inlined via `juice` so Outlook renders them correctly
 - **Multipart/alternative sends** — every campaign includes both an HTML and a plain-text part, a hard requirement for avoiding spam filters at Yahoo and Gmail
 - **RFC-compliant unsubscribe headers** — `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` are automatically added to all bulk sends so Gmail and Yahoo display their native unsubscribe chip
@@ -59,6 +62,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Resubscribe** — one-click resubscribe for any unsubscribed/bounced/complained subscriber; clears brand-scoped suppression and `pausedUntil` in one action; warns if a global suppression still blocks delivery
 
 ### Tracking & analytics
+
 - **Open tracking** — transparent pixel injection with per-send logs; can be disabled per campaign at send time
 - **Click tracking** — link wrapping through a redirect proxy; can be disabled per campaign at send time
 - **Per-campaign tracking toggles** — choose at send time whether opens and/or clicks are tracked; setting is persisted on the campaign record for audit purposes
@@ -66,11 +70,13 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Per-subscriber engagement history** — aggregate activity rolls up into send-time optimization
 
 ### Subscriber & list management
+
 - **Subscriber tags** — create free-form tags per brand and apply them to individual subscribers; use `has_tag` in segment rules for tag-based targeting
 - **Subscriber pause** — subscribers can pause emails for 30, 60, or 90 days from the preference center; paused subscribers are skipped at dispatch time
 - **Preference center** — public `/preferences?i=<id>` page where subscribers manage per-list opt-ins, pause emails, and unsubscribe from everything; `[PreferencesUrl]` merge tag auto-inserts the link; footer auto-injects "Manage Preferences" link alongside "Unsubscribe"
 
 ### Automations
+
 - **Drip automations** — multi-step delay + email sequences triggered automatically
 - **Subscriber triggers** — start a sequence when someone joins a list (single opt-in) or confirms (double opt-in)
 - **Event-based triggers** — fire an automation when a named subscriber event is tracked via the `/api/v1/events` endpoint (e.g. `purchase`, `login`, `trial_started`)
@@ -78,6 +84,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **API Trigger** — enroll subscribers into an automation via `POST /api/v1/automations/:id/enroll` using your existing API key; ideal for CRM and no-code tool integrations
 
 ### Integrations & APIs
+
 - **Transactional email API** — `POST /api/send` for receipts, notifications, and one-off messages
 - **REST API v1** — full CRUD over brands, lists, subscribers, campaigns, webhooks, and automation enrollment
 - **Subscriber events API** — `POST /api/v1/events` to track named events against a subscriber; triggers event-based automations and feeds segment rules
@@ -87,6 +94,7 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **Incoming SES webhooks** — production-grade SNS signature verification and bounce/complaint processing
 
 ### Administration & security
+
 - **First-run signup** — the first user to visit `/signup` automatically becomes admin; subsequent signups are blocked
 - **Role-based access** — admin and standard user roles with brand-level permissions
 - **User management** — admins can create, delete, and assign users to brands from the Settings UI
@@ -101,18 +109,18 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js (App Router, React Server Components) |
-| Database | PostgreSQL + Prisma ORM |
-| Queue | BullMQ + Redis |
-| Email | Amazon SES v2 |
-| Auth | NextAuth.js (Credentials provider, JWT sessions) |
-| 2FA | otplib (TOTP) + qrcode |
-| Email rendering | cheerio (DOM), juice (CSS inliner), html-to-text |
-| UI | Tailwind CSS v4, Radix UI, shadcn/ui, Lucide Icons |
-| Editor | TipTap v3 (rich text) + CodeMirror 6 (HTML source) + custom block builder (@dnd-kit) |
-| Deployment | PM2 (`ecosystem.config.js`) or Vercel + separate worker host |
+| Layer           | Technology                                                                           |
+| --------------- | ------------------------------------------------------------------------------------ |
+| Framework       | Next.js (App Router, React Server Components)                                        |
+| Database        | PostgreSQL + Prisma ORM                                                              |
+| Queue           | BullMQ + Redis                                                                       |
+| Email           | Amazon SES v2                                                                        |
+| Auth            | NextAuth.js (Credentials provider, JWT sessions)                                     |
+| 2FA             | otplib (TOTP) + qrcode                                                               |
+| Email rendering | cheerio (DOM), juice (CSS inliner), html-to-text                                     |
+| UI              | Tailwind CSS v4, Radix UI, shadcn/ui, Lucide Icons                                   |
+| Editor          | TipTap v3 (rich text) + CodeMirror 6 (HTML source) + custom block builder (@dnd-kit) |
+| Deployment      | PM2 (`ecosystem.config.js`) or Vercel + separate worker host                         |
 
 ---
 
@@ -155,7 +163,7 @@ The worker process (`npm run worker`) is **required** alongside the web server �
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-org/dak-send.git
+git clone https://github.com/chetan552/dak-send.git
 cd dak-send
 npm install
 ```
@@ -224,21 +232,21 @@ Open [http://localhost:3000/signup](http://localhost:3000/signup) to create your
 
 Three cron endpoints drive the time-based features. All require a `?secret=` query parameter matching `CRON_SECRET`.
 
-| Endpoint | Purpose | Recommended Interval |
-|----------|---------|----------------------|
-| `GET /api/cron/scheduled` | Dispatch campaigns whose `scheduledAt` has passed | Every 1 minute |
-| `GET /api/cron/rss` | Poll RSS feeds and draft new campaigns | Every 15–60 min; once daily for digest feeds |
-| `GET /api/cron/automations` | Advance subscribers through automation steps | Every 1–5 minutes |
-| `GET /api/cron/retention` | Purge old bounced/unsubscribed subscribers and campaign analytics per GDPR data retention policy | Once daily |
+| Endpoint                    | Purpose                                                                                          | Recommended Interval                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `GET /api/cron/scheduled`   | Dispatch campaigns whose `scheduledAt` has passed                                                | Every 1 minute                               |
+| `GET /api/cron/rss`         | Poll RSS feeds and draft new campaigns                                                           | Every 15–60 min; once daily for digest feeds |
+| `GET /api/cron/automations` | Advance subscribers through automation steps                                                     | Every 1–5 minutes                            |
+| `GET /api/cron/retention`   | Purge old bounced/unsubscribed subscribers and campaign analytics per GDPR data retention policy | Once daily                                   |
 
 The retention cron uses thresholds configurable in the `Setting` table:
 
-| Key | Default | Effect |
-|-----|---------|--------|
-| `RETENTION_BOUNCED_DAYS` | 90 | Delete bounced subscribers older than N days |
-| `RETENTION_UNSUBSCRIBED_DAYS` | 365 | Delete unsubscribed subscribers older than N days |
-| `RETENTION_CAMPAIGN_SENDS_DAYS` | 730 | Delete `CampaignSend` records older than N days |
-| `RETENTION_CAMPAIGN_CLICKS_DAYS` | 730 | Delete `CampaignClick` records older than N days |
+| Key                              | Default | Effect                                            |
+| -------------------------------- | ------- | ------------------------------------------------- |
+| `RETENTION_BOUNCED_DAYS`         | 90      | Delete bounced subscribers older than N days      |
+| `RETENTION_UNSUBSCRIBED_DAYS`    | 365     | Delete unsubscribed subscribers older than N days |
+| `RETENTION_CAMPAIGN_SENDS_DAYS`  | 730     | Delete `CampaignSend` records older than N days   |
+| `RETENTION_CAMPAIGN_CLICKS_DAYS` | 730     | Delete `CampaignClick` records older than N days  |
 
 Set any threshold to `0` to disable that purge. Each run is logged to the `AuditLog` table.
 
@@ -256,10 +264,22 @@ Set any threshold to `0` to disable that purge. Each run is logged to the `Audit
 ```json
 {
   "crons": [
-    { "path": "/api/cron/scheduled?secret=YOUR_CRON_SECRET", "schedule": "* * * * *" },
-    { "path": "/api/cron/automations?secret=YOUR_CRON_SECRET", "schedule": "*/2 * * * *" },
-    { "path": "/api/cron/rss?secret=YOUR_CRON_SECRET", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/retention?secret=YOUR_CRON_SECRET", "schedule": "0 3 * * *" }
+    {
+      "path": "/api/cron/scheduled?secret=YOUR_CRON_SECRET",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/automations?secret=YOUR_CRON_SECRET",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/rss?secret=YOUR_CRON_SECRET",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/retention?secret=YOUR_CRON_SECRET",
+      "schedule": "0 3 * * *"
+    }
   ]
 }
 ```
@@ -312,17 +332,17 @@ SNS signature verification is enforced. Hard bounces mark the subscriber globall
 
 A full REST API for external integrations lives under `/api/v1`. Authenticate with `x-api-key: YOUR_API_KEY`.
 
-| Resource | Endpoints |
-|----------|-----------|
-| Brands | `GET /api/v1/brands` |
-| Lists | `GET /api/v1/lists` |
-| Subscribers | `GET /api/v1/subscribers`, `POST /api/v1/subscribers`, `GET /api/v1/subscribers/:email`, `PATCH /api/v1/subscribers/:email`, `DELETE /api/v1/subscribers/:email` |
-| Subscriber Tags | `GET /api/v1/subscribers/:email/tags`, `POST /api/v1/subscribers/:email/tags`, `DELETE /api/v1/subscribers/:email/tags` |
-| Events | `POST /api/v1/events` — track a named event against a subscriber; triggers event-based automations |
-| Tags | `GET /api/v1/tags`, `POST /api/v1/tags`, `DELETE /api/v1/tags` |
-| Campaigns | `GET /api/v1/campaigns`, `GET /api/v1/campaigns/:id` |
-| Automations | `POST /api/v1/automations/:id/enroll` — enroll a subscriber by email into an API-triggered automation |
-| Webhooks | `GET /api/v1/webhooks`, `POST /api/v1/webhooks`, `GET /api/v1/webhooks/:id`, `PATCH /api/v1/webhooks/:id`, `DELETE /api/v1/webhooks/:id` |
+| Resource        | Endpoints                                                                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brands          | `GET /api/v1/brands`                                                                                                                                             |
+| Lists           | `GET /api/v1/lists`                                                                                                                                              |
+| Subscribers     | `GET /api/v1/subscribers`, `POST /api/v1/subscribers`, `GET /api/v1/subscribers/:email`, `PATCH /api/v1/subscribers/:email`, `DELETE /api/v1/subscribers/:email` |
+| Subscriber Tags | `GET /api/v1/subscribers/:email/tags`, `POST /api/v1/subscribers/:email/tags`, `DELETE /api/v1/subscribers/:email/tags`                                          |
+| Events          | `POST /api/v1/events` — track a named event against a subscriber; triggers event-based automations                                                               |
+| Tags            | `GET /api/v1/tags`, `POST /api/v1/tags`, `DELETE /api/v1/tags`                                                                                                   |
+| Campaigns       | `GET /api/v1/campaigns`, `GET /api/v1/campaigns/:id`                                                                                                             |
+| Automations     | `POST /api/v1/automations/:id/enroll` — enroll a subscriber by email into an API-triggered automation                                                            |
+| Webhooks        | `GET /api/v1/webhooks`, `POST /api/v1/webhooks`, `GET /api/v1/webhooks/:id`, `PATCH /api/v1/webhooks/:id`, `DELETE /api/v1/webhooks/:id`                         |
 
 #### Automation enrollment via API
 
@@ -528,21 +548,24 @@ npm run lint         # Run ESLint
 
 All three records are required to pass spam filters and avoid landing in junk:
 
-| Record | Type | Purpose |
-|--------|------|---------|
-| SPF | TXT at `@` | Tells receiving servers which IPs can send on your behalf |
-| DKIM | CNAME (×3) | Cryptographically signs your emails — AWS provides the records |
-| DMARC | TXT at `_dmarc` | Policy for what to do with failing mail; enables Postmaster reporting |
+| Record | Type            | Purpose                                                               |
+| ------ | --------------- | --------------------------------------------------------------------- |
+| SPF    | TXT at `@`      | Tells receiving servers which IPs can send on your behalf             |
+| DKIM   | CNAME (×3)      | Cryptographically signs your emails — AWS provides the records        |
+| DMARC  | TXT at `_dmarc` | Policy for what to do with failing mail; enables Postmaster reporting |
 
 **SPF** (add to your root domain `@`):
+
 ```
 v=spf1 include:amazonses.com ~all
 ```
 
 **DMARC** (add at `_dmarc.yourdomain.com`):
+
 ```
 v=DMARC1; p=none; rua=mailto:dmarc-reports@yourdomain.com
 ```
+
 Start with `p=none` (monitor only), then move to `p=quarantine` and eventually `p=reject` once you confirm all your sending sources pass.
 
 **DKIM**: AWS SES generates three CNAME records for you automatically when you verify a domain. Just add all three to your DNS.
@@ -619,12 +642,12 @@ Common deductions: missing plain-text part, no `List-Unsubscribe` header, hidden
 
 **Q: What personalization tags can I use in campaigns?**
 
-| Tag | Replaced with |
-|-----|--------------|
-| `[Name]` | Subscriber's name (or blank if empty) |
-| `[Email]` | Subscriber's email address |
-| `[UnsubscribeUrl]` | Full unsubscribe URL for this subscriber |
-| `[Unsubscribe]` | Same as above (alias) |
+| Tag                       | Replaced with                               |
+| ------------------------- | ------------------------------------------- |
+| `[Name]`                  | Subscriber's name (or blank if empty)       |
+| `[Email]`                 | Subscriber's email address                  |
+| `[UnsubscribeUrl]`        | Full unsubscribe URL for this subscriber    |
+| `[Unsubscribe]`           | Same as above (alias)                       |
 | `[CustomField:FieldName]` | Value of the custom field named `FieldName` |
 
 Tags work in subject lines, HTML bodies, and plain-text bodies.
@@ -646,7 +669,7 @@ nvm install 20 && nvm use 20
 sudo apt install -y postgresql redis-server
 
 # Clone and install DakSend
-git clone https://github.com/your-org/dak-send.git
+git clone https://github.com/chetan552/dak-send.git
 cd dak-send
 npm install
 npx prisma generate      # Required on ARM — regenerates the platform-specific binary
@@ -828,16 +851,16 @@ If you use the [Views module](https://www.drupal.org/project/views) (bundled in 
 
 Dashboard → **RSS Feeds** → **Add RSS Feed**:
 
-| Field | Value |
-|-------|-------|
-| Feed Name | `Sermon Daily Digest` |
-| RSS Feed URL | `https://yoursite.com/sermons/feed` |
-| Brand | your brand |
-| Target Lists | Sermon Daily Digest |
-| **Daily Digest Mode** | **enabled** |
-| Digest Subject | `New Sermons Added — [RssDate]` (or customize) |
-| Item Block Template | leave blank for the default card, or paste custom HTML |
-| Digest Email Wrapper | leave blank for the default wrapper, or paste a fully branded HTML email |
+| Field                 | Value                                                                    |
+| --------------------- | ------------------------------------------------------------------------ |
+| Feed Name             | `Sermon Daily Digest`                                                    |
+| RSS Feed URL          | `https://yoursite.com/sermons/feed`                                      |
+| Brand                 | your brand                                                               |
+| Target Lists          | Sermon Daily Digest                                                      |
+| **Daily Digest Mode** | **enabled**                                                              |
+| Digest Subject        | `New Sermons Added — [RssDate]` (or customize)                           |
+| Item Block Template   | leave blank for the default card, or paste custom HTML                   |
+| Digest Email Wrapper  | leave blank for the default wrapper, or paste a fully branded HTML email |
 
 ### Step 5 — Schedule the cron (once per day)
 
@@ -847,6 +870,7 @@ Dashboard → **RSS Feeds** → **Add RSS Feed**:
 ```
 
 Every time this runs, DakSend:
+
 1. Fetches your RSS feed
 2. Collects all items published since the last run
 3. If any new items exist, renders them into a single digest email and creates a campaign **draft**
@@ -860,24 +884,24 @@ By default, digest campaigns land as drafts so you can review before they go out
 
 **In the Item Block template** (renders once per new item):
 
-| Tag | Replaced with |
-|-----|--------------|
-| `[RssTitle]` | Sermon / article title |
-| `[RssLink]` | URL of the page |
-| `[RssContent]` | Short excerpt (200 characters, HTML stripped) |
-| `[RssAuthor]` | Author / preacher name |
-| `[RssDate]` | Publication date (formatted, e.g. "April 13, 2026") |
+| Tag              | Replaced with                                           |
+| ---------------- | ------------------------------------------------------- |
+| `[RssTitle]`     | Sermon / article title                                  |
+| `[RssLink]`      | URL of the page                                         |
+| `[RssContent]`   | Short excerpt (200 characters, HTML stripped)           |
+| `[RssAuthor]`    | Author / preacher name                                  |
+| `[RssDate]`      | Publication date (formatted, e.g. "April 13, 2026")     |
 | `[RssThumbnail]` | Thumbnail image URL (from RSS `<enclosure>` if present) |
 
 **In the Digest Wrapper and Subject** (renders once per digest email):
 
-| Tag | Replaced with |
-|-----|--------------|
-| `[RssItems]` | All rendered item blocks concatenated |
-| `[RssDate]` | Today's date |
-| `[RssCount]` | Number of new items in this digest |
-| `[RssFeedName]` | Feed name as set in DakSend |
-| `[Unsubscribe]` | Unsubscribe link |
+| Tag             | Replaced with                         |
+| --------------- | ------------------------------------- |
+| `[RssItems]`    | All rendered item blocks concatenated |
+| `[RssDate]`     | Today's date                          |
+| `[RssCount]`    | Number of new items in this digest    |
+| `[RssFeedName]` | Feed name as set in DakSend           |
+| `[Unsubscribe]` | Unsubscribe link                      |
 
 ---
 
@@ -894,11 +918,21 @@ By default, digest campaigns land as drafts so you can review before they go out
 Drupal can add an image to the RSS enclosure field. In your Sermon View's RSS display, add the image field and set the "Style" to use it as the enclosure (`<enclosure url="..." />`). Then in your Item Block template, add an `<img>` using `[RssThumbnail]`:
 
 ```html
-<div style="border-bottom:1px solid #e5e7eb;padding:24px 0;display:flex;gap:16px;">
-  <img src="[RssThumbnail]" width="80" height="80" style="border-radius:8px;object-fit:cover;flex-shrink:0;" alt="" />
+<div
+  style="border-bottom:1px solid #e5e7eb;padding:24px 0;display:flex;gap:16px;"
+>
+  <img
+    src="[RssThumbnail]"
+    width="80"
+    height="80"
+    style="border-radius:8px;object-fit:cover;flex-shrink:0;"
+    alt=""
+  />
   <div>
     <h3 style="margin:0 0 6px;"><a href="[RssLink]">[RssTitle]</a></h3>
-    <p style="margin:0;color:#6b7280;font-size:14px;">[RssAuthor] — [RssDate]</p>
+    <p style="margin:0;color:#6b7280;font-size:14px;">
+      [RssAuthor] — [RssDate]
+    </p>
   </div>
 </div>
 ```
@@ -915,12 +949,12 @@ Digest Mode was not enabled when the feed was created. Edit the feed (pencil ico
 
 Any CMS or framework that produces a valid RSS 2.0 or Atom feed works identically. Examples:
 
-| Platform | Default feed URL |
-|----------|-----------------|
-| WordPress | `/feed` or `/feed/rss2` |
-| Ghost | `/rss` |
-| Webflow (Blog) | `/blog/rss.xml` |
-| Jekyll | `/feed.xml` |
+| Platform       | Default feed URL                                     |
+| -------------- | ---------------------------------------------------- |
+| WordPress      | `/feed` or `/feed/rss2`                              |
+| Ghost          | `/rss`                                               |
+| Webflow (Blog) | `/blog/rss.xml`                                      |
+| Jekyll         | `/feed.xml`                                          |
 | Custom Next.js | Create a `/api/rss` route that returns valid RSS XML |
 
 ---
