@@ -6,7 +6,15 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 
-export async function importSubscribersAction(formData: FormData) {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type ImportResult = {
+    created: number;
+    updated: number;
+    skipped: { existing: number; invalid: number; errored: number };
+};
+
+export async function importSubscribersAction(formData: FormData): Promise<ImportResult> {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
     const currentUserRole = session?.user?.role || "user";
@@ -17,6 +25,7 @@ export async function importSubscribersAction(formData: FormData) {
 
     const listId = formData.get("listId") as string;
     const subscribersJsonStr = formData.get("subscribers") as string;
+    const updateExisting = formData.get("updateExisting") === "true";
 
     if (!listId || !subscribersJsonStr) {
         throw new Error("List ID and subscribers are required");
@@ -34,71 +43,117 @@ export async function importSubscribersAction(formData: FormData) {
         throw new Error("List not found or unauthorized");
     }
 
-    const subscribersArr = JSON.parse(subscribersJsonStr) as { email: string, name?: string, customFields?: Record<string, string> }[];
+    const rawRows = JSON.parse(subscribersJsonStr) as { email: string, name?: string, customFields?: Record<string, string> }[];
 
-    let importedCount = 0;
+    const result: ImportResult = {
+        created: 0,
+        updated: 0,
+        skipped: { existing: 0, invalid: 0, errored: 0 },
+    };
 
-    // Fetch list custom fields to validate against and avoid querying inside the loop
-    const listCustomFields = await prisma.customField.findMany({
-        where: { listId }
+    // Normalize + dedupe by email (last write wins for same address in one upload).
+    const byEmail = new Map<string, { email: string; name?: string; customFields?: Record<string, string> }>();
+    for (const row of rawRows) {
+        const email = (row.email || "").trim().toLowerCase();
+        if (!email || !EMAIL_REGEX.test(email)) {
+            result.skipped.invalid++;
+            continue;
+        }
+        byEmail.set(email, { ...row, email });
+    }
+
+    if (byEmail.size === 0) {
+        return result;
+    }
+
+    const emails = Array.from(byEmail.keys());
+
+    // Pre-fetch existing rows in this list once.
+    const existingRows = await prisma.subscriber.findMany({
+        where: { listId, email: { in: emails } },
+        select: { id: true, email: true },
     });
+    const existingByEmail = new Map(existingRows.map(r => [r.email, r.id]));
 
-    for (const sub of subscribersArr) {
-        if (!sub.email) continue;
+    const listCustomFields = await prisma.customField.findMany({ where: { listId } });
+    const validCustomFieldIds = new Set(listCustomFields.map(cf => cf.id));
+
+    for (const sub of byEmail.values()) {
+        const existingId = existingByEmail.get(sub.email);
 
         try {
-            const dbSub = await prisma.subscriber.upsert({
-                where: {
-                    email_listId: {
+            let subscriberId: string;
+
+            if (existingId) {
+                if (!updateExisting) {
+                    result.skipped.existing++;
+                    continue;
+                }
+                // Update name only — never touch status (preserves unsubscribed/bounced/complained).
+                await prisma.subscriber.update({
+                    where: { id: existingId },
+                    data: { name: sub.name?.trim() || undefined },
+                });
+                subscriberId = existingId;
+                result.updated++;
+            } else {
+                const created = await prisma.subscriber.create({
+                    data: {
                         email: sub.email,
+                        name: sub.name?.trim() || null,
                         listId,
-                    }
-                },
-                update: {
-                    name: sub.name || undefined,
-                    status: "subscribed" // refresh status
-                },
-                create: {
-                    email: sub.email,
-                    name: sub.name || null,
-                    listId,
-                    hasConfirmedGdpr: list.requireGdpr
-                }
-            });
-
-            // Handle custom fields
-            if (sub.customFields && Object.keys(sub.customFields).length > 0) {
-                for (const [cfId, fieldValue] of Object.entries(sub.customFields)) {
-                    // Look up the custom field definition by its ID in our pre-fetched list
-                    const customFieldDef = listCustomFields.find((cf: any) => cf.id === cfId);
-
-                    if (customFieldDef) {
-                        await prisma.subscriberFieldValue.upsert({
-                            where: {
-                                subscriberId_customFieldId: {
-                                    subscriberId: dbSub.id,
-                                    customFieldId: customFieldDef.id
-                                }
-                            },
-                            update: { value: fieldValue },
-                            create: {
-                                subscriberId: dbSub.id,
-                                customFieldId: customFieldDef.id,
-                                value: fieldValue
-                            }
-                        });
-                    }
-                }
+                        hasConfirmedGdpr: list.requireGdpr,
+                    },
+                });
+                subscriberId = created.id;
+                result.created++;
             }
 
-            importedCount++;
+            if (sub.customFields) {
+                for (const [cfId, fieldValue] of Object.entries(sub.customFields)) {
+                    if (!validCustomFieldIds.has(cfId)) continue;
+                    if (fieldValue === undefined || fieldValue === null || fieldValue === "") continue;
+                    await prisma.subscriberFieldValue.upsert({
+                        where: { subscriberId_customFieldId: { subscriberId, customFieldId: cfId } },
+                        update: { value: String(fieldValue) },
+                        create: { subscriberId, customFieldId: cfId, value: String(fieldValue) },
+                    });
+                }
+            }
         } catch (e) {
             console.warn("Failed inserting subscriber", sub.email, e);
+            result.skipped.errored++;
         }
     }
 
     revalidatePath(`/dashboard/lists/${listId}`);
-    return { importedCount };
+    return result;
+}
+
+export async function checkExistingEmailsAction(listId: string, emails: string[]): Promise<{ existing: string[] }> {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+    if (!listId) throw new Error("List ID is required");
+    if (!Array.isArray(emails) || emails.length === 0) return { existing: [] };
+
+    const whereCondition: any = currentUserRole === 'admin'
+        ? { id: listId }
+        : { id: listId, brand: { users: { some: { id: userId } } } };
+
+    const list = await prisma.list.findFirst({ where: whereCondition, select: { id: true } });
+    if (!list) throw new Error("List not found or unauthorized");
+
+    const normalized = Array.from(new Set(emails.map(e => (e || "").trim().toLowerCase()).filter(Boolean)));
+
+    const rows = await prisma.subscriber.findMany({
+        where: { listId, email: { in: normalized } },
+        select: { email: true },
+    });
+
+    return { existing: rows.map(r => r.email) };
 }
 
 export async function deleteSubscriber(id: string, listId: string) {
