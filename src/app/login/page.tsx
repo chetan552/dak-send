@@ -9,16 +9,18 @@ export default async function LoginPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-zinc-950 p-4 relative overflow-hidden">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none" />
+            <div
+                aria-hidden
+                className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(99,102,241,0.08),transparent)]"
+            />
 
-            <Card className="w-full max-w-md z-10 border-zinc-800 bg-zinc-900/50 backdrop-blur-xl shadow-2xl">
+            <Card className="w-full max-w-md z-10 border-zinc-800/60 bg-zinc-900/50 shadow-lg">
                 <CardHeader className="space-y-3 pb-6">
-                    <div className="mb-1">
+                    <div>
                         <Image src="/logo.svg" alt="DakSend" width={150} height={36} priority />
                     </div>
-                    <CardDescription className="text-zinc-400 text-base">
-                        Enter your email and password to sign in to your self-hosted mailer.
+                    <CardDescription className="text-zinc-400">
+                        Sign in to your workspace.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

@@ -8,7 +8,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "./sidebar-nav";
+import { NAV_GROUPS, NAV_ITEMS } from "./sidebar-nav";
 
 interface MobileNavProps {
     userEmail: string;
@@ -30,7 +30,7 @@ export function MobileNav({ userEmail, userName }: MobileNavProps) {
                 </div>
                 <button
                     onClick={() => setIsOpen(!isOpen)}
-                    className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     aria-label="Toggle menu"
                 >
                     {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -46,50 +46,57 @@ export function MobileNav({ userEmail, userName }: MobileNavProps) {
                         onClick={() => setIsOpen(false)}
                     />
                     {/* Panel */}
-                    <div className="md:hidden fixed top-0 right-0 bottom-0 z-50 w-72 bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in slide-in-from-right duration-200 flex flex-col">
-                        <div className="p-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
-                            <span className="font-semibold text-zinc-900 dark:text-white">Menu</span>
+                    <div className="md:hidden fixed top-0 right-0 bottom-0 z-50 w-72 bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-lg animate-in slide-in-from-right duration-200 flex flex-col">
+                        <div className="px-4 py-3 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
+                            <span className="text-sm font-semibold text-zinc-900 dark:text-white">Menu</span>
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <nav className="flex-1 overflow-y-auto px-4 space-y-1 py-4">
-                            {NAV_ITEMS.map((item) => {
-                                const isActive = item.exact
-                                    ? pathname === item.href
-                                    : pathname.startsWith(item.href);
+                        <nav className="flex-1 overflow-y-auto px-3 py-3">
+                            {NAV_GROUPS.map((group, idx) => (
+                                <div key={group.label} className={cn(idx > 0 && "mt-5")}>
+                                    <p className="nav-section-label">{group.label}</p>
+                                    <div className="space-y-0.5">
+                                        {group.items.map((item) => {
+                                            const isActive = item.exact
+                                                ? pathname === item.href
+                                                : pathname.startsWith(item.href);
 
-                                const Icon = item.icon;
+                                            const Icon = item.icon;
 
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        onClick={() => setIsOpen(false)}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-3 rounded-lg transition-colors",
-                                            isActive
-                                                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white"
-                                                : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50"
-                                        )}
-                                    >
-                                        <Icon className={cn(
-                                            "w-5 h-5",
-                                            isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-500 dark:text-zinc-400"
-                                        )} />
-                                        <span className="text-sm font-medium">{item.name}</span>
-                                    </Link>
-                                );
-                            })}
+                                            return (
+                                                <Link
+                                                    key={item.href}
+                                                    href={item.href}
+                                                    onClick={() => setIsOpen(false)}
+                                                    className={cn(
+                                                        "flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors",
+                                                        isActive
+                                                            ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800/70 dark:text-white"
+                                                            : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800/50"
+                                                    )}
+                                                >
+                                                    <Icon className={cn(
+                                                        "w-4 h-4",
+                                                        isActive ? "text-primary" : "text-zinc-500 dark:text-zinc-400"
+                                                    )} />
+                                                    <span className="text-sm font-medium">{item.name}</span>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
                         </nav>
 
                         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex-shrink-0 space-y-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
-                                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-600 dark:text-zinc-300 flex-shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300 flex-shrink-0">
                                     {userEmail?.[0]?.toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -100,7 +107,7 @@ export function MobileNav({ userEmail, userName }: MobileNavProps) {
                             </div>
                             <button
                                 onClick={() => signOut({ callbackUrl: "/login" })}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors text-sm font-medium"
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors text-sm font-medium"
                             >
                                 <LogOut className="w-4 h-4" />
                                 Sign out
@@ -122,10 +129,10 @@ export function MobileNav({ userEmail, userName }: MobileNavProps) {
                             key={item.href}
                             href={item.href}
                             className={cn(
-                                "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors",
+                                "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md transition-colors",
                                 isActive
-                                    ? "text-blue-600 dark:text-blue-400"
-                                    : "text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400"
+                                    ? "text-primary"
+                                    : "text-zinc-500 hover:text-primary"
                             )}
                         >
                             <Icon className="w-5 h-5" />

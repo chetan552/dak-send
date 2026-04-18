@@ -27,8 +27,8 @@ export default async function DashboardLayout({
         <TooltipProvider delayDuration={300}>
         <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex transition-colors duration-300">
             {/* Desktop Sidebar — hidden on mobile */}
-            <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col backdrop-blur-md transition-colors duration-300 flex-shrink-0 sticky top-0 h-screen">
-                <div className="p-6">
+            <aside className="hidden md:flex w-64 border-r border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-950/50 flex-col transition-colors duration-300 flex-shrink-0 sticky top-0 h-screen">
+                <div className="px-5 py-5">
                     <Link href="/dashboard">
                         <Image src="/logo.svg" alt="DakSend" width={140} height={34} priority />
                     </Link>
@@ -38,21 +38,17 @@ export default async function DashboardLayout({
                     <SidebarNav />
                 </div>
 
-                <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-600 dark:text-zinc-300 flex-shrink-0">
-                                {userEmail?.[0]?.toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0 pr-2">
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{userName}</p>
-                                <p className="text-xs text-zinc-500 truncate">{userEmail}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <ThemeToggle />
-                            <LogoutButton />
-                        </div>
+                <div className="px-4 py-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300 flex-shrink-0">
+                        {userEmail?.[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{userName}</p>
+                        <p className="text-xs text-zinc-500 truncate">{userEmail}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <ThemeToggle />
+                        <LogoutButton />
                     </div>
                 </div>
             </aside>

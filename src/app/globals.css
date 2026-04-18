@@ -48,7 +48,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -142,10 +142,22 @@
     @apply text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400;
   }
   .stat-value {
-    @apply text-[26px] sm:text-[30px] font-semibold tabular-nums tracking-[-0.03em] text-zinc-900 dark:text-white;
+    @apply text-[22px] sm:text-[26px] font-semibold tabular-nums tracking-[-0.03em] text-zinc-900 dark:text-white;
   }
   .surface-card {
     @apply bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-lg;
+  }
+  .surface-card-elevated {
+    @apply bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-lg shadow-[0_1px_0_rgba(0,0,0,0.02),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.02),0_1px_3px_rgba(0,0,0,0.2)];
+  }
+  .surface-card-hover {
+    @apply transition-colors duration-150 hover:border-zinc-300 dark:hover:border-zinc-700;
+  }
+  .page-header-divider {
+    @apply border-b border-zinc-200/70 dark:border-zinc-800/70 pb-5 mb-6;
+  }
+  .nav-section-label {
+    @apply px-2.5 pb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-400 dark:text-zinc-500;
   }
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-300;

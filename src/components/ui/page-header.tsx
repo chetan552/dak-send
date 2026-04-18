@@ -12,7 +12,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action, breadcrumb, meta, className }: PageHeaderProps) {
     return (
-        <div className={cn("mb-8", className)}>
+        <div className={cn("page-header-divider", className)}>
             {breadcrumb && (
                 <div className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">{breadcrumb}</div>
             )}
