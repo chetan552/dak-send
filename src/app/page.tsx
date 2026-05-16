@@ -17,6 +17,8 @@ import {
   Users,
   Workflow,
   Zap,
+  Network,
+  WandSparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -78,7 +80,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto text-center space-y-8 animate-slide-up">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-sm text-indigo-300 backdrop-blur-md">
             <Sparkles className="w-4 h-4" />
-            <span>The open-source email platform</span>
+            <span>New: AI Assistant &amp; 6 email providers</span>
             <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
           </div>
           <h1 className="text-5xl sm:text-6xl md:text-[5.5rem] font-bold tracking-tight leading-[1.05]">
@@ -91,8 +93,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            A powerful, self-hosted email platform built for modern brands.
-            Master your deliverability, automate your workflows, and own your audience data.
+            A powerful, self-hosted email platform with an AI Assistant that drafts your emails,
+            connects to any provider, and gives you full control over your deliverability and data.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
             <Link href="/login">
@@ -314,24 +316,33 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[280px]">
-            {/* Feature 1: Visual Automations — Large */}
+            {/* Feature 1: Visual Automations — Large (animated demo) */}
             <div className="md:col-span-2 bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-indigo-500/30 transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-              {/* Workflow Illustration */}
-              <div className="absolute top-6 right-6 w-[55%] h-full opacity-30 group-hover:opacity-70 transition-all duration-700 pointer-events-none">
+              {/* Workflow Illustration with sequential glow */}
+              <div className="absolute top-6 right-6 w-[55%] h-full opacity-60 group-hover:opacity-90 transition-all duration-700 pointer-events-none">
                 <div className="flex flex-col items-center gap-3 transform -rotate-3 scale-[0.85]">
                   {/* Trigger node */}
-                  <div className="bg-zinc-900/90 backdrop-blur border border-indigo-500/40 rounded-xl px-5 py-3 w-56 shadow-[0_0_20px_rgba(99,102,241,0.1)] flex items-center gap-3">
+                  <div
+                    className="bg-zinc-900/90 backdrop-blur border border-indigo-500/40 rounded-xl px-5 py-3 w-56 flex items-center gap-3 animate-node-glow"
+                    style={{ ["--node-glow-color" as string]: "rgba(99,102,241,0.55)" }}
+                  >
                     <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center"><Mail className="w-4 h-4 text-indigo-400" /></div>
                     <div><p className="text-[11px] font-medium text-white">New Subscriber</p><p className="text-[9px] text-zinc-500">Trigger → Welcome Flow</p></div>
                   </div>
-                  {/* Connector */}
+                  {/* Connector with flowing dot */}
                   <div className="relative h-6 w-0.5 bg-gradient-to-b from-indigo-500/60 to-emerald-500/60">
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-flow-dot" />
+                    <div
+                      className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-connector-flow animation-delay-300"
+                      style={{ boxShadow: "0 0 8px rgba(99,102,241,0.8)" }}
+                    />
                   </div>
                   {/* Wait node */}
-                  <div className="bg-zinc-900/90 backdrop-blur border border-amber-500/40 rounded-xl px-5 py-3 w-56 shadow-[0_0_20px_rgba(245,158,11,0.1)] flex items-center gap-3">
+                  <div
+                    className="bg-zinc-900/90 backdrop-blur border border-amber-500/40 rounded-xl px-5 py-3 w-56 flex items-center gap-3 animate-node-glow animation-delay-700"
+                    style={{ ["--node-glow-color" as string]: "rgba(245,158,11,0.55)" }}
+                  >
                     <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center"><Sparkles className="w-4 h-4 text-amber-400" /></div>
                     <div><p className="text-[11px] font-medium text-white">Wait 2 Days</p><p className="text-[9px] text-zinc-500">Delay → Then continue</p></div>
                   </div>
@@ -339,19 +350,31 @@ export default function Home() {
                   <div className="flex items-start gap-12 relative">
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-px bg-gradient-to-r from-emerald-500/60 to-emerald-500/60" />
                     <div className="h-5 w-0.5 bg-emerald-500/60 relative">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-flow-dot animation-delay-500" />
+                      <div
+                        className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-connector-flow animation-delay-1500"
+                        style={{ boxShadow: "0 0 8px rgba(16,185,129,0.8)" }}
+                      />
                     </div>
-                    <div className="h-5 w-0.5 bg-emerald-500/60 relative">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-flow-dot animation-delay-700" />
+                    <div className="h-5 w-0.5 bg-purple-500/60 relative">
+                      <div
+                        className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 animate-connector-flow animation-delay-1500"
+                        style={{ boxShadow: "0 0 8px rgba(168,85,247,0.8)" }}
+                      />
                     </div>
                   </div>
                   {/* Branch nodes */}
                   <div className="flex gap-4">
-                    <div className="bg-zinc-900/90 backdrop-blur border border-emerald-500/40 rounded-lg px-3 py-2 w-28 shadow-lg flex items-center gap-2">
+                    <div
+                      className="bg-zinc-900/90 backdrop-blur border border-emerald-500/40 rounded-lg px-3 py-2 w-28 flex items-center gap-2 animate-node-glow animation-delay-2000"
+                      style={{ ["--node-glow-color" as string]: "rgba(16,185,129,0.55)" }}
+                    >
                       <Send className="w-3.5 h-3.5 text-emerald-400" />
                       <span className="text-[10px] text-white font-medium">Send Email</span>
                     </div>
-                    <div className="bg-zinc-900/90 backdrop-blur border border-purple-500/40 rounded-lg px-3 py-2 w-28 shadow-lg flex items-center gap-2">
+                    <div
+                      className="bg-zinc-900/90 backdrop-blur border border-purple-500/40 rounded-lg px-3 py-2 w-28 flex items-center gap-2 animate-node-glow animation-delay-2500"
+                      style={{ ["--node-glow-color" as string]: "rgba(168,85,247,0.55)" }}
+                    >
                       <Zap className="w-3.5 h-3.5 text-purple-400" />
                       <span className="text-[10px] text-white font-medium">Add Tag</span>
                     </div>
@@ -359,12 +382,12 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="relative z-10 h-full flex flex-col justify-end">
+              <div className="relative z-10 h-full flex flex-col justify-end max-w-[42%]">
                 <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center mb-4">
                   <Workflow className="w-5 h-5 text-indigo-400" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">Visual Automations</h3>
-                <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">Build sophisticated drip campaigns with delays, conditional splits, and triggers. Put your subscriber engagement on autopilot.</p>
+                <p className="text-zinc-400 text-sm leading-relaxed">Build sophisticated drip campaigns with delays, conditional splits, and triggers. Put your subscriber engagement on autopilot.</p>
               </div>
             </div>
 
@@ -589,6 +612,105 @@ export default function Home() {
               </div>
               <div className="absolute bottom-0 right-0 w-28 h-28 bg-sky-500/10 blur-3xl rounded-full pointer-events-none" />
             </div>
+
+            {/* Feature 9: AI Assistant — Large (animated demo) */}
+            <div className="md:col-span-2 bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-fuchsia-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/[0.04] via-violet-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              {/* Animated AI demo */}
+              <div className="absolute top-6 right-6 w-[48%] pointer-events-none">
+                {/* Prompt box with typewriter effect */}
+                <div className="bg-zinc-900/90 backdrop-blur border border-fuchsia-500/30 rounded-lg px-3 py-2 shadow-[0_0_20px_rgba(217,70,239,0.1)] mb-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <WandSparkles className="w-3 h-3 text-fuchsia-400" />
+                    <span className="text-[9px] font-medium uppercase tracking-wider text-fuchsia-300/80">Prompt</span>
+                  </div>
+                  <div className="text-[11px] text-zinc-300 leading-tight relative">
+                    <span className="animate-ai-prompt inline-block whitespace-nowrap overflow-hidden">
+                      Welcome email for new subscribers
+                    </span>
+                    <span className="inline-block w-[2px] h-3 align-middle bg-fuchsia-400 ml-0.5 animate-ai-caret" />
+                  </div>
+                </div>
+
+                {/* Result chips that pop in sequentially each loop */}
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Draft generated · 6 blocks", icon: WandSparkles, ring: "border-fuchsia-500/30", iconClass: "text-fuchsia-400", delay: "animation-delay-1500" },
+                    { label: "5 subject ideas ready", icon: Sparkles, ring: "border-violet-500/30", iconClass: "text-violet-400", delay: "animation-delay-2500" },
+                    { label: "Pre-send review · 87/100", icon: ShieldCheck, ring: "border-emerald-500/30", iconClass: "text-emerald-400", delay: "animation-delay-3500" },
+                    { label: "Insights ready", icon: BarChart3, ring: "border-cyan-500/30", iconClass: "text-cyan-400", delay: "animation-delay-4500" },
+                  ].map((row, i) => (
+                    <div
+                      key={i}
+                      className={`animate-ai-chip ${row.delay} flex items-center gap-2 bg-zinc-900/90 backdrop-blur border ${row.ring} rounded-lg px-2.5 py-1.5`}
+                    >
+                      <row.icon className={`w-3 h-3 ${row.iconClass} flex-shrink-0`} />
+                      <span className="text-[10px] text-zinc-300 truncate">{row.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col justify-end max-w-[52%]">
+                <div className="w-11 h-11 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/20 flex items-center justify-center mb-4">
+                  <WandSparkles className="w-5 h-5 text-fuchsia-400" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">AI Assistant</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Generate full emails from a prompt, get subject line suggestions, run a pre-send review,
+                  and turn post-send stats into plain English. Powered by DeepSeek; off by default per brand.
+                </p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-40 h-40 bg-fuchsia-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Feature 10: Multi-Provider Email (animated demo) */}
+            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-teal-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              {/* Animated provider switching demo */}
+              <div className="absolute top-5 right-4 w-[58%] pointer-events-none">
+                {/* Sent indicator that pops near the active provider each cycle */}
+                <div className="relative h-3 mb-1">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className={`absolute top-0 text-[8px] font-bold text-emerald-400 animate-provider-sent`}
+                      style={{
+                        left: `${(i % 2) * 50 + 25}%`,
+                        top: `${Math.floor(i / 2) * 0}px`,
+                        animationDelay: `${i * 1.4}s`,
+                      }}
+                    >
+                      ✓ Sent
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {["SES", "Resend", "Postmark", "SendGrid", "Mailjet", "Elastic"].map((name, i) => (
+                    <div
+                      key={name}
+                      className="text-[9px] font-mono font-semibold px-2 py-1 rounded-md border animate-provider-light"
+                      style={{ animationDelay: `${i * 1.4}s` }}
+                    >
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-teal-500/15 border border-teal-500/20 flex items-center justify-center mb-4">
+                  <Network className="w-5 h-5 text-teal-400" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">Bring Your Own Provider</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Send through SES, Resend, Postmark, SendGrid, Mailjet, or Elastic Email — paste an API key and switch any time.
+                </p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-28 h-28 bg-teal-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
           </div>
         </div>
       </section>
@@ -620,8 +742,8 @@ export default function Home() {
                     <Zap className="w-5 h-5 text-indigo-400" />
                   </div>
                 </div>
-                <h3 className="text-lg font-bold mb-3">Connect Your SES</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">Link your Amazon SES account with one API key. We handle verification, reputation, and bounce management.</p>
+                <h3 className="text-lg font-bold mb-3">Pick Your Provider</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">Choose SES, Resend, Postmark, SendGrid, Mailjet, or Elastic Email. Paste an API key and you&apos;re sending — bounce and complaint webhooks included.</p>
               </div>
               <div className="hidden md:block absolute top-1/2 -right-3 w-6 h-px">
                 <div className="w-full h-full bg-gradient-to-r from-indigo-500/40 to-transparent" />
@@ -674,7 +796,7 @@ export default function Home() {
             Free forever. No catch.
           </h2>
           <p className="text-zinc-400 text-lg max-w-2xl mx-auto mb-12">
-            DakSend is fully open source and self-hosted. Pay only for your AWS SES usage — typically $0.10 per 1,000 emails.
+            DakSend is fully open source and self-hosted. Pay only for your email provider&apos;s usage — as low as $0.10 per 1,000 emails on SES.
           </p>
 
           <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-10 max-w-lg mx-auto hover:border-indigo-500/20 transition-all duration-500">
@@ -683,12 +805,13 @@ export default function Home() {
 
             <div className="space-y-3 text-left mb-8">
               {[
-                "Unlimited subscribers",
-                "Unlimited campaigns",
+                "Unlimited subscribers & campaigns",
+                "6 email providers: SES, Resend, Postmark, SendGrid, Mailjet, Elastic",
+                "AI Assistant: draft, subject lines, pre/post-send review",
                 "Visual automation builder",
                 "Custom landing pages & forms",
                 "Audience segmentation",
-                "Real-time analytics",
+                "Real-time analytics with CTOR",
                 "GDPR compliance tools",
                 "API & webhook integrations",
               ].map((feature, i) => (

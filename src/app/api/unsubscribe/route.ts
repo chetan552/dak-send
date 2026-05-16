@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/aws";
+import { getProvider } from "@/lib/email-provider/factory";
 import { dispatchWebhooks } from "@/lib/webhooks";
 import { redisRateLimit } from "@/lib/redis-rate-limit";
 
@@ -86,22 +86,17 @@ export async function GET(req: NextRequest) {
         if (list.goodbyeEmailHtml && list.brand.fromEmail) {
             try {
                 const brandName = list.brand.fromName || list.brand.name;
-                await sendEmail({
-                    FromEmailAddress: `${brandName} <${list.brand.fromEmail}>`,
-                    Destination: { ToAddresses: [subscriber!.email] },
-                    ReplyToAddresses: list.brand.replyTo ? [list.brand.replyTo] : [],
-                    Content: {
-                        Simple: {
-                            Subject: { Data: `You've been unsubscribed from ${list.name}` },
-                            Body: {
-                                Html: {
-                                    Data: list.goodbyeEmailHtml
-                                        .replace(/\[Name\]/gi, subscriber!.name || "Friend")
-                                        .replace(/\[Email\]/gi, subscriber!.email),
-                                },
-                            },
-                        },
-                    },
+                const html = list.goodbyeEmailHtml
+                    .replace(/\[Name\]/gi, subscriber!.name || "Friend")
+                    .replace(/\[Email\]/gi, subscriber!.email);
+                const provider = await getProvider();
+                await provider.send({
+                    from: { email: list.brand.fromEmail, name: brandName },
+                    to: { email: subscriber!.email, name: subscriber!.name || undefined },
+                    replyTo: list.brand.replyTo || undefined,
+                    subject: `You've been unsubscribed from ${list.name}`,
+                    html,
+                    text: "",
                 });
             } catch (emailError) {
                 console.error("Error sending goodbye email:", emailError);

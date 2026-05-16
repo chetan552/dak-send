@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/aws";
+import { getProvider } from "@/lib/email-provider/factory";
 import { randomBytes } from "crypto";
 import { dispatchWebhooks } from "@/lib/webhooks";
 import { redis } from "@/lib/queue";
@@ -207,17 +207,16 @@ export async function POST(req: NextRequest) {
             const confirmUrl = `${appUrl}/api/confirm?token=${token}`;
             const brandName = list.brand.fromName || list.brand.name;
 
-            try {
-                await sendEmail({
-                    FromEmailAddress: `${brandName} <${list.brand.fromEmail}>`,
-                    Destination: { ToAddresses: [email] },
-                    ReplyToAddresses: list.brand.replyTo ? [list.brand.replyTo] : [],
-                    Content: {
-                        Simple: {
-                            Subject: { Data: `Please confirm your subscription to ${list.name}` },
-                            Body: {
-                                Html: {
-                                    Data: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:2rem;">
+            if (!list.brand.fromEmail) {
+                console.warn(`Skipping confirmation email: brand ${list.brand.id} has no fromEmail`);
+            } else try {
+                const provider = await getProvider();
+                await provider.send({
+                    from: { email: list.brand.fromEmail, name: brandName },
+                    to: { email, name: name || undefined },
+                    replyTo: list.brand.replyTo || undefined,
+                    subject: `Please confirm your subscription to ${list.name}`,
+                    html: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:2rem;">
 <h2>Confirm your subscription</h2>
 <p>Hi ${name || "there"},</p>
 <p>Please confirm your subscription to <strong>${list.name}</strong> by clicking the button below:</p>
@@ -226,36 +225,28 @@ export async function POST(req: NextRequest) {
 </p>
 <p style="color:#666;font-size:0.875rem;">If you didn't request this, you can safely ignore this email.</p>
 <p style="color:#999;font-size:0.75rem;">This link expires in 48 hours.</p>
-</div>`
-                                }
-                            }
-                        }
-                    }
+</div>`,
+                    text: "",
                 });
             } catch (emailError) {
                 console.error("Error sending confirmation email:", emailError);
             }
         } else {
             // Single opt-in: send welcome email if configured
-            if (list.welcomeEmailHtml) {
+            if (list.welcomeEmailHtml && list.brand.fromEmail) {
                 try {
                     const brandName = list.brand.fromName || list.brand.name;
-                    await sendEmail({
-                        FromEmailAddress: `${brandName} <${list.brand.fromEmail}>`,
-                        Destination: { ToAddresses: [email] },
-                        ReplyToAddresses: list.brand.replyTo ? [list.brand.replyTo] : [],
-                        Content: {
-                            Simple: {
-                                Subject: { Data: `Welcome to ${list.name}!` },
-                                Body: {
-                                    Html: {
-                                        Data: list.welcomeEmailHtml
-                                            .replace(/\[Name\]/gi, name || "Friend")
-                                            .replace(/\[Email\]/gi, email)
-                                    }
-                                }
-                            }
-                        }
+                    const html = list.welcomeEmailHtml
+                        .replace(/\[Name\]/gi, name || "Friend")
+                        .replace(/\[Email\]/gi, email);
+                    const provider = await getProvider();
+                    await provider.send({
+                        from: { email: list.brand.fromEmail, name: brandName },
+                        to: { email, name: name || undefined },
+                        replyTo: list.brand.replyTo || undefined,
+                        subject: `Welcome to ${list.name}!`,
+                        html,
+                        text: "",
                     });
                 } catch (emailError) {
                     console.error("Error sending welcome email:", emailError);

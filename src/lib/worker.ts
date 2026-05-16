@@ -2,7 +2,8 @@ import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
 import cron from "node-cron";
 import { prisma } from "./prisma";
-import { sendEmail } from "./aws";
+import { getProvider } from "./email-provider/factory";
+import type { EmailMessage } from "./email-provider/types";
 import { incrementWarmupSent } from "./warmup";
 import { renderEmail, buildUnsubscribeHeaders } from "./email-render";
 
@@ -74,30 +75,27 @@ const startWorker = async () => {
                 brandFromEmail,
             );
 
-            const toAddress = subscriberName
-                ? `"${subscriberName.replace(/"/g, '\\"')}" <${subscriberEmail}>`
-                : subscriberEmail;
+            const automationHeaders: Record<string, string> = {
+                "List-Unsubscribe": listUnsubscribe,
+                "List-Unsubscribe-Post": listUnsubscribePost,
+                "Precedence": "bulk",
+            };
+            if (brandId) {
+                automationHeaders["Feedback-ID"] = `automation:${brandId}:daksend`;
+            }
 
-            await sendEmail({
-                FromEmailAddress: `${brandFromName} <${brandFromEmail}>`,
-                Destination: { ToAddresses: [toAddress] },
-                ReplyToAddresses: brandReplyTo ? [brandReplyTo] : [],
-                Content: {
-                    Simple: {
-                        Subject: { Data: subject },
-                        Body: {
-                            Html: { Data: rendered.html },
-                            Text: { Data: rendered.text },
-                        },
-                        Headers: [
-                            { Name: "List-Unsubscribe",      Value: listUnsubscribe },
-                            { Name: "List-Unsubscribe-Post", Value: listUnsubscribePost },
-                            { Name: "Precedence",            Value: "bulk" },
-                            ...(brandId ? [{ Name: "Feedback-ID", Value: `automation:${brandId}:daksend` }] : []),
-                        ],
-                    },
-                },
-            });
+            const automationMsg: EmailMessage = {
+                from: { email: brandFromEmail, name: brandFromName },
+                to: { email: subscriberEmail, name: subscriberName || undefined },
+                replyTo: brandReplyTo || undefined,
+                subject,
+                html: rendered.html,
+                text: rendered.text,
+                headers: automationHeaders,
+            };
+
+            const provider = await getProvider();
+            await provider.send(automationMsg);
 
             console.log(`Automation email sent to ${subscriberEmail}: "${subject}"`);
             return;
@@ -157,31 +155,27 @@ const startWorker = async () => {
         );
 
         try {
-            const toAddress = subscriberName
-                ? `"${subscriberName.replace(/"/g, '\\"')}" <${subscriberEmail}>`
-                : subscriberEmail;
-
-            await sendEmail({
-                FromEmailAddress: `${campaign.brand.fromName || campaign.brand.name} <${campaign.brand.fromEmail}>`,
-                Destination: { ToAddresses: [toAddress] },
-                ReplyToAddresses: campaign.brand.replyTo ? [campaign.brand.replyTo] : [],
-                Content: {
-                    Simple: {
-                        Subject: { Data: campaign.subject },
-                        Body: {
-                            Html: { Data: rendered.html },
-                            Text: { Data: rendered.text },
-                        },
-                        Headers: [
-                            { Name: "List-Unsubscribe",      Value: listUnsubscribe },
-                            { Name: "List-Unsubscribe-Post", Value: listUnsubscribePost },
-                            { Name: "Feedback-ID",           Value: `${campaignId}:${campaign.brandId}:campaign:daksend` },
-                            { Name: "Precedence",            Value: "bulk" },
-                        ],
-                    },
+            const campaignMsg: EmailMessage = {
+                from: {
+                    email: campaign.brand.fromEmail || "",
+                    name: campaign.brand.fromName || campaign.brand.name,
                 },
-                EmailTags: [{ Name: "campaign_id", Value: campaignId }],
-            });
+                to: { email: subscriberEmail, name: subscriberName || undefined },
+                replyTo: campaign.brand.replyTo || undefined,
+                subject: campaign.subject,
+                html: rendered.html,
+                text: rendered.text,
+                headers: {
+                    "List-Unsubscribe": listUnsubscribe,
+                    "List-Unsubscribe-Post": listUnsubscribePost,
+                    "Feedback-ID": `${campaignId}:${campaign.brandId}:campaign:daksend`,
+                    "Precedence": "bulk",
+                },
+                tags: { campaign_id: campaignId },
+            };
+
+            const provider = await getProvider();
+            await provider.send(campaignMsg);
 
             // Track against warmup daily limit (fire-and-forget, non-fatal)
             incrementWarmupSent(campaign.brandId).catch((e) =>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/aws";
+import { getProvider } from "@/lib/email-provider/factory";
 import { writeAuditLog } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
@@ -61,22 +61,17 @@ export async function GET(req: NextRequest) {
         if (list.welcomeEmailHtml && list.brand.fromEmail) {
             try {
                 const brandName = list.brand.fromName || list.brand.name;
-                await sendEmail({
-                    FromEmailAddress: `${brandName} <${list.brand.fromEmail}>`,
-                    Destination: { ToAddresses: [subToken.subscriber.email] },
-                    ReplyToAddresses: list.brand.replyTo ? [list.brand.replyTo] : [],
-                    Content: {
-                        Simple: {
-                            Subject: { Data: `Welcome to ${list.name}!` },
-                            Body: {
-                                Html: {
-                                    Data: list.welcomeEmailHtml
-                                        .replace(/\[Name\]/gi, subToken.subscriber.name || "Friend")
-                                        .replace(/\[Email\]/gi, subToken.subscriber.email)
-                                }
-                            }
-                        }
-                    }
+                const html = list.welcomeEmailHtml
+                    .replace(/\[Name\]/gi, subToken.subscriber.name || "Friend")
+                    .replace(/\[Email\]/gi, subToken.subscriber.email);
+                const provider = await getProvider();
+                await provider.send({
+                    from: { email: list.brand.fromEmail, name: brandName },
+                    to: { email: subToken.subscriber.email, name: subToken.subscriber.name || undefined },
+                    replyTo: list.brand.replyTo || undefined,
+                    subject: `Welcome to ${list.name}!`,
+                    html,
+                    text: "",
                 });
             } catch (emailError) {
                 console.error("Error sending welcome email:", emailError);
