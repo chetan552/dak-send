@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/aws";
+import { getProvider } from "@/lib/email-provider/factory";
 import bcrypt from "bcryptjs";
 
 // Transactional email API with API key auth
@@ -47,24 +47,24 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Brand not found or sender email not configured" }, { status: 404 });
         }
 
-        const emailParams: any = {
-            Source: `${brand.fromName || brand.name} <${brand.fromEmail}>`,
-            Destination: { ToAddresses: Array.isArray(to) ? to : [to] },
-            Message: {
-                Subject: { Data: subject },
-                Body: {
-                    Html: { Data: html },
-                    ...(text && { Text: { Data: text } })
-                }
-            },
-            ReplyToAddresses: replyTo ? [replyTo] : (brand.replyTo ? [brand.replyTo] : []),
-        };
+        const recipients: string[] = Array.isArray(to) ? to : [to];
+        const provider = await getProvider();
 
-        await sendEmail(emailParams);
+        // Send one message per recipient so each provider's per-recipient APIs work uniformly.
+        for (const recipient of recipients) {
+            await provider.send({
+                from: { email: brand.fromEmail, name: brand.fromName || brand.name },
+                to: { email: recipient },
+                replyTo: replyTo || brand.replyTo || undefined,
+                subject,
+                html,
+                text: text || "",
+            });
+        }
 
         return NextResponse.json({
             success: true,
-            message: `Email sent to ${Array.isArray(to) ? to.join(', ') : to}`
+            message: `Email sent to ${recipients.join(', ')}`
         });
 
     } catch (error: any) {

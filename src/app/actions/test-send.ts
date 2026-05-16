@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/aws";
+import { getProvider } from "@/lib/email-provider/factory";
 import { renderEmail, buildUnsubscribeHeaders } from "@/lib/email-render";
 
 export async function sendTestEmail(campaignId: string, testEmail: string) {
@@ -49,24 +49,19 @@ export async function sendTestEmail(campaignId: string, testEmail: string) {
         campaign.brand.fromEmail,
     );
 
-    await sendEmail({
-        FromEmailAddress: `${campaign.brand.fromName || campaign.brand.name} <${campaign.brand.fromEmail}>`,
-        Destination: { ToAddresses: [testEmail] },
-        ReplyToAddresses: campaign.brand.replyTo ? [campaign.brand.replyTo] : [],
-        Content: {
-            Simple: {
-                Subject: { Data: `[TEST] ${campaign.subject}` },
-                Body: {
-                    Html: { Data: rendered.html },
-                    Text: { Data: rendered.text },
-                },
-                Headers: [
-                    { Name: "List-Unsubscribe",      Value: listUnsubscribe },
-                    { Name: "List-Unsubscribe-Post", Value: listUnsubscribePost },
-                    { Name: "Precedence",            Value: "bulk" },
-                    { Name: "X-Test-Send",           Value: "true" },
-                ],
-            },
+    const provider = await getProvider();
+    await provider.send({
+        from: { email: campaign.brand.fromEmail, name: campaign.brand.fromName || campaign.brand.name },
+        to: { email: testEmail },
+        replyTo: campaign.brand.replyTo || undefined,
+        subject: `[TEST] ${campaign.subject}`,
+        html: rendered.html,
+        text: rendered.text,
+        headers: {
+            "List-Unsubscribe": listUnsubscribe,
+            "List-Unsubscribe-Post": listUnsubscribePost,
+            "Precedence": "bulk",
+            "X-Test-Send": "true",
         },
     });
 
