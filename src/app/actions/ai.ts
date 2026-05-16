@@ -4,6 +4,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { chatJson, AiUnavailableError } from "@/lib/ai/client";
+
+function aiErrorMessage(reason: AiUnavailableError["reason"]): string {
+    switch (reason) {
+        case "no_api_key":      return "AI provider is not configured. Pick a provider and add its API key in Settings → AI Assistant.";
+        case "no_base_url":     return "Custom AI provider needs a base URL. Set AI_CUSTOM_BASE_URL in Settings → AI Assistant.";
+        case "disabled_for_brand": return "AI is disabled for this brand.";
+        case "disabled_globally":  return "AI is disabled platform-wide.";
+    }
+}
 import { getAiAvailability, setBrandAiEnabled } from "@/lib/ai/config";
 import { revalidatePath } from "next/cache";
 import { htmlToText } from "html-to-text";
@@ -122,13 +131,7 @@ export async function reviewCampaign(campaignId: string): Promise<CampaignReview
                 : [],
         };
     } catch (err) {
-        if (err instanceof AiUnavailableError) {
-            throw new Error(
-                err.reason === "no_api_key"
-                    ? "DeepSeek API key is not configured."
-                    : "AI is disabled for this brand.",
-            );
-        }
+        if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
         throw err;
     }
 }
@@ -205,13 +208,7 @@ export async function summarizeCampaignResults(campaignId: string): Promise<Camp
             nextSteps: Array.isArray(result.nextSteps) ? result.nextSteps.filter((s) => typeof s === "string").slice(0, 5) : [],
         };
     } catch (err) {
-        if (err instanceof AiUnavailableError) {
-            throw new Error(
-                err.reason === "no_api_key"
-                    ? "DeepSeek API key is not configured."
-                    : "AI is disabled for this brand.",
-            );
-        }
+        if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
         throw err;
     }
 }
@@ -347,13 +344,7 @@ export async function generateEmailFromPrompt(input: {
             suggestedSubject: typeof result.subject === "string" ? result.subject : undefined,
         };
     } catch (err) {
-        if (err instanceof AiUnavailableError) {
-            throw new Error(
-                err.reason === "no_api_key"
-                    ? "DeepSeek API key is not configured."
-                    : "AI is disabled for this brand.",
-            );
-        }
+        if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
         throw err;
     }
 }
@@ -404,13 +395,7 @@ export async function generateSubjectLines(input: {
         if (suggestions.length === 0) throw new Error("No subject lines returned.");
         return { suggestions };
     } catch (err) {
-        if (err instanceof AiUnavailableError) {
-            throw new Error(
-                err.reason === "no_api_key"
-                    ? "DeepSeek API key is not configured. Set it in Settings."
-                    : "AI is disabled for this brand.",
-            );
-        }
+        if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
         throw err;
     }
 }

@@ -16,7 +16,7 @@ DakSend(In Hindi, "Dak" (डाक) primarily translates to "mail" or "post") is
 
 **Bring your own provider.** DakSend ships with six email transports out of the box — Amazon SES, Resend, Postmark, SendGrid, Mailjet, and Elastic Email. Switch any time from the Settings UI.
 
-**Optional AI Assistant.** A DeepSeek-powered assistant can draft full emails from a prompt, suggest subject lines, run a pre-send deliverability review, and turn post-send metrics into plain-English insights. Off by default; togglable per brand.
+**Optional AI Assistant.** A pluggable LLM assistant can draft full emails from a prompt, suggest subject lines, run a pre-send deliverability review, and turn post-send metrics into plain-English insights. Bring your own provider — OpenAI, OpenRouter, Groq, DeepSeek, or any OpenAI-compatible endpoint (Ollama, LiteLLM, Azure OpenAI). Off by default; togglable per brand.
 
 Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with a dedicated worker process that handles the hot path: personalization, CSS inlining, tracking injection, warmup enforcement, and email delivery.
 
@@ -44,14 +44,24 @@ DakSend speaks six provider APIs through a single `EmailProvider` interface. Pic
 
 ### AI Assistant
 
-Optional DeepSeek-powered assistant for four high-value tasks. Off globally by default; per-brand opt-out also available.
+Optional pluggable assistant for four high-value tasks. Off globally by default; per-brand opt-out also available.
 
 - **AI Email Generator** — describe an email in plain English, get a block-based draft with a suggested subject line; preview before inserting
 - **AI Subject Line Generator** — five subject line candidates tailored to the email body and audience hint
 - **AI Pre-Send Review** — runs your draft through a deliverability + clarity check; returns a score, severity-tagged warnings, and area-tagged suggestions
 - **AI Post-Send Insights** — turns opens, clicks, CTOR, bounces, and complaints into a plain-English narrative with strengths, risks, and next steps
 
-Configure once in **Settings → AI Assistant**: paste a `DEEPSEEK_API_KEY` and flip the global toggle. Each brand has its own opt-out pill on the brand page.
+**Bring your own LLM.** DakSend supports five provider modes through one OpenAI-compatible client:
+
+| Provider     | Default model              | Reasoning model (optional) | Notes                                                              |
+| ------------ | -------------------------- | -------------------------- | ------------------------------------------------------------------ |
+| **OpenAI**     | `gpt-4o-mini`              | configurable (e.g. `o4-mini`) | The default. Reliable. Hosted in the US.                       |
+| **OpenRouter** | `openai/gpt-4o-mini`       | configurable (e.g. `anthropic/claude-3.5-sonnet`) | One key, hundreds of models — Claude, Gemini, Llama, etc.    |
+| **Groq**       | `llama-3.1-70b-versatile`  | —                          | Very fast inference. No reasoning-tier model.                      |
+| **DeepSeek**   | `deepseek-chat`            | `deepseek-reasoner`        | Cheap, has a reasoner. API hosted in China — privacy note below.   |
+| **Custom**     | user-provided              | —                          | Any OpenAI-compatible endpoint (Ollama, LiteLLM, Azure OpenAI).    |
+
+Configure once in **Settings → AI Assistant**: pick a provider, paste its API key, flip the global toggle. Each brand has its own opt-out pill on the brand page. Existing installs that only set `DEEPSEEK_API_KEY` are auto-migrated to the DeepSeek provider on first read; no manual change needed.
 
 ### Subscriber & list management
 
@@ -148,7 +158,7 @@ Configure once in **Settings → AI Assistant**: paste a `DEEPSEEK_API_KEY` and 
 | Database        | PostgreSQL + Prisma ORM                                                              |
 | Queue           | BullMQ + Redis                                                                       |
 | Email           | SES v2 · Resend · Postmark · SendGrid · Mailjet · Elastic Email (pick one)           |
-| AI (optional)   | DeepSeek via OpenAI-compatible API                                                   |
+| AI (optional)   | OpenAI · OpenRouter · Groq · DeepSeek · Custom (any OpenAI-compatible endpoint)      |
 | Auth            | NextAuth.js (Credentials provider, JWT sessions)                                     |
 | 2FA             | otplib (TOTP) + qrcode                                                               |
 | Email rendering | cheerio (DOM), juice (CSS inliner), html-to-text                                     |
@@ -191,7 +201,7 @@ The worker process (`npm run worker`) is **required** alongside the web server �
 - **PostgreSQL** 14+ (Neon, Supabase, RDS, or self-hosted)
 - **Redis** 6+ (for the BullMQ queue)
 - **An email provider account** with a verified sender identity — DakSend supports Amazon SES, Resend, Postmark, SendGrid, Mailjet, or Elastic Email
-- **Optional:** a [DeepSeek](https://platform.deepseek.com) API key to enable the AI Assistant
+- **Optional:** an LLM API key to enable the AI Assistant — OpenAI, OpenRouter, Groq, DeepSeek, or any OpenAI-compatible endpoint
 
 ---
 
@@ -266,8 +276,15 @@ AWS_SECRET_ACCESS_KEY="your-secret-key"
 # Elastic Email (if EMAIL_PROVIDER=elastic)
 # ELASTIC_API_KEY="..."
 
-# Optional: DeepSeek AI Assistant
+# Optional: AI Assistant — pick one provider
+# LLM_PROVIDER="openai"   # openai | openrouter | groq | deepseek | custom
+# OPENAI_API_KEY="sk-..."
+# OPENROUTER_API_KEY="sk-or-..."
+# GROQ_API_KEY="gsk_..."
 # DEEPSEEK_API_KEY="sk-..."
+# AI_CUSTOM_BASE_URL="https://your-proxy.example.com/v1"
+# AI_CUSTOM_API_KEY="..."
+# AI_CUSTOM_MODEL="your-model"
 ```
 
 ### 4. Migrate the database
@@ -510,7 +527,7 @@ pm2 start ecosystem.config.js
 - [ ] Worker process running (`pm2 ls`)
 - [ ] Cron endpoints scheduled (including `/api/cron/retention` for data retention)
 - [ ] Provider webhook URL (`/api/webhooks/{provider}`) configured in the provider's dashboard for bounce/complaint processing
-- [ ] If using AI Assistant: `DEEPSEEK_API_KEY` set and global toggle on in Settings
+- [ ] If using AI Assistant: provider picked, API key set, and global toggle on in Settings → AI Assistant
 
 ---
 
@@ -636,19 +653,33 @@ DakSend wraps every link through `/api/track/click` and injects its own open pix
 
 **Q: How do I enable the AI Assistant?**
 
-1. Get a [DeepSeek](https://platform.deepseek.com) API key
-2. **Settings → AI Assistant** → paste the key and check "Enable AI features platform-wide"
+1. Pick an LLM provider — OpenAI, OpenRouter, Groq, DeepSeek, or a Custom OpenAI-compatible endpoint
+2. **Settings → AI Assistant** → click the provider tile, paste its API key, and check "Enable AI features platform-wide"
 3. Each brand can opt out via the AI pill on its brand page
 
 The four features (Generate email, Subject lines, Pre-send review, Post-send insights) appear automatically on the relevant pages once enabled.
 
+**Q: Which LLM provider should I pick?**
+
+| Pick           | When                                                                                |
+| -------------- | ----------------------------------------------------------------------------------- |
+| **OpenAI**     | The default. Reliable, hosted in the US. Use `gpt-4o-mini` for cost.                |
+| **OpenRouter** | You want to A/B different models (Claude, Llama, Gemini) without juggling API keys. |
+| **Groq**       | You care about latency. Llama 3.1 70B responds in a few seconds.                    |
+| **DeepSeek**   | You want the lowest cost and don't mind the API being hosted in China.              |
+| **Custom**     | Self-hosted Ollama, LiteLLM gateway, Azure OpenAI, or any OpenAI-compatible proxy.  |
+
 **Q: Where does my campaign data go when I use the AI Assistant?**
 
-DeepSeek's API is hosted in China. Email body text + stats are sent only when an AI button is clicked. If that's not acceptable for a particular brand, leave the brand-level AI toggle off — global toggle on, brand toggle off means no AI calls for that brand.
+To the LLM provider you picked. Email body text + campaign stats are sent only when an AI button is clicked — no background calls. If a brand has privacy concerns with a particular provider (e.g. DeepSeek's API runs in China), leave the brand-level AI toggle off — global toggle on, brand toggle off means no AI calls for that brand.
 
-**Q: Can I use a different LLM provider instead of DeepSeek?**
+**Q: Can I run the LLM locally with Ollama?**
 
-The AI client in [src/lib/ai/client.ts](src/lib/ai/client.ts) uses an OpenAI-compatible chat endpoint. You can point it at any OpenAI-compatible API (OpenAI, Anthropic via a proxy, OpenRouter, a local Ollama, etc.) by changing the `BASE_URL` constant and the `DEEPSEEK_API_KEY` env var.
+Yes. Pick the **Custom** provider, set `AI_CUSTOM_BASE_URL` to your Ollama endpoint (e.g. `http://localhost:11434/v1`), set `AI_CUSTOM_API_KEY` to any non-empty placeholder (Ollama ignores it), and set `AI_CUSTOM_MODEL` to the local model you have pulled (e.g. `llama3.1:70b`). Same for LiteLLM proxies and Azure OpenAI deployments — point the base URL at your endpoint.
+
+**Q: I already had DeepSeek configured. Do I need to migrate?**
+
+No. Installs with `DEEPSEEK_API_KEY` set but no `LLM_PROVIDER` setting are auto-detected as DeepSeek on first read. You can switch in the Settings UI any time without losing the existing key.
 
 ### AWS SES
 

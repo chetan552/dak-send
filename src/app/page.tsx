@@ -279,16 +279,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Social Proof Bar */}
+      {/* Product fact bar */}
       <section className="py-16 px-6 border-y border-white/[0.04]">
         <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm text-zinc-500 mb-8 uppercase tracking-wider font-medium">Trusted by forward-thinking teams everywhere</p>
+          <p className="text-sm text-zinc-500 mb-8 uppercase tracking-wider font-medium">Everything you need, out of the box</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { label: "Emails Sent", value: "10M+", icon: Send },
-              { label: "Active Brands", value: "2,500+", icon: Globe },
-              { label: "Avg Open Rate", value: "46%", icon: Mail },
-              { label: "Uptime", value: "99.9%", icon: ShieldCheck },
+              { label: "Email providers", value: "6", icon: Network },
+              { label: "LLM providers", value: "5", icon: Sparkles },
+              { label: "Block types in the editor", value: "8", icon: Layers },
+              { label: "MIT licensed", value: "$0", icon: ShieldCheck },
             ].map((item, i) => (
               <div key={i} className="flex flex-col items-center gap-2 group">
                 <item.icon className="w-5 h-5 text-zinc-600 group-hover:text-indigo-400 transition-colors" />
@@ -659,7 +659,8 @@ export default function Home() {
                 <h3 className="text-xl font-bold mb-2">AI Assistant</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed">
                   Generate full emails from a prompt, get subject line suggestions, run a pre-send review,
-                  and turn post-send stats into plain English. Powered by DeepSeek; off by default per brand.
+                  and turn post-send stats into plain English. Bring your own LLM &mdash; OpenAI, OpenRouter,
+                  Groq, DeepSeek, or any OpenAI-compatible endpoint.
                 </p>
               </div>
               <div className="absolute bottom-0 right-0 w-40 h-40 bg-fuchsia-500/10 blur-3xl rounded-full pointer-events-none" />
