@@ -2,9 +2,9 @@
 
 <img src="public/logo.svg" alt="DakSend" width="220" />
 
-**The self-hosted email platform for teams who care about deliverability, data ownership, and price.**
+**The self-hosted email platform for teams who care about deliverability, data ownership, and price. Now with an AI Assistant and six email providers.**
 
-[Features](#features) · [Quick Start](#quick-start) · [REST API](#rest-api-v1) · [n8n Integration](#n8n-integration) · [Deployment](#deployment) · [Q&A Setup Guide](#qa-setup-guide) · [RSS Digest for Drupal](#rss-digest-for-drupal-or-any-cms)
+[Features](#features) · [Email Providers](#email-providers) · [AI Assistant](#ai-assistant) · [Quick Start](#quick-start) · [REST API](#rest-api-v1) · [n8n Integration](#n8n-integration) · [Deployment](#deployment) · [Q&A Setup Guide](#qa-setup-guide)
 
 </div>
 
@@ -12,13 +12,46 @@
 
 ## Overview
 
-DakSend is a production-ready, self-hosted email newsletter and marketing automation platform built on top of Amazon SES. It gives you a modern dashboard for managing multi-brand subscriber lists, campaigns, drip automations, landing pages, and transactional email — at a fraction of the cost of hosted alternatives like Mailchimp, ConvertKit, or Klaviyo.
+DakSend is a production-ready, self-hosted email newsletter and marketing automation platform. It gives you a modern dashboard for managing multi-brand subscriber lists, campaigns, drip automations, landing pages, and transactional email — at a fraction of the cost of hosted alternatives like Mailchimp, ConvertKit, or Klaviyo.
 
-Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with a dedicated worker process that handles the hot path: personalization, CSS inlining, tracking injection, warmup enforcement, and SES delivery.
+**Bring your own provider.** DakSend ships with six email transports out of the box — Amazon SES, Resend, Postmark, SendGrid, Mailjet, and Elastic Email. Switch any time from the Settings UI.
+
+**Optional AI Assistant.** A DeepSeek-powered assistant can draft full emails from a prompt, suggest subject lines, run a pre-send deliverability review, and turn post-send metrics into plain-English insights. Off by default; togglable per brand.
+
+Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with a dedicated worker process that handles the hot path: personalization, CSS inlining, tracking injection, warmup enforcement, and email delivery.
 
 ---
 
 ## Features
+
+### Email Providers
+
+DakSend speaks six provider APIs through a single `EmailProvider` interface. Pick one in **Dashboard → Settings → Email Provider**, paste credentials, copy the displayed webhook URL into the provider's dashboard, and you're sending.
+
+| Provider           | Send API                     | Webhook auth                  | Status check                  |
+| ------------------ | ---------------------------- | ----------------------------- | ----------------------------- |
+| **Amazon SES**     | SES v2 SDK                   | SNS signature (HMAC + cert)   | `GetSendQuota` daily quota    |
+| **Resend**         | REST `/emails`               | Svix HMAC-SHA256              | `/domains` ping               |
+| **Postmark**       | REST `/email` (broadcast)    | Optional HTTP Basic Auth      | `/server` token check         |
+| **SendGrid**       | REST `/v3/mail/send`         | Twilio ECDSA + timestamp      | `/user/credits` quota         |
+| **Mailjet**        | REST `/v3.1/send`            | Optional `?token=` shared secret | `/myprofile` credentials check |
+| **Elastic Email**  | REST `/v4/emails`            | Optional `?token=` shared secret | `/security/credit` quota   |
+
+- Provider-side open/click tracking is **disabled** on every transport — DakSend's pixel and link rewriter remain the single source of truth for analytics
+- Bounce and complaint events from any provider normalize to the same internal model and feed the suppression list automatically
+- Sidebar status pill reflects the active provider's health (Healthy / Near limit / At limit / Sandbox / Auth failed)
+- All credentials live in the `Setting` table — no schema migration needed to switch
+
+### AI Assistant
+
+Optional DeepSeek-powered assistant for four high-value tasks. Off globally by default; per-brand opt-out also available.
+
+- **AI Email Generator** — describe an email in plain English, get a block-based draft with a suggested subject line; preview before inserting
+- **AI Subject Line Generator** — five subject line candidates tailored to the email body and audience hint
+- **AI Pre-Send Review** — runs your draft through a deliverability + clarity check; returns a score, severity-tagged warnings, and area-tagged suggestions
+- **AI Post-Send Insights** — turns opens, clicks, CTOR, bounces, and complaints into a plain-English narrative with strengths, risks, and next steps
+
+Configure once in **Settings → AI Assistant**: paste a `DEEPSEEK_API_KEY` and flip the global toggle. Each brand has its own opt-out pill on the brand page.
 
 ### Subscriber & list management
 
@@ -57,8 +90,8 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 - **`Precedence: bulk` header** — correctly classifies campaigns as bulk mail to mailbox providers
 - **Domain warmup** — 14-day ramp-up schedule that enforces daily send caps with automatic campaign truncation
 - **Deliverability dashboard** — per-brand subscriber health breakdown (subscribed / unsubscribed / bounced / complained counts) with color-coded bounce and complaint rate badges against industry thresholds; recent issues log
-- **Suppression list** — global and brand-scoped suppression entries; hard bounces are auto-suppressed globally, complaints are auto-suppressed per brand via SES notifications; manual add/remove with reason and note; suppressed addresses are filtered at dispatch time even if still subscribed
-- **Bounce & complaint handling** — SES → SNS webhooks with HMAC signature verification; brand-scoped complaint routing via email tags; auto-populates suppression list
+- **Suppression list** — global and brand-scoped suppression entries; hard bounces are auto-suppressed globally, complaints are auto-suppressed per brand; manual add/remove with reason and note; suppressed addresses are filtered at dispatch time even if still subscribed
+- **Provider-agnostic bounce & complaint handling** — every supported provider posts to its own `/api/webhooks/<provider>` route, parses into a normalized event, and feeds the same shared handler; soft bounces are tracked but not auto-suppressed
 - **Resubscribe** — one-click resubscribe for any unsubscribed/bounced/complained subscriber; clears brand-scoped suppression and `pausedUntil` in one action; warns if a global suppression still blocks delivery
 
 ### Tracking & analytics
@@ -114,7 +147,8 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 | Framework       | Next.js (App Router, React Server Components)                                        |
 | Database        | PostgreSQL + Prisma ORM                                                              |
 | Queue           | BullMQ + Redis                                                                       |
-| Email           | Amazon SES v2                                                                        |
+| Email           | SES v2 · Resend · Postmark · SendGrid · Mailjet · Elastic Email (pick one)           |
+| AI (optional)   | DeepSeek via OpenAI-compatible API                                                   |
 | Auth            | NextAuth.js (Credentials provider, JWT sessions)                                     |
 | 2FA             | otplib (TOTP) + qrcode                                                               |
 | Email rendering | cheerio (DOM), juice (CSS inliner), html-to-text                                     |
@@ -136,16 +170,18 @@ User action (UI)
                                                          ├─ CSS inlining (juice)
                                                          ├─ Tracking pixel + click rewrites
                                                          └─ Plain-text generation
-                                                 ─►  AWS SES (multipart/alternative)
+                                                 ─►  getProvider().send()
+                                                         └─ SES / Resend / Postmark /
+                                                            SendGrid / Mailjet / Elastic
                                                  ─►  Warmup counter
                                                  ─►  Outgoing webhook dispatch
 
 External events
-  └─► SES/SNS  ─►  /api/webhooks/ses  ─►  Bounce/complaint suppression
-  └─► Cron     ─►  /api/cron/*         ─►  Scheduled campaigns, RSS polling, automations
+  └─► Provider webhooks  ─►  /api/webhooks/{provider}  ─►  Normalize → suppression
+  └─► Cron               ─►  /api/cron/*                ─►  Scheduled campaigns, RSS, automations
 ```
 
-The worker process (`npm run worker`) is **required** alongside the web server — it drains the BullMQ queue, handles rendering, and sends through SES. Without it, queued emails will sit idle.
+The worker process (`npm run worker`) is **required** alongside the web server — it drains the BullMQ queue, handles rendering, and delivers through the active provider. Without it, queued emails will sit idle.
 
 ---
 
@@ -154,7 +190,8 @@ The worker process (`npm run worker`) is **required** alongside the web server �
 - **Node.js** 20 or newer
 - **PostgreSQL** 14+ (Neon, Supabase, RDS, or self-hosted)
 - **Redis** 6+ (for the BullMQ queue)
-- **AWS SES account** with a verified sender identity
+- **An email provider account** with a verified sender identity — DakSend supports Amazon SES, Resend, Postmark, SendGrid, Mailjet, or Elastic Email
+- **Optional:** a [DeepSeek](https://platform.deepseek.com) API key to enable the AI Assistant
 
 ---
 
@@ -202,10 +239,35 @@ REDIS_URL="redis://localhost:6379"
 # Cron security (required for /api/cron/* endpoints)
 CRON_SECRET="$(openssl rand -hex 24)"
 
-# AWS SES — optional here, can also be set per-brand via the UI
+# Email provider — pick one. All credentials can also be set in the UI later.
+EMAIL_PROVIDER="ses"   # ses | resend | postmark | sendgrid | mailjet | elastic
+
+# Amazon SES (if EMAIL_PROVIDER=ses)
 AWS_REGION="us-east-1"
 AWS_ACCESS_KEY_ID="your-access-key"
 AWS_SECRET_ACCESS_KEY="your-secret-key"
+
+# Resend (if EMAIL_PROVIDER=resend)
+# RESEND_API_KEY="re_..."
+# RESEND_WEBHOOK_SECRET="whsec_..."
+
+# Postmark (if EMAIL_PROVIDER=postmark)
+# POSTMARK_SERVER_TOKEN="..."
+# POSTMARK_MESSAGE_STREAM="broadcast"
+
+# SendGrid (if EMAIL_PROVIDER=sendgrid)
+# SENDGRID_API_KEY="SG..."
+# SENDGRID_WEBHOOK_PUBLIC_KEY="-----BEGIN PUBLIC KEY----- ..."
+
+# Mailjet (if EMAIL_PROVIDER=mailjet)
+# MAILJET_API_KEY="..."
+# MAILJET_API_SECRET="..."
+
+# Elastic Email (if EMAIL_PROVIDER=elastic)
+# ELASTIC_API_KEY="..."
+
+# Optional: DeepSeek AI Assistant
+# DEEPSEEK_API_KEY="sk-..."
 ```
 
 ### 4. Migrate the database
@@ -316,15 +378,20 @@ curl -X POST https://your-domain.com/api/subscribe \
   }'
 ```
 
-### SES bounce / complaint handler
+### Bounce / complaint webhooks
 
-Point your SES → SNS topic at:
+Each provider posts to its own webhook route. Configure the URL displayed in **Settings → Email Provider** in your provider's dashboard:
 
-```
-POST https://your-domain.com/api/webhooks/ses
-```
+| Provider     | Webhook URL                                  |
+| ------------ | -------------------------------------------- |
+| Amazon SES   | `POST /api/webhooks/ses` (via SNS topic)     |
+| Resend       | `POST /api/webhooks/resend`                  |
+| Postmark     | `POST /api/webhooks/postmark`                |
+| SendGrid     | `POST /api/webhooks/sendgrid`                |
+| Mailjet      | `POST /api/webhooks/mailjet?token=<secret>`  |
+| Elastic Email| `POST /api/webhooks/elastic?token=<secret>`  |
 
-SNS signature verification is enforced. Hard bounces mark the subscriber globally and add a global suppression entry; complaints are scoped to the originating brand via the `campaign_id` email tag and add a brand-scoped suppression entry. Both are visible in the Deliverability dashboard.
+Each route verifies the provider's signature/secret (when configured), parses the payload, and runs the normalized event through a shared handler: hard bounces mark the subscriber globally and add a global suppression entry; complaints are scoped to the originating brand via the `campaign_id` correlation tag and add a brand-scoped suppression entry. Both are visible in the Deliverability dashboard.
 
 ---
 
@@ -438,11 +505,12 @@ pm2 start ecosystem.config.js
 - [ ] Redis reachable from both web and worker processes
 - [ ] `NEXTAUTH_SECRET` and `CRON_SECRET` set to strong random values (`openssl rand -base64 32`)
 - [ ] `NEXT_PUBLIC_APP_URL` matches the production domain (embedded in all tracking + unsubscribe links)
-- [ ] SES sender domain verified with SPF, DKIM, and DMARC records
-- [ ] SES production access requested (out of sandbox)
+- [ ] Sender domain verified with SPF, DKIM, and DMARC records (every provider needs this)
+- [ ] Provider account out of any sandbox / sending-limited mode (e.g. SES production access requested, Postmark "approved sender", etc.)
 - [ ] Worker process running (`pm2 ls`)
 - [ ] Cron endpoints scheduled (including `/api/cron/retention` for data retention)
-- [ ] SNS topic pointing to `/api/webhooks/ses` for bounce/complaint processing
+- [ ] Provider webhook URL (`/api/webhooks/{provider}`) configured in the provider's dashboard for bounce/complaint processing
+- [ ] If using AI Assistant: `DEEPSEEK_API_KEY` set and global toggle on in Settings
 
 ---
 
@@ -532,6 +600,55 @@ npm run lint         # Run ESLint
 ---
 
 ## Q&A Setup Guide
+
+### Email providers
+
+**Q: How do I choose between SES, Resend, Postmark, SendGrid, Mailjet, and Elastic Email?**
+
+Rough rules of thumb:
+
+| Pick                  | When                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------- |
+| **Amazon SES**        | High volume (>100k/mo), comfortable with AWS, want the lowest cost (~$0.10/1k)         |
+| **Resend**            | Want the fastest setup, modern API, painless DNS                                       |
+| **Postmark**          | Premium deliverability for transactional + broadcast, willing to pay for it            |
+| **SendGrid**          | Enterprise-friendly, mature ecosystem, need long-standing IP reputation                |
+| **Mailjet**           | EU data residency, balanced price/performance                                          |
+| **Elastic Email**     | Pay-as-you-go, smallest volume tier, no monthly minimums                               |
+
+You can switch any time in **Settings → Email Provider** — no schema migration, no downtime, just paste the new credentials and save.
+
+**Q: How do I switch providers later?**
+
+1. **Settings → Email Provider** → click the new provider tile
+2. Paste API key + any provider-specific fields
+3. Copy the displayed webhook URL into your new provider's dashboard
+4. Verify the same sender domain in the new provider (SPF/DKIM)
+5. Click **Save Provider** — the next outgoing email goes through the new transport
+
+Old webhook routes from the previous provider keep working (they still parse incoming bounce/complaint events for legacy in-flight messages). The suppression list and analytics are provider-agnostic and carry over.
+
+**Q: Why is provider-side open/click tracking disabled?**
+
+DakSend wraps every link through `/api/track/click` and injects its own open pixel so analytics stay consistent across providers. If both DakSend and the provider tracked clicks, every link would be double-wrapped and the provider's redirect would fire first — making DakSend's per-link CTOR data wrong. Each provider integration explicitly disables the provider's tracking flags.
+
+### AI Assistant
+
+**Q: How do I enable the AI Assistant?**
+
+1. Get a [DeepSeek](https://platform.deepseek.com) API key
+2. **Settings → AI Assistant** → paste the key and check "Enable AI features platform-wide"
+3. Each brand can opt out via the AI pill on its brand page
+
+The four features (Generate email, Subject lines, Pre-send review, Post-send insights) appear automatically on the relevant pages once enabled.
+
+**Q: Where does my campaign data go when I use the AI Assistant?**
+
+DeepSeek's API is hosted in China. Email body text + stats are sent only when an AI button is clicked. If that's not acceptable for a particular brand, leave the brand-level AI toggle off — global toggle on, brand toggle off means no AI calls for that brand.
+
+**Q: Can I use a different LLM provider instead of DeepSeek?**
+
+The AI client in [src/lib/ai/client.ts](src/lib/ai/client.ts) uses an OpenAI-compatible chat endpoint. You can point it at any OpenAI-compatible API (OpenAI, Anthropic via a proxy, OpenRouter, a local Ollama, etc.) by changing the `BASE_URL` constant and the `DEEPSEEK_API_KEY` env var.
 
 ### AWS SES
 

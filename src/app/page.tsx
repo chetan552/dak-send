@@ -17,6 +17,8 @@ import {
   Users,
   Workflow,
   Zap,
+  Network,
+  WandSparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -78,7 +80,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto text-center space-y-8 animate-slide-up">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] text-sm text-indigo-300 backdrop-blur-md">
             <Sparkles className="w-4 h-4" />
-            <span>The open-source email platform</span>
+            <span>New: AI Assistant &amp; 6 email providers</span>
             <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
           </div>
           <h1 className="text-5xl sm:text-6xl md:text-[5.5rem] font-bold tracking-tight leading-[1.05]">
@@ -91,8 +93,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            A powerful, self-hosted email platform built for modern brands.
-            Master your deliverability, automate your workflows, and own your audience data.
+            A powerful, self-hosted email platform with an AI Assistant that drafts your emails,
+            connects to any provider, and gives you full control over your deliverability and data.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
             <Link href="/login">
@@ -589,6 +591,74 @@ export default function Home() {
               </div>
               <div className="absolute bottom-0 right-0 w-28 h-28 bg-sky-500/10 blur-3xl rounded-full pointer-events-none" />
             </div>
+
+            {/* Feature 9: AI Assistant — Large */}
+            <div className="md:col-span-2 bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-fuchsia-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/[0.04] via-violet-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              {/* AI tool chips illustration */}
+              <div className="absolute top-6 right-8 w-[45%] space-y-2 opacity-30 group-hover:opacity-70 transition-all duration-700 pointer-events-none">
+                {[
+                  { label: "Draft this email", icon: WandSparkles, iconClass: "text-fuchsia-400" },
+                  { label: "5 subject line ideas", icon: Sparkles, iconClass: "text-violet-400" },
+                  { label: "Pre-send review · score 87", icon: ShieldCheck, iconClass: "text-emerald-400" },
+                  { label: "Post-send insights", icon: BarChart3, iconClass: "text-cyan-400" },
+                ].map((row, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 bg-zinc-900/90 backdrop-blur border border-white/[0.08] rounded-lg px-3 py-2 shadow-[0_0_20px_rgba(217,70,239,0.05)]"
+                    style={{ transform: `translateX(${i * 6}px)` }}
+                  >
+                    <row.icon className={`w-3.5 h-3.5 ${row.iconClass} flex-shrink-0`} />
+                    <span className="text-[10px] text-zinc-300 truncate">{row.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/20 flex items-center justify-center mb-4">
+                  <WandSparkles className="w-5 h-5 text-fuchsia-400" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">AI Assistant</h3>
+                <p className="text-zinc-400 text-sm max-w-sm leading-relaxed">
+                  Generate full emails from a prompt, get subject line suggestions, run a pre-send review,
+                  and turn post-send stats into plain English. Powered by DeepSeek; off by default per brand.
+                </p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-40 h-40 bg-fuchsia-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Feature 10: Multi-Provider Email */}
+            <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden group hover:border-teal-500/30 transition-all duration-500">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+              {/* Provider chips */}
+              <div className="absolute top-6 right-4 grid grid-cols-2 gap-1.5 opacity-25 group-hover:opacity-60 transition-all duration-700 pointer-events-none">
+                {["SES", "Resend", "Postmark", "SendGrid", "Mailjet", "Elastic"].map((name, i) => (
+                  <div
+                    key={name}
+                    className={`text-[9px] font-mono font-semibold px-2 py-1 rounded-md border ${
+                      i === 0
+                        ? "bg-teal-500/25 border-teal-400/40 text-teal-200"
+                        : "bg-zinc-800/60 border-zinc-700/50 text-zinc-400"
+                    }`}
+                  >
+                    {name}
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative z-10 h-full flex flex-col justify-end">
+                <div className="w-11 h-11 rounded-xl bg-teal-500/15 border border-teal-500/20 flex items-center justify-center mb-4">
+                  <Network className="w-5 h-5 text-teal-400" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">Bring Your Own Provider</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Send through SES, Resend, Postmark, SendGrid, Mailjet, or Elastic Email — paste an API key and switch any time.
+                </p>
+              </div>
+              <div className="absolute bottom-0 right-0 w-28 h-28 bg-teal-500/10 blur-3xl rounded-full pointer-events-none" />
+            </div>
           </div>
         </div>
       </section>
@@ -620,8 +690,8 @@ export default function Home() {
                     <Zap className="w-5 h-5 text-indigo-400" />
                   </div>
                 </div>
-                <h3 className="text-lg font-bold mb-3">Connect Your SES</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">Link your Amazon SES account with one API key. We handle verification, reputation, and bounce management.</p>
+                <h3 className="text-lg font-bold mb-3">Pick Your Provider</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">Choose SES, Resend, Postmark, SendGrid, Mailjet, or Elastic Email. Paste an API key and you&apos;re sending — bounce and complaint webhooks included.</p>
               </div>
               <div className="hidden md:block absolute top-1/2 -right-3 w-6 h-px">
                 <div className="w-full h-full bg-gradient-to-r from-indigo-500/40 to-transparent" />
@@ -674,7 +744,7 @@ export default function Home() {
             Free forever. No catch.
           </h2>
           <p className="text-zinc-400 text-lg max-w-2xl mx-auto mb-12">
-            DakSend is fully open source and self-hosted. Pay only for your AWS SES usage — typically $0.10 per 1,000 emails.
+            DakSend is fully open source and self-hosted. Pay only for your email provider&apos;s usage — as low as $0.10 per 1,000 emails on SES.
           </p>
 
           <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border border-white/[0.06] rounded-2xl p-10 max-w-lg mx-auto hover:border-indigo-500/20 transition-all duration-500">
@@ -683,12 +753,13 @@ export default function Home() {
 
             <div className="space-y-3 text-left mb-8">
               {[
-                "Unlimited subscribers",
-                "Unlimited campaigns",
+                "Unlimited subscribers & campaigns",
+                "6 email providers: SES, Resend, Postmark, SendGrid, Mailjet, Elastic",
+                "AI Assistant: draft, subject lines, pre/post-send review",
                 "Visual automation builder",
                 "Custom landing pages & forms",
                 "Audience segmentation",
-                "Real-time analytics",
+                "Real-time analytics with CTOR",
                 "GDPR compliance tools",
                 "API & webhook integrations",
               ].map((feature, i) => (
