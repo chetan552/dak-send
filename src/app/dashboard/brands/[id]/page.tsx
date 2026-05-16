@@ -9,6 +9,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BrandSettingsButton } from "@/components/brand/brand-settings-button";
 import { DeleteBrandButton } from "@/components/brand/delete-brand-button";
+import { BrandAiToggle } from "@/components/brand/brand-ai-toggle";
+import { isAiEnabledGlobal, isAiEnabledForBrand } from "@/lib/ai/config";
 
 export default async function BrandPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -34,6 +36,11 @@ export default async function BrandPage({ params }: { params: Promise<{ id: stri
         notFound();
     }
 
+    const [aiGlobal, aiForBrand] = await Promise.all([
+        isAiEnabledGlobal(),
+        isAiEnabledForBrand(brand.id),
+    ]);
+
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center gap-4 text-zinc-500 dark:text-zinc-400 mb-2">
@@ -48,6 +55,7 @@ export default async function BrandPage({ params }: { params: Promise<{ id: stri
                     <p className="page-subtitle">Manage all mailing lists associated with this brand.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
+                    <BrandAiToggle brandId={brand.id} initialEnabled={aiForBrand} aiAvailableGlobally={aiGlobal} />
                     {currentUserRole === 'admin' && <DeleteBrandButton brandId={brand.id} brandName={brand.name} />}
                     <BrandSettingsButton brand={brand} />
                     <CreateListButton brandId={brand.id} existingLists={brand.lists} />

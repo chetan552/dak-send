@@ -5,6 +5,68 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { BlockEmailDocument } from "@/lib/blocks-to-html";
+import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+
+const MAX_HTML_BYTES = 1_500_000;
+
+function safeOriginUrl(raw: string): URL {
+    let url: URL;
+    try {
+        url = new URL(raw);
+    } catch {
+        throw new Error("That doesn't look like a valid URL.");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("Only http and https URLs are supported.");
+    }
+    const host = url.hostname.toLowerCase();
+    if (
+        host === "localhost" ||
+        host === "0.0.0.0" ||
+        host.endsWith(".localhost") ||
+        host.endsWith(".internal") ||
+        host.startsWith("127.") ||
+        host.startsWith("10.") ||
+        host.startsWith("192.168.") ||
+        /^169\.254\./.test(host) ||
+        /^172\.(1[6-9]|2[0-9]|3[01])\./.test(host)
+    ) {
+        throw new Error("Refusing to fetch from internal/private hosts.");
+    }
+    return url;
+}
+
+export async function importCampaignContent(input: { html?: string; url?: string }) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    if (input.html && input.html.trim()) {
+        if (input.html.length > MAX_HTML_BYTES) throw new Error("Pasted HTML is too large (max 1.5 MB).");
+        return { html: sanitizeEmailHtml(input.html) };
+    }
+
+    if (input.url) {
+        const url = safeOriginUrl(input.url);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15_000);
+        try {
+            const res = await fetch(url.toString(), {
+                signal: controller.signal,
+                redirect: "follow",
+                headers: { "User-Agent": "DakSend/1.0 (+import)" },
+            });
+            if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
+            const buf = await res.arrayBuffer();
+            if (buf.byteLength > MAX_HTML_BYTES) throw new Error("Fetched HTML is too large (max 1.5 MB).");
+            const html = new TextDecoder().decode(buf);
+            return { html: sanitizeEmailHtml(html) };
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    throw new Error("Provide either HTML or a URL.");
+}
 
 export async function createCampaignDraft(formData: FormData) {
     const session = await getServerSession(authOptions);

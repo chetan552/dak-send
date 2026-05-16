@@ -20,7 +20,7 @@ export function CancelCampaignButton({
         e.preventDefault();
         e.stopPropagation();
 
-        if (confirm("Are you sure you want to stop sending this campaign? Any pending emails in the queue will be cancelled.")) {
+        if (confirm("Stop this campaign? Pending queued emails will be cancelled. Already-sent emails will remain in the report.")) {
             setLoading(true);
             try {
                 await cancelCampaign(campaignId);

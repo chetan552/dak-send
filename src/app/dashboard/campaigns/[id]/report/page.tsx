@@ -3,12 +3,14 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, BarChart3, MailCheck, MailWarning, MousePointerClick, Send, TrendingUp, Link2 } from "lucide-react";
+import { ArrowLeft, BarChart3, MailCheck, MailWarning, MousePointerClick, Send, TrendingUp, Link2, Target } from "lucide-react";
 import Link from "next/link";
 import { getCampaignStats } from "@/app/actions/analytics";
 import { getCampaignTimeline, getTopLinks } from "@/app/actions/dashboard-analytics";
 import { TimelineChart } from "@/components/campaign/analytics/timeline-chart";
 import { TopLinksChart } from "@/components/campaign/analytics/top-links-chart";
+import { AiPostSendInsights } from "@/components/campaign/ai-post-send-insights";
+import { isAiEnabledForBrand } from "@/lib/ai/config";
 
 export default async function CampaignReportPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -25,10 +27,11 @@ export default async function CampaignReportPage({ params }: { params: Promise<{
 
     if (!campaign) notFound();
 
-    const [stats, timeline, topLinks] = await Promise.all([
+    const [stats, timeline, topLinks, aiEnabled] = await Promise.all([
         getCampaignStats(id),
         getCampaignTimeline(id),
         getTopLinks(id),
+        isAiEnabledForBrand(campaign.brandId),
     ]);
 
     return (
@@ -59,7 +62,7 @@ export default async function CampaignReportPage({ params }: { params: Promise<{
             </div>
 
             {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 border-t-4 border-t-indigo-500 hover:shadow-md transition-shadow">
                     <CardContent className="p-6">
                         <div className="flex items-center justify-between">
@@ -105,6 +108,21 @@ export default async function CampaignReportPage({ params }: { params: Promise<{
                     </CardContent>
                 </Card>
 
+                <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 border-t-4 border-t-violet-500 hover:shadow-md transition-shadow">
+                    <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1">CTOR</p>
+                                <h3 className="text-3xl font-bold text-zinc-900 dark:text-white">{stats.ctor}%</h3>
+                            </div>
+                            <div className="w-12 h-12 bg-violet-500/10 rounded-full flex items-center justify-center">
+                                <Target className="w-6 h-6 text-violet-500" />
+                            </div>
+                        </div>
+                        <div className="mt-4 text-xs text-zinc-500">Click-to-open rate</div>
+                    </CardContent>
+                </Card>
+
                 <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 border-t-4 border-t-orange-500 hover:shadow-md transition-shadow">
                     <CardContent className="p-6">
                         <div className="flex items-center justify-between">
@@ -135,6 +153,8 @@ export default async function CampaignReportPage({ params }: { params: Promise<{
                     </CardContent>
                 </Card>
             </div>
+
+            {aiEnabled && stats.totalSent > 0 && <AiPostSendInsights campaignId={id} />}
 
             {stats.totalQueued > 0 && (
                 <Card className="bg-yellow-500/5 dark:bg-yellow-500/5 border-yellow-500/20">
@@ -182,6 +202,7 @@ export default async function CampaignReportPage({ params }: { params: Promise<{
                                         <th className="text-left py-2 px-3 font-medium text-zinc-500 dark:text-zinc-400">URL</th>
                                         <th className="text-right py-2 px-3 font-medium text-zinc-500 dark:text-zinc-400">Total Clicks</th>
                                         <th className="text-right py-2 px-3 font-medium text-zinc-500 dark:text-zinc-400">Unique Clickers</th>
+                                        <th className="text-right py-2 px-3 font-medium text-zinc-500 dark:text-zinc-400">CTOR</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -194,6 +215,7 @@ export default async function CampaignReportPage({ params }: { params: Promise<{
                                             </td>
                                             <td className="py-2 px-3 text-right text-zinc-900 dark:text-white font-medium">{link.totalClicks}</td>
                                             <td className="py-2 px-3 text-right text-zinc-500 dark:text-zinc-400">{link.uniqueClicks}</td>
+                                            <td className="py-2 px-3 text-right text-violet-600 dark:text-violet-400 font-medium">{link.ctor}%</td>
                                         </tr>
                                     ))}
                                 </tbody>

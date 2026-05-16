@@ -299,12 +299,12 @@ export async function cancelCampaign(campaignId: string) {
     });
 
     if (!campaign || campaign.status !== 'sending') {
-        throw new Error("Invalid campaign or not currently sending");
+        throw new Error("Campaign is not currently sending");
     }
 
     await prisma.campaign.update({
         where: { id: campaignId },
-        data: { status: "cancelled" }
+        data: { status: "cancelled" },
     });
 
     // Best-effort: remove queued/delayed jobs from Redis so they don't consume
@@ -312,4 +312,5 @@ export async function cancelCampaign(campaignId: string) {
     await drainCampaignJobs(campaignId);
 
     revalidatePath("/dashboard/campaigns");
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
 }

@@ -11,27 +11,45 @@ import { Loader2, Save, Blocks, Code2 } from "lucide-react";
 import { createCampaignDraft, updateCampaignDraft } from "@/app/actions/campaign";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { AiSubjectGenerator } from "@/components/campaign/ai-subject-generator";
 
 interface CampaignFormProps {
     brands: any[];
     initialData?: any;
+    aiEnabledByBrand?: Record<string, boolean>;
 }
 
-export function CampaignForm({ brands, initialData }: CampaignFormProps) {
+export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: CampaignFormProps) {
     const [loading, setLoading] = useState(false);
     const [htmlContent, setHtmlContent] = useState(initialData?.htmlText || "");
+    const [subject, setSubject] = useState<string>(initialData?.subject || "");
+    const [brandId, setBrandId] = useState<string | undefined>(
+        initialData?.brandId || (brands.length === 1 ? brands[0].id : undefined),
+    );
     const [editorMode, setEditorMode] = useState<"html" | "blocks">(
         initialData ? (initialData.contentJson ? "blocks" : "html") : "blocks"
     );
     const router = useRouter();
+    const aiAvailable = brandId ? aiEnabledByBrand[brandId] === true : false;
 
-    // Load template HTML from sessionStorage (set by Template Library)
+    // Load template HTML / subject / brand from sessionStorage (set by Template Library, AI generator, or importer)
     useEffect(() => {
         if (typeof window !== "undefined" && !initialData) {
             const templateHtml = sessionStorage.getItem("template_html");
             if (templateHtml) {
                 setHtmlContent(templateHtml.trim());
+                setEditorMode("html");
                 sessionStorage.removeItem("template_html");
+            }
+            const templateSubject = sessionStorage.getItem("template_subject");
+            if (templateSubject) {
+                setSubject(templateSubject);
+                sessionStorage.removeItem("template_subject");
+            }
+            const templateBrand = sessionStorage.getItem("template_brand");
+            if (templateBrand) {
+                setBrandId(templateBrand);
+                sessionStorage.removeItem("template_brand");
             }
         }
     }, [initialData]);
@@ -72,7 +90,7 @@ export function CampaignForm({ brands, initialData }: CampaignFormProps) {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="brandId" className="text-zinc-700 dark:text-zinc-300">Brand</Label>
-                    <Select name="brandId" defaultValue={initialData?.brandId || (brands.length === 1 ? brands[0].id : undefined)} disabled={!!initialData}>
+                    <Select name="brandId" value={brandId} onValueChange={setBrandId} disabled={!!initialData}>
                         <SelectTrigger className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm">
                             <SelectValue placeholder="Select a brand" />
                         </SelectTrigger>
@@ -87,7 +105,23 @@ export function CampaignForm({ brands, initialData }: CampaignFormProps) {
 
             <div className="space-y-2">
                 <Label htmlFor="subject" className="text-zinc-700 dark:text-zinc-300">Email Subject Line</Label>
-                <Input id="subject" name="subject" defaultValue={initialData?.subject} placeholder="Don't miss out on our biggest sale of the year!" required className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm" />
+                <Input
+                    id="subject"
+                    name="subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Don't miss out on our biggest sale of the year!"
+                    required
+                    className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                />
+                {aiAvailable && (
+                    <AiSubjectGenerator
+                        brandId={brandId}
+                        getBodyHtml={() => htmlContent}
+                        currentSubject={subject}
+                        onPick={setSubject}
+                    />
+                )}
             </div>
 
             {/* Editor mode toggle — only shown when creating a new campaign */}

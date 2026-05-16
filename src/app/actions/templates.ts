@@ -406,6 +406,50 @@ export async function saveTemplate(data: {
     return template;
 }
 
+export async function duplicateTemplate(id: string) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    if (!userId) throw new Error("Unauthorized");
+
+    const builtIn = BUILT_IN_TEMPLATES.find(t => t.id === id);
+    if (builtIn) {
+        const copy = await prisma.emailTemplate.create({
+            data: {
+                name: `${builtIn.name} (copy)`,
+                category: builtIn.category,
+                description: builtIn.description,
+                html: builtIn.html,
+                isPublic: false,
+                userId,
+                brandId: null,
+            },
+        });
+        revalidatePath("/dashboard/templates");
+        return copy;
+    }
+
+    const role = session?.user?.role || "user";
+    const where: any = role === "admin" ? { id } : { id, OR: [{ userId }, { isPublic: true }] };
+    const source = await prisma.emailTemplate.findFirst({ where });
+    if (!source) throw new Error("Template not found");
+
+    const copy = await prisma.emailTemplate.create({
+        data: {
+            name: `${source.name} (copy)`,
+            category: source.category,
+            description: source.description,
+            html: source.html,
+            thumbnail: source.thumbnail,
+            isPublic: false,
+            userId,
+            brandId: source.brandId,
+        },
+    });
+
+    revalidatePath("/dashboard/templates");
+    return copy;
+}
+
 export async function deleteTemplate(id: string) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;

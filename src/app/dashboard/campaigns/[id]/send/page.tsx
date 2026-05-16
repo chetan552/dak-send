@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
 import { ListSelectionForm } from "@/components/campaign/list-selection";
+import { AiPreSendReview } from "@/components/campaign/ai-pre-send-review";
+import { isAiEnabledForBrand } from "@/lib/ai/config";
 
 export default async function SendCampaignPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -29,6 +31,8 @@ export default async function SendCampaignPage({ params }: { params: Promise<{ i
     if (campaign.status !== 'draft') {
         redirect(`/dashboard/campaigns/${campaign.id}`);
     }
+
+    const aiEnabled = await isAiEnabledForBrand(campaign.brandId);
 
     // Get all lists for this brand that have active subscribers
     const lists = await prisma.list.findMany({
@@ -67,7 +71,8 @@ export default async function SendCampaignPage({ params }: { params: Promise<{ i
                         Emails will be queued and sent via AWS SES in the background. Duplicate emails across selected lists will be automatically ignored.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                    {aiEnabled && <AiPreSendReview campaignId={campaign.id} />}
                     <ListSelectionForm lists={lists} campaignId={campaign.id} />
                 </CardContent>
             </Card>

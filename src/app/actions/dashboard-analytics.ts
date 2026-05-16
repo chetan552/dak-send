@@ -196,10 +196,15 @@ export async function getTopLinks(campaignId: string) {
     });
     if (!campaign) throw new Error("Campaign not found");
 
-    const clicks = await prisma.campaignClick.findMany({
-        where: { campaignId },
-        select: { url: true, subscriberEmail: true },
-    });
+    const [clicks, totalOpened] = await Promise.all([
+        prisma.campaignClick.findMany({
+            where: { campaignId },
+            select: { url: true, subscriberEmail: true },
+        }),
+        prisma.campaignSend.count({
+            where: { campaignId, openedAt: { not: null } },
+        }),
+    ]);
 
     // Aggregate by URL
     const urlMap: Record<string, { url: string; totalClicks: number; uniqueClickers: Set<string> }> = {};
@@ -217,6 +222,7 @@ export async function getTopLinks(campaignId: string) {
             url: entry.url,
             totalClicks: entry.totalClicks,
             uniqueClicks: entry.uniqueClickers.size,
+            ctor: totalOpened > 0 ? ((entry.uniqueClickers.size / totalOpened) * 100).toFixed(1) : "0.0",
         }))
         .sort((a, b) => b.totalClicks - a.totalClicks)
         .slice(0, 20);

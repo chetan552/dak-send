@@ -62,10 +62,12 @@ export async function getCampaignStats(campaignId: string) {
         totalQueued,
         openRate: totalSent > 0 ? ((totalOpened / totalSent) * 100).toFixed(1) : "0.0",
         clickRate: totalSent > 0 ? ((totalClicked / totalSent) * 100).toFixed(1) : "0.0",
+        ctor: totalOpened > 0 ? ((totalClicked / totalOpened) * 100).toFixed(1) : "0.0",
         bounceRate: total > 0 ? ((totalBounced / total) * 100).toFixed(1) : "0.0",
         complaintRate: total > 0 ? ((totalComplained / total) * 100).toFixed(1) : "0.0",
     };
 }
+
 
 export async function getListStats(listId: string) {
     const session = await getServerSession(authOptions);

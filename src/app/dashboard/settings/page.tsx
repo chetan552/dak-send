@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { BrandUserAssignment } from "@/components/brand/brand-user-assignment";
 import { Briefcase, Cloud } from "lucide-react";
 import { AWSConfigForm } from "@/components/settings/aws-config-form";
+import { AIConfigForm } from "@/components/settings/ai-config-form";
+import { ThemeShortcutInput } from "@/components/settings/theme-shortcut-input";
 import { SESStats } from "@/components/settings/ses-stats";
 import { getSystemSettings } from "@/app/actions/settings";
 import { ApiKeyManager } from "@/components/settings/api-key-manager";
@@ -124,10 +126,13 @@ export default async function SettingsPage() {
                 </CardContent>
             </Card>
 
+            <ThemeShortcutInput />
+
             {currentUserRole === "admin" && (
                 <div className="grid grid-cols-1 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
                     <SESStats />
                     <AWSConfigForm initialSettings={systemSettings} />
+                    <AIConfigForm initialSettings={systemSettings} />
                     <ApiKeyManager hasExistingKey={!!systemSettings.API_KEY} />
                     <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                         <CardHeader>

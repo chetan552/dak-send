@@ -12,9 +12,37 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getStoredShortcut, parseShortcut, eventMatchesShortcut } from "@/lib/theme-shortcut";
 
 export function ThemeToggle() {
-    const { setTheme } = useTheme();
+    const { setTheme, resolvedTheme } = useTheme();
+
+    React.useEffect(() => {
+        let shortcut = parseShortcut(getStoredShortcut());
+
+        const reload = () => {
+            shortcut = parseShortcut(getStoredShortcut());
+        };
+
+        const handler = (e: KeyboardEvent) => {
+            if (!shortcut) return;
+            const target = e.target as HTMLElement | null;
+            if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) {
+                return;
+            }
+            if (eventMatchesShortcut(e, shortcut)) {
+                e.preventDefault();
+                setTheme(resolvedTheme === "dark" ? "light" : "dark");
+            }
+        };
+
+        window.addEventListener("keydown", handler);
+        window.addEventListener("daksend:theme-shortcut-changed", reload);
+        return () => {
+            window.removeEventListener("keydown", handler);
+            window.removeEventListener("daksend:theme-shortcut-changed", reload);
+        };
+    }, [setTheme, resolvedTheme]);
 
     return (
         <DropdownMenu>

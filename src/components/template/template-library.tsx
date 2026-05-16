@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LayoutTemplate, Search, Trash2, Eye, Pencil, ArrowRight } from "lucide-react";
+import { LayoutTemplate, Search, Trash2, Eye, Pencil, ArrowRight, Copy } from "lucide-react";
 import { TemplatePreview } from "@/components/template/template-preview";
-import { deleteTemplate } from "@/app/actions/templates";
+import { deleteTemplate, duplicateTemplate } from "@/app/actions/templates";
 
 interface Template {
     id: string;
@@ -52,6 +52,19 @@ export function TemplateLibrary({ templates, currentUserId, isAdmin }: TemplateL
         startTransition(async () => {
             await deleteTemplate(id);
             router.refresh();
+        });
+    };
+
+    const handleDuplicate = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startTransition(async () => {
+            try {
+                await duplicateTemplate(id);
+                router.refresh();
+            } catch (err) {
+                alert(err instanceof Error ? err.message : "Failed to duplicate template");
+            }
         });
     };
 
@@ -143,6 +156,15 @@ export function TemplateLibrary({ templates, currentUserId, isAdmin }: TemplateL
                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white text-xs font-medium hover:bg-white/20 transition-colors"
                                         >
                                             <Eye className="w-3.5 h-3.5" /> Preview
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleDuplicate(template.id, e)}
+                                            disabled={isPending}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 text-white text-xs font-medium hover:bg-white/20 transition-colors"
+                                            title="Make a copy of this template"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" /> Duplicate
                                         </button>
                                         {template.isCustom && (template.userId === currentUserId || isAdmin) && (
                                             <>

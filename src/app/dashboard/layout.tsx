@@ -7,6 +7,7 @@ import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/components/logout-button";
 import { MobileNav } from "@/components/mobile-nav";
+import { SidebarProviderStatus } from "@/components/sidebar-provider-status";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default async function DashboardLayout({
@@ -37,6 +38,8 @@ export default async function DashboardLayout({
                 <div className="flex-1 overflow-y-auto">
                     <SidebarNav />
                 </div>
+
+                <SidebarProviderStatus />
 
                 <div className="px-4 py-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-zinc-600 dark:text-zinc-300 flex-shrink-0">
