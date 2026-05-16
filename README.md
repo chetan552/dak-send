@@ -12,7 +12,7 @@
 
 ## Overview
 
-DakSend is a production-ready, self-hosted email newsletter and marketing automation platform. It gives you a modern dashboard for managing multi-brand subscriber lists, campaigns, drip automations, landing pages, and transactional email — at a fraction of the cost of hosted alternatives like Mailchimp, ConvertKit, or Klaviyo.
+DakSend(In Hindi, "Dak" (डाक) primarily translates to "mail" or "post") is a production-ready, self-hosted email newsletter and marketing automation platform. It gives you a modern dashboard for managing multi-brand subscriber lists, campaigns, drip automations, landing pages, and transactional email — at a fraction of the cost of hosted alternatives like Mailchimp, ConvertKit, or Klaviyo.
 
 **Bring your own provider.** DakSend ships with six email transports out of the box — Amazon SES, Resend, Postmark, SendGrid, Mailjet, and Elastic Email. Switch any time from the Settings UI.
 
@@ -28,14 +28,14 @@ Under the hood it's a Next.js app backed by PostgreSQL, Redis, and BullMQ, with 
 
 DakSend speaks six provider APIs through a single `EmailProvider` interface. Pick one in **Dashboard → Settings → Email Provider**, paste credentials, copy the displayed webhook URL into the provider's dashboard, and you're sending.
 
-| Provider           | Send API                     | Webhook auth                  | Status check                  |
-| ------------------ | ---------------------------- | ----------------------------- | ----------------------------- |
-| **Amazon SES**     | SES v2 SDK                   | SNS signature (HMAC + cert)   | `GetSendQuota` daily quota    |
-| **Resend**         | REST `/emails`               | Svix HMAC-SHA256              | `/domains` ping               |
-| **Postmark**       | REST `/email` (broadcast)    | Optional HTTP Basic Auth      | `/server` token check         |
-| **SendGrid**       | REST `/v3/mail/send`         | Twilio ECDSA + timestamp      | `/user/credits` quota         |
-| **Mailjet**        | REST `/v3.1/send`            | Optional `?token=` shared secret | `/myprofile` credentials check |
-| **Elastic Email**  | REST `/v4/emails`            | Optional `?token=` shared secret | `/security/credit` quota   |
+| Provider          | Send API                  | Webhook auth                     | Status check                   |
+| ----------------- | ------------------------- | -------------------------------- | ------------------------------ |
+| **Amazon SES**    | SES v2 SDK                | SNS signature (HMAC + cert)      | `GetSendQuota` daily quota     |
+| **Resend**        | REST `/emails`            | Svix HMAC-SHA256                 | `/domains` ping                |
+| **Postmark**      | REST `/email` (broadcast) | Optional HTTP Basic Auth         | `/server` token check          |
+| **SendGrid**      | REST `/v3/mail/send`      | Twilio ECDSA + timestamp         | `/user/credits` quota          |
+| **Mailjet**       | REST `/v3.1/send`         | Optional `?token=` shared secret | `/myprofile` credentials check |
+| **Elastic Email** | REST `/v4/emails`         | Optional `?token=` shared secret | `/security/credit` quota       |
 
 - Provider-side open/click tracking is **disabled** on every transport — DakSend's pixel and link rewriter remain the single source of truth for analytics
 - Bounce and complaint events from any provider normalize to the same internal model and feed the suppression list automatically
@@ -382,14 +382,14 @@ curl -X POST https://your-domain.com/api/subscribe \
 
 Each provider posts to its own webhook route. Configure the URL displayed in **Settings → Email Provider** in your provider's dashboard:
 
-| Provider     | Webhook URL                                  |
-| ------------ | -------------------------------------------- |
-| Amazon SES   | `POST /api/webhooks/ses` (via SNS topic)     |
-| Resend       | `POST /api/webhooks/resend`                  |
-| Postmark     | `POST /api/webhooks/postmark`                |
-| SendGrid     | `POST /api/webhooks/sendgrid`                |
-| Mailjet      | `POST /api/webhooks/mailjet?token=<secret>`  |
-| Elastic Email| `POST /api/webhooks/elastic?token=<secret>`  |
+| Provider      | Webhook URL                                 |
+| ------------- | ------------------------------------------- |
+| Amazon SES    | `POST /api/webhooks/ses` (via SNS topic)    |
+| Resend        | `POST /api/webhooks/resend`                 |
+| Postmark      | `POST /api/webhooks/postmark`               |
+| SendGrid      | `POST /api/webhooks/sendgrid`               |
+| Mailjet       | `POST /api/webhooks/mailjet?token=<secret>` |
+| Elastic Email | `POST /api/webhooks/elastic?token=<secret>` |
 
 Each route verifies the provider's signature/secret (when configured), parses the payload, and runs the normalized event through a shared handler: hard bounces mark the subscriber globally and add a global suppression entry; complaints are scoped to the originating brand via the `campaign_id` correlation tag and add a brand-scoped suppression entry. Both are visible in the Deliverability dashboard.
 
@@ -607,14 +607,14 @@ npm run lint         # Run ESLint
 
 Rough rules of thumb:
 
-| Pick                  | When                                                                                   |
-| --------------------- | -------------------------------------------------------------------------------------- |
-| **Amazon SES**        | High volume (>100k/mo), comfortable with AWS, want the lowest cost (~$0.10/1k)         |
-| **Resend**            | Want the fastest setup, modern API, painless DNS                                       |
-| **Postmark**          | Premium deliverability for transactional + broadcast, willing to pay for it            |
-| **SendGrid**          | Enterprise-friendly, mature ecosystem, need long-standing IP reputation                |
-| **Mailjet**           | EU data residency, balanced price/performance                                          |
-| **Elastic Email**     | Pay-as-you-go, smallest volume tier, no monthly minimums                               |
+| Pick              | When                                                                           |
+| ----------------- | ------------------------------------------------------------------------------ |
+| **Amazon SES**    | High volume (>100k/mo), comfortable with AWS, want the lowest cost (~$0.10/1k) |
+| **Resend**        | Want the fastest setup, modern API, painless DNS                               |
+| **Postmark**      | Premium deliverability for transactional + broadcast, willing to pay for it    |
+| **SendGrid**      | Enterprise-friendly, mature ecosystem, need long-standing IP reputation        |
+| **Mailjet**       | EU data residency, balanced price/performance                                  |
+| **Elastic Email** | Pay-as-you-go, smallest volume tier, no monthly minimums                       |
 
 You can switch any time in **Settings → Email Provider** — no schema migration, no downtime, just paste the new credentials and save.
 
