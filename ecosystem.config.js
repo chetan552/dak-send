@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: "daksend-web",
-      script: "npm",
-      args: "run start",
+      script: "node",
+      args: ".next/standalone/server.js",
       env: {
         NODE_ENV: "production",
         PORT: 3000,
