@@ -206,6 +206,24 @@ export async function updateCampaignBlocks(
     return updated;
 }
 
+export async function deleteMultipleCampaigns(ids: string[]) {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+    const currentUserRole = session?.user?.role || "user";
+
+    if (!userId) throw new Error("Unauthorized");
+    if (!ids.length) return { deleted: 0 };
+
+    const whereCondition: any = currentUserRole === 'admin'
+        ? { id: { in: ids } }
+        : { id: { in: ids }, brand: { users: { some: { id: userId } } } };
+
+    const { count } = await prisma.campaign.deleteMany({ where: whereCondition });
+
+    revalidatePath("/dashboard/campaigns");
+    return { deleted: count };
+}
+
 export async function duplicateCampaign(id: string) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
