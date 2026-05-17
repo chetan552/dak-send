@@ -190,6 +190,15 @@ export async function POST(req: NextRequest) {
 
         // Double opt-in: send confirmation email
         if (isDoubleOptIn) {
+            // Throttle confirmation emails: at most one per email address per 30 minutes.
+            // Prevents anyone from weaponising the subscribe form to spam a victim's inbox.
+            const throttleKey = `subscribe:confirm-throttle:${email.toLowerCase()}`;
+            let confirmThrottled = false;
+            try {
+                const sent = await redis.set(throttleKey, "1", "EX", 1800, "NX");
+                confirmThrottled = sent === null; // null means key already existed
+            } catch { /* Redis unavailable — allow */ }
+
             const token = randomBytes(32).toString("hex");
             const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
 
@@ -209,6 +218,8 @@ export async function POST(req: NextRequest) {
 
             if (!list.brand.fromEmail) {
                 console.warn(`Skipping confirmation email: brand ${list.brand.id} has no fromEmail`);
+            } else if (confirmThrottled) {
+                console.log(`Skipping confirmation email to ${email}: throttled (sent within last 30 min)`);
             } else try {
                 const provider = await getProvider();
                 await provider.send({

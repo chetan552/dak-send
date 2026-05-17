@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import juice from "juice";
 import { htmlToText } from "html-to-text";
 import { EMAIL_BOILERPLATE } from "./email-boilerplate";
+import { signToken } from "./sign-url";
 
 export interface RenderEmailInput {
     /** Raw campaign HTML from TipTap editor (may be a bare fragment). */
@@ -127,7 +128,14 @@ function finishPipeline(
             const href = $(el).attr("href") || "";
             if (!href.startsWith("http")) return;
             if (href.includes("/api/unsubscribe")) return;
-            const trackedUrl = `${tracking.baseUrl}/api/track/click?cid=${tracking.campaignId}&email=${encodeURIComponent(personalization.email)}&url=${encodeURIComponent(href)}`;
+            // HMAC-sign (cid, email, url) so the click endpoint can't be abused
+            // as an open redirect to arbitrary URLs.
+            const token = signToken("click", {
+                cid: tracking.campaignId,
+                e: personalization.email,
+                u: href,
+            });
+            const trackedUrl = `${tracking.baseUrl}/api/track/click?t=${encodeURIComponent(token)}`;
             $(el).attr("href", trackedUrl);
         });
     }

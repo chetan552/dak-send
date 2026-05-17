@@ -59,6 +59,10 @@ export const authOptions: NextAuthOptions = {
 
                 if (!user) {
                     recordFailedAttempt(ip);
+                    // Run a dummy bcrypt compare so a missing user takes the same
+                    // wall-clock time as a wrong password — prevents email enumeration
+                    // via response-time differences.
+                    await bcrypt.compare(credentials.password, "$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
                     return null;
                 }
 

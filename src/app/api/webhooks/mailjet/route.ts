@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { parseMailjetWebhook } from "@/lib/email-provider/mailjet-provider";
 import { handleProviderEvent } from "@/lib/email-provider/handle-event";
 import { readSettings } from "@/lib/email-provider/settings";
@@ -11,8 +12,11 @@ import { readSettings } from "@/lib/email-provider/settings";
 export async function POST(req: NextRequest) {
     const { MAILJET_WEBHOOK_SECRET } = await readSettings(["MAILJET_WEBHOOK_SECRET"]);
     if (MAILJET_WEBHOOK_SECRET) {
-        const token = req.nextUrl.searchParams.get("token");
-        if (token !== MAILJET_WEBHOOK_SECRET) {
+        const token = req.nextUrl.searchParams.get("token") ?? "";
+        const expected = Buffer.from(MAILJET_WEBHOOK_SECRET);
+        const provided = Buffer.from(token);
+        const valid = provided.length === expected.length && timingSafeEqual(provided, expected);
+        if (!valid) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
     }

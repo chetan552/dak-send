@@ -3,6 +3,23 @@ import { prisma } from "@/lib/prisma";
 import { getProvider } from "@/lib/email-provider/factory";
 import { dispatchWebhooks } from "@/lib/webhooks";
 import { redisRateLimit } from "@/lib/redis-rate-limit";
+import { verifyToken } from "@/lib/sign-url";
+
+interface UnsubToken { i: string; l: string; }
+
+function resolveUnsubParams(searchParams: URLSearchParams): { subscriberId: string; listId: string } | null {
+    const s = searchParams.get("s");
+    if (s) {
+        const claims = verifyToken<UnsubToken>("unsub", s);
+        if (claims?.i && claims?.l) return { subscriberId: claims.i, listId: claims.l };
+        return null; // tampered token — reject
+    }
+    // Legacy unsigned path (emails sent before signing was introduced)
+    const subscriberId = searchParams.get("i");
+    const listId = searchParams.get("l");
+    if (subscriberId && listId) return { subscriberId, listId };
+    return null;
+}
 
 // ---------------------------------------------------------------------------
 // Shared helper — used by both GET and POST
@@ -54,13 +71,11 @@ export async function GET(req: NextRequest) {
     const limited = await redisRateLimit(req, "unsubscribe", 20, 60);
     if (limited) return limited;
 
-    const searchParams = req.nextUrl.searchParams;
-    const subscriberId = searchParams.get("i");
-    const listId = searchParams.get("l");
-
-    if (!subscriberId || !listId) {
-        return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+    const params = resolveUnsubParams(req.nextUrl.searchParams);
+    if (!params) {
+        return NextResponse.json({ error: "Missing or invalid parameters" }, { status: 400 });
     }
+    const { subscriberId, listId } = params;
 
     try {
         const result = await markUnsubscribed(subscriberId, listId);
@@ -139,17 +154,18 @@ export async function POST(req: NextRequest) {
     if (limited) return limited;
 
     const searchParams = req.nextUrl.searchParams;
-    const subscriberId = searchParams.get("i");
-    const listId = searchParams.get("l");
 
     // Skip test sends that use a placeholder URL
     if (searchParams.get("test") === "1") {
         return new NextResponse(null, { status: 200 });
     }
 
-    if (!subscriberId || !listId) {
-        return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+    const params = resolveUnsubParams(searchParams);
+    if (!params) {
+        // Return 200 — RFC 8058 says mailbox providers must not retry on non-5xx
+        return new NextResponse(null, { status: 200 });
     }
+    const { subscriberId, listId } = params;
 
     try {
         const result = await markUnsubscribed(subscriberId, listId);

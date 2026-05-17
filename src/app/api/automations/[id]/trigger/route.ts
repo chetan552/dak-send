@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { enrollSubscriber } from "@/app/actions/automation";
 
@@ -25,7 +26,10 @@ export async function POST(
         return NextResponse.json({ error: "Automation not found." }, { status: 404 });
     }
 
-    if (automation.webhookSecret !== token) {
+    const secretBuf = Buffer.from(automation.webhookSecret ?? "");
+    const tokenBuf = Buffer.from(token);
+    const secretValid = secretBuf.length > 0 && secretBuf.length === tokenBuf.length && timingSafeEqual(secretBuf, tokenBuf);
+    if (!secretValid) {
         return NextResponse.json({ error: "Invalid token." }, { status: 403 });
     }
 
@@ -46,7 +50,7 @@ export async function POST(
     }
 
     // Find or create subscriber (no list association for webhook trigger)
-    let subscriber = await prisma.subscriber.findFirst({
+    const subscriber = await prisma.subscriber.findFirst({
         where: {
             email,
             list: { brand: { automations: { some: { id } } } },

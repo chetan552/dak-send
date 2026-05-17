@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { parseElasticWebhook } from "@/lib/email-provider/elastic-provider";
 import { handleProviderEvent } from "@/lib/email-provider/handle-event";
 import { readSettings } from "@/lib/email-provider/settings";
@@ -34,8 +35,11 @@ async function readBody(req: NextRequest): Promise<unknown> {
 export async function POST(req: NextRequest) {
     const { ELASTIC_WEBHOOK_SECRET } = await readSettings(["ELASTIC_WEBHOOK_SECRET"]);
     if (ELASTIC_WEBHOOK_SECRET) {
-        const token = req.nextUrl.searchParams.get("token");
-        if (token !== ELASTIC_WEBHOOK_SECRET) {
+        const token = req.nextUrl.searchParams.get("token") ?? "";
+        const expected = Buffer.from(ELASTIC_WEBHOOK_SECRET);
+        const provided = Buffer.from(token);
+        const valid = provided.length === expected.length && timingSafeEqual(provided, expected);
+        if (!valid) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
     }

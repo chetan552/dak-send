@@ -166,8 +166,8 @@ function compileImage(block: ImageBlock): string {
     const width = p.width ? ` width="${p.width}"` : ' style="max-width:100%;height:auto;"';
     const radius = p.rounded ? ' style="border-radius:8px;"' : "";
     const img = `<img src="${escapeAttr(p.src)}" alt="${escapeAttr(p.alt || "")}"${width}${radius} border="0" />`;
-    const content = p.href
-        ? `<a href="${escapeAttr(p.href)}" style="display:inline-block;">${img}</a>`
+    const content = p.href && safeHref(p.href)
+        ? `<a href="${safeHref(p.href)}" style="display:inline-block;">${img}</a>`
         : img;
     return `<tr>
   <td align="${align}" style="padding:${padding};">
@@ -188,8 +188,8 @@ function compileButton(block: ButtonBlock): string {
     const fontWeight = p.bold !== false ? "bold" : "normal";
     return `<tr>
   <td align="${align}" style="padding:${blockPadding};">
-    <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escapeAttr(p.href)}" style="height:50px;v-text-anchor:middle;width:200px;" arcsize="10%" fillcolor="${bgColor}" strokecolor="${bgColor}"><w:anchorlock/><center style="color:${textColor};font-family:Arial,sans-serif;font-size:${fontSize}px;font-weight:${fontWeight};">${escapeHtml(p.text)}</center></v:roundrect><![endif]-->
-    <!--[if !mso]><!--><a href="${escapeAttr(p.href)}" style="background-color:${bgColor};border-radius:${radius}px;color:${textColor};display:inline-block;font-family:Arial,sans-serif;font-size:${fontSize}px;font-weight:${fontWeight};line-height:1;padding:${innerPadding};text-align:center;text-decoration:none;-webkit-text-size-adjust:none;mso-hide:all;">${escapeHtml(p.text)}</a><!--<![endif]-->
+    <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref(p.href)}" style="height:50px;v-text-anchor:middle;width:200px;" arcsize="10%" fillcolor="${bgColor}" strokecolor="${bgColor}"><w:anchorlock/><center style="color:${textColor};font-family:Arial,sans-serif;font-size:${fontSize}px;font-weight:${fontWeight};">${escapeHtml(p.text)}</center></v:roundrect><![endif]-->
+    <!--[if !mso]><!--><a href="${safeHref(p.href)}" style="background-color:${bgColor};border-radius:${radius}px;color:${textColor};display:inline-block;font-family:Arial,sans-serif;font-size:${fontSize}px;font-weight:${fontWeight};line-height:1;padding:${innerPadding};text-align:center;text-decoration:none;-webkit-text-size-adjust:none;mso-hide:all;">${escapeHtml(p.text)}</a><!--<![endif]-->
   </td>
 </tr>`;
 }
@@ -331,6 +331,19 @@ export function compileBlocksToHtml(doc: BlockEmailDocument): string {
 
 function escapeAttr(s: string): string {
     return s.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Strip URLs that are not http/https to prevent javascript:/data: injection in href/src attributes. */
+function safeHref(url: string | undefined | null): string {
+    if (!url) return "";
+    const trimmed = url.trim();
+    try {
+        const parsed = new URL(trimmed);
+        return parsed.protocol === "http:" || parsed.protocol === "https:" ? escapeAttr(trimmed) : "";
+    } catch {
+        // Relative URLs (#anchor, /path) are fine; reject anything else
+        return trimmed.startsWith("/") || trimmed.startsWith("#") ? escapeAttr(trimmed) : "";
+    }
 }
 
 function escapeHtml(s: string): string {

@@ -6,6 +6,7 @@ import { getProvider } from "./email-provider/factory";
 import type { EmailMessage } from "./email-provider/types";
 import { incrementWarmupSent } from "./warmup";
 import { renderEmail, buildUnsubscribeHeaders } from "./email-render";
+import { signToken } from "./sign-url";
 
 const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
@@ -49,11 +50,16 @@ const startWorker = async () => {
             }
 
             const trackingBaseUrlAuto = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-            const unsubscribeUrl = jobUnsubscribeUrl ||
-                `${trackingBaseUrlAuto}/api/unsubscribe?i=${encodeURIComponent(subscriberId || "")}&l=${encodeURIComponent(listId || "")}`;
+            let unsubscribeUrl = jobUnsubscribeUrl;
+            if (!unsubscribeUrl && subscriberId && listId) {
+                const tok = signToken("unsub", { i: subscriberId, l: listId });
+                unsubscribeUrl = `${trackingBaseUrlAuto}/api/unsubscribe?s=${encodeURIComponent(tok)}`;
+            } else if (!unsubscribeUrl) {
+                unsubscribeUrl = `${trackingBaseUrlAuto}/api/unsubscribe`;
+            }
 
             const preferencesUrl = subscriberId
-                ? `${trackingBaseUrlAuto}/api/preferences?i=${encodeURIComponent(subscriberId)}`
+                ? `${trackingBaseUrlAuto}/api/preferences?s=${encodeURIComponent(signToken("prefs", { i: subscriberId }))}`
                 : undefined;
 
             const rendered = renderEmail({
@@ -116,8 +122,8 @@ const startWorker = async () => {
         }
 
         const trackingBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        const unsubscribeUrl = `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriberId)}&l=${encodeURIComponent(listId)}`;
-        const preferencesUrl = `${trackingBaseUrl}/api/preferences?i=${encodeURIComponent(subscriberId)}`;
+        const unsubscribeUrl = `${trackingBaseUrl}/api/unsubscribe?s=${encodeURIComponent(signToken("unsub", { i: subscriberId, l: listId }))}`;
+        const preferencesUrl = `${trackingBaseUrl}/api/preferences?s=${encodeURIComponent(signToken("prefs", { i: subscriberId }))}`;
 
         // Fetch custom fields for this subscriber scoped to the list being sent to
         const subscriberCustomFields = await prisma.subscriberFieldValue.findMany({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { parsePostmarkWebhook } from "@/lib/email-provider/postmark-provider";
 import { handleProviderEvent } from "@/lib/email-provider/handle-event";
 import { readSettings } from "@/lib/email-provider/settings";
@@ -15,7 +16,14 @@ function checkBasicAuth(req: NextRequest, user: string, pass: string): boolean {
         const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
         const idx = decoded.indexOf(":");
         if (idx === -1) return false;
-        return decoded.slice(0, idx) === user && decoded.slice(idx + 1) === pass;
+        const providedUser = Buffer.from(decoded.slice(0, idx));
+        const providedPass = Buffer.from(decoded.slice(idx + 1));
+        const expectedUser = Buffer.from(user);
+        const expectedPass = Buffer.from(pass);
+        return (
+            providedUser.length === expectedUser.length && timingSafeEqual(providedUser, expectedUser) &&
+            providedPass.length === expectedPass.length && timingSafeEqual(providedPass, expectedPass)
+        );
     } catch {
         return false;
     }

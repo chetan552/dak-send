@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { emailQueue } from "@/lib/queue";
 import { markCronLastRun } from "@/app/actions/cron-settings";
 import { verifyCronSecret } from "../_auth";
+import { signToken } from "@/lib/sign-url";
 
 export async function GET(req: NextRequest) {
     const authError = verifyCronSecret(req);
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
                     // The worker's renderEmail() pipeline handles personalization,
                     // HTML wrapping, CSS inlining, tracking, and plain-text generation.
                     const unsubscribeUrl = subscriber && listId
-                        ? `${trackingBaseUrl}/api/unsubscribe?i=${encodeURIComponent(subscriber.id)}&l=${encodeURIComponent(listId)}`
+                        ? `${trackingBaseUrl}/api/unsubscribe?s=${encodeURIComponent(signToken("unsub", { i: subscriber.id, l: listId }))}`
                         : "";
 
                     await emailQueue.add("send-automation-email", {

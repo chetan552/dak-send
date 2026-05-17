@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { redisRateLimit } from "@/lib/redis-rate-limit";
+import { verifyToken } from "@/lib/sign-url";
+
+interface PrefsToken { i: string; }
+
+function resolveSubscriberId(searchParams: URLSearchParams): string | null {
+    const s = searchParams.get("s");
+    if (s) {
+        const claims = verifyToken<PrefsToken>("prefs", s);
+        return claims?.i ?? null;
+    }
+    // Legacy unsigned path
+    return searchParams.get("i");
+}
 
 // ---------------------------------------------------------------------------
 // GET — render the preference center HTML page
@@ -12,11 +25,11 @@ export async function GET(req: NextRequest) {
     const limited = await redisRateLimit(req, "preferences", 30, 60);
     if (limited) return limited;
 
-    const subscriberId = req.nextUrl.searchParams.get("i");
+    const subscriberId = resolveSubscriberId(req.nextUrl.searchParams);
     const action = req.nextUrl.searchParams.get("action");
 
     if (!subscriberId) {
-        return new NextResponse("Missing subscriber ID", { status: 400 });
+        return new NextResponse("Missing or invalid subscriber token", { status: 400 });
     }
 
     const subscriber = await prisma.subscriber.findUnique({
@@ -36,13 +49,28 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Subscriber not found", { status: 404 });
     }
 
-    // ── Unsubscribe-all shortcut ─────────────────────────────────────────────
+    // ── Unsubscribe-all shortcut (GET now only renders a confirm page) ────────
+    // The actual unsubscribe is done via POST to prevent CSRF/accidental prefetch.
     if (action === "unsubscribe_all") {
-        await prisma.subscriber.updateMany({
-            where: { email: subscriber.email, list: { brandId: subscriber.list.brand.id } },
-            data: { status: "unsubscribed", pausedUntil: null },
-        });
-        return new NextResponse(getConfirmHtml("Unsubscribed", "You have been unsubscribed from all emails from " + subscriber.list.brand.name + "."), {
+        const brandName = esc(subscriber.list.brand.name);
+        return new NextResponse(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Confirm Unsubscribe — ${brandName}</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f4f4f5;}
+.card{text-align:center;padding:3rem;border-radius:12px;background:white;box-shadow:0 2px 16px rgba(0,0,0,.08);max-width:420px;}
+h1{font-size:1.375rem;margin:0 0 .75rem;}p{margin:0 0 1.5rem;color:#71717a;font-size:.9375rem;}
+.btn-red{padding:10px 24px;border-radius:8px;border:none;background:#ef4444;color:#fff;font-size:.9375rem;font-weight:600;cursor:pointer;}
+.btn-ghost{padding:10px 24px;border-radius:8px;border:1.5px solid #e4e4e7;background:#fff;font-size:.9375rem;color:#3f3f46;cursor:pointer;margin-left:8px;}</style>
+</head>
+<body><div class="card">
+<h1>Unsubscribe from all?</h1>
+<p>You will no longer receive any emails from <strong>${brandName}</strong>.</p>
+<form method="POST" action="/api/preferences">
+  <input type="hidden" name="action" value="unsubscribe_all">
+  <input type="hidden" name="subscriberId" value="${esc(subscriberId)}">
+  <button class="btn-red" type="submit">Yes, unsubscribe me</button>
+  <button class="btn-ghost" type="button" onclick="history.back()">Cancel</button>
+</form>
+</div></body></html>`, {
             status: 200,
             headers: { "Content-Type": "text/html" },
         });
@@ -267,36 +295,63 @@ export async function POST(req: NextRequest) {
     const limited = await redisRateLimit(req, "preferences", 30, 60);
     if (limited) return limited;
 
-    let body: Record<string, any>;
-    try {
-        body = await req.json();
-    } catch {
-        return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    // Accept both JSON (from the in-page JS) and form submissions (unsubscribe_all confirm page)
+    const contentType = req.headers.get("content-type") ?? "";
+    let body: Record<string, unknown>;
+    if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+        const fd = await req.formData();
+        body = Object.fromEntries(fd.entries()) as Record<string, unknown>;
+    } else {
+        try {
+            body = await req.json();
+        } catch {
+            return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+        }
     }
 
-    const { action, subscriberId, brandId } = body;
+    const { action, subscriberId, brandId } = body as { action?: string; subscriberId?: string; brandId?: string };
 
-    if (!subscriberId || !brandId) {
-        return NextResponse.json({ error: "Missing subscriberId or brandId" }, { status: 400 });
+    if (!subscriberId) {
+        return NextResponse.json({ error: "Missing subscriberId" }, { status: 400 });
     }
 
-    // Verify the subscriber exists and belongs to this brand
+    // Verify the subscriber exists; fetch brand info for unsubscribe_all
     const subscriber = await prisma.subscriber.findUnique({
         where: { id: subscriberId },
-        select: { email: true, list: { select: { brandId: true } } },
+        select: { email: true, list: { select: { brandId: true, brand: { select: { name: true } } } } },
     });
 
-    if (!subscriber || subscriber.list.brandId !== brandId) {
+    if (!subscriber) {
+        return NextResponse.json({ error: "Subscriber not found" }, { status: 404 });
+    }
+
+    const resolvedBrandId = brandId ?? subscriber.list.brandId;
+    if (subscriber.list.brandId !== resolvedBrandId) {
         return NextResponse.json({ error: "Subscriber not found" }, { status: 404 });
     }
 
     const email = subscriber.email;
 
     try {
+        if (action === "unsubscribe_all") {
+            await prisma.subscriber.updateMany({
+                where: { email, list: { brandId: resolvedBrandId } },
+                data: { status: "unsubscribed", pausedUntil: null },
+            });
+            return new NextResponse(getConfirmHtml("Unsubscribed", `You have been unsubscribed from all emails from ${esc(subscriber.list.brand.name)}.`), {
+                status: 200,
+                headers: { "Content-Type": "text/html" },
+            });
+        }
+
+        if (!brandId) {
+            return NextResponse.json({ error: "Missing brandId" }, { status: 400 });
+        }
+
         if (action === "save_prefs") {
             const selectedLists: string[] = Array.isArray(body.selectedLists) ? body.selectedLists : [];
 
-            const brandLists = await prisma.list.findMany({ where: { brandId }, select: { id: true } });
+            const brandLists = await prisma.list.findMany({ where: { brandId: resolvedBrandId }, select: { id: true } });
 
             for (const list of brandLists) {
                 if (selectedLists.includes(list.id)) {
@@ -322,7 +377,7 @@ export async function POST(req: NextRequest) {
 
             // Apply pausedUntil to ALL subscriber records for this email under this brand
             await prisma.subscriber.updateMany({
-                where: { email, list: { brandId } },
+                where: { email, list: { brandId: resolvedBrandId } },
                 data: { pausedUntil },
             });
 
@@ -331,7 +386,7 @@ export async function POST(req: NextRequest) {
 
         if (action === "resume") {
             await prisma.subscriber.updateMany({
-                where: { email, list: { brandId } },
+                where: { email, list: { brandId: resolvedBrandId } },
                 data: { pausedUntil: null },
             });
 

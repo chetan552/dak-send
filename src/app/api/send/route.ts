@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getProvider } from "@/lib/email-provider/factory";
 import bcrypt from "bcryptjs";
+import { redis } from "@/lib/queue";
+
+async function apiKeyRateLimit(keyFingerprint: string): Promise<NextResponse | null> {
+    const key = `rl:api-send:${keyFingerprint}`;
+    try {
+        const count = await redis.incr(key);
+        if (count === 1) await redis.expire(key, 60);
+        if (count > 120) { // 120 transactional sends per minute per API key
+            const ttl = await redis.ttl(key);
+            return NextResponse.json(
+                { error: "Rate limit exceeded. Max 120 sends per minute." },
+                { status: 429, headers: { "Retry-After": String(ttl > 0 ? ttl : 60) } },
+            );
+        }
+    } catch { /* Redis unavailable — fail open */ }
+    return null;
+}
 
 // Transactional email API with API key auth
 export async function POST(req: NextRequest) {
@@ -29,6 +46,11 @@ export async function POST(req: NextRequest) {
         if (!keysMatch) {
             return NextResponse.json({ error: "Invalid API key" }, { status: 403 });
         }
+
+        // Rate-limit per API key fingerprint (sha256 of the raw key, truncated)
+        const keyFingerprint = createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+        const rateLimited = await apiKeyRateLimit(keyFingerprint);
+        if (rateLimited) return rateLimited;
 
         const body = await req.json();
         const { brandId, to, subject, html, text, replyTo } = body;
