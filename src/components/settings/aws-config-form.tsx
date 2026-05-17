@@ -106,7 +106,7 @@ export function AWSConfigForm({ initialSettings }: AWSConfigFormProps) {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 dark:text-black min-w-[120px]"
+                            className="min-w-[120px]"
                         >
                             {loading ? (
                                 <>

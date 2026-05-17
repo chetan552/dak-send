@@ -117,7 +117,7 @@ export function EditProfileForm({ currentName, currentEmail }: EditProfileFormPr
             <Button
                 type="submit"
                 disabled={loading || !isDirty}
-                className="bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                className="disabled:opacity-50"
             >
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Save Changes

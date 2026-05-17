@@ -202,7 +202,7 @@ export function EmailProviderForm({ initialSettings, appUrl }: EmailProviderForm
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 dark:text-black min-w-[140px]"
+                            className="min-w-[140px]"
                         >
                             {loading ? (
                                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { createWebhook, toggleWebhook, deleteWebhook, testWebhook } from "@/app/actions/webhook";
 import { Webhook, Plus, Trash2, Zap, ZapOff, Send, CheckCircle, XCircle, Globe, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const EVENTS = [
     { value: "subscribe", label: "Subscribe" },
@@ -80,12 +81,9 @@ export function WebhooksManager({ webhooks: initialWebhooks, brands }: WebhooksM
                         Send HTTP callbacks to external services like Zapier, n8n, or Make.
                     </p>
                 </div>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors"
-                >
+                <Button onClick={() => setShowForm(!showForm)} className="gap-2">
                     <Plus className="w-4 h-4" /> Add Webhook
-                </button>
+                </Button>
             </div>
 
             {showForm && (
@@ -95,11 +93,11 @@ export function WebhooksManager({ webhooks: initialWebhooks, brands }: WebhooksM
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">Name</label>
-                                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Zapier — New Subscriber" className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none" />
+                                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Zapier — New Subscriber" className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-primary/20 focus:border-transparent outline-none" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">Brand</label>
-                                    <select value={brandId} onChange={e => setBrandId(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none">
+                                    <select value={brandId} onChange={e => setBrandId(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-primary/20 focus:border-transparent outline-none">
                                         <option value="">Select brand...</option>
                                         {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                     </select>
@@ -107,13 +105,13 @@ export function WebhooksManager({ webhooks: initialWebhooks, brands }: WebhooksM
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">Endpoint URL</label>
-                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://hooks.zapier.com/..." className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-mono focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none" />
+                                <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://hooks.zapier.com/..." className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-mono focus:ring-2 focus:ring-primary/20 focus:border-transparent outline-none" />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2">Events</label>
                                 <div className="flex flex-wrap gap-2">
                                     {EVENTS.map(ev => (
-                                        <button key={ev.value} type="button" onClick={() => toggleEvent(ev.value)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEvents.includes(ev.value) ? "bg-teal-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}>
+                                        <button key={ev.value} type="button" onClick={() => toggleEvent(ev.value)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEvents.includes(ev.value) ? "bg-primary text-primary-foreground" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}>
                                             {ev.label}
                                         </button>
                                     ))}
@@ -121,12 +119,12 @@ export function WebhooksManager({ webhooks: initialWebhooks, brands }: WebhooksM
                             </div>
                             {error && <div className="p-2 rounded-lg bg-red-500/10 text-red-600 text-sm">{error}</div>}
                             <div className="flex gap-2">
-                                <button type="submit" disabled={isPending} className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50">
+                                <Button type="submit" disabled={isPending}>
                                     {isPending ? "Creating..." : "Create Webhook"}
-                                </button>
-                                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                                     Cancel
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </CardContent>
