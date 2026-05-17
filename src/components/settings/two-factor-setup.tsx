@@ -121,7 +121,7 @@ export function TwoFactorSetup({ enabled, recoveryCodesLeft }: TwoFactorSetupPro
                         Each code can only be used once. Store them in a safe place.
                     </p>
                 </div>
-                <Button onClick={reset} className="bg-blue-600 text-white hover:bg-blue-700">Done</Button>
+                <Button onClick={reset} className="gap-2">Done</Button>
             </div>
         );
     }
@@ -162,7 +162,7 @@ export function TwoFactorSetup({ enabled, recoveryCodesLeft }: TwoFactorSetupPro
                 </div>
                 {error && <p className="text-sm text-red-500">{error}</p>}
                 <div className="flex gap-2">
-                    <Button type="submit" disabled={loading} className="bg-red-600 text-white hover:bg-red-700">
+                    <Button type="submit" disabled={loading} variant="destructive">
                         {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Disable 2FA
                     </Button>
                     <Button type="button" variant="outline" onClick={reset}>Cancel</Button>
@@ -192,7 +192,7 @@ export function TwoFactorSetup({ enabled, recoveryCodesLeft }: TwoFactorSetupPro
                 </div>
                 {error && <p className="text-sm text-red-500">{error}</p>}
                 <div className="flex gap-2">
-                    <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700">
+                    <Button type="submit" disabled={loading} className="gap-2">
                         {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Generate New Codes
                     </Button>
                     <Button type="button" variant="outline" onClick={reset}>Cancel</Button>
@@ -226,7 +226,7 @@ export function TwoFactorSetup({ enabled, recoveryCodesLeft }: TwoFactorSetupPro
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={() => setView("setup-verify")} className="bg-blue-600 text-white hover:bg-blue-700">Continue</Button>
+                    <Button onClick={() => setView("setup-verify")} className="gap-2">Continue</Button>
                     <Button variant="outline" onClick={reset}>Cancel</Button>
                 </div>
             </div>
@@ -256,7 +256,7 @@ export function TwoFactorSetup({ enabled, recoveryCodesLeft }: TwoFactorSetupPro
                 </div>
                 {error && <p className="text-sm text-red-500">{error}</p>}
                 <div className="flex gap-2">
-                    <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700">
+                    <Button type="submit" disabled={loading} className="gap-2">
                         {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Enable 2FA
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setView("setup-qr")}>Back</Button>
@@ -314,8 +314,7 @@ export function TwoFactorSetup({ enabled, recoveryCodesLeft }: TwoFactorSetupPro
                     <Button
                         onClick={startSetup}
                         disabled={loading}
-                        className="bg-blue-600 text-white hover:bg-blue-700"
-                    >
+                                           >
                         {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Set Up 2FA
                     </Button>

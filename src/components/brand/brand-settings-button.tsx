@@ -74,7 +74,7 @@ export function BrandSettingsButton({ brand }: BrandSettingsButtonProps) {
                         <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800">
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700">
+                        <Button type="submit" disabled={loading}>
                             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             Save Changes
                         </Button>

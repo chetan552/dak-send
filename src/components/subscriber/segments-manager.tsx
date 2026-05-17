@@ -145,7 +145,7 @@ export function SegmentsManager({ listId, segments, customFields = [] }: { listI
                     </div>
                 </details>
 
-                <Button type="submit" disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto self-start mt-2">
+                <Button type="submit" disabled={isLoading} className="w-full sm:w-auto self-start mt-2">
                     <Plus className="w-4 h-4 mr-2" /> Create Segment
                 </Button>
             </form>

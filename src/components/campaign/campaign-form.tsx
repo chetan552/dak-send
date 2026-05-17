@@ -189,7 +189,7 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
             )}
 
             <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/50 flex justify-end">
-                <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700 gap-2">
+                <Button type="submit" disabled={loading} className="gap-2">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {initialData ? 'Update Draft' : 'Save Draft'}
                 </Button>

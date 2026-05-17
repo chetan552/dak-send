@@ -203,7 +203,7 @@ export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {
             )}
 
             <div className="flex items-center gap-3">
-                <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                <Button type="submit" disabled={loading} className="gap-2">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Changes
                 </Button>

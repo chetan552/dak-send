@@ -55,7 +55,7 @@ export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
 
     if (!isOpen) {
         return (
-            <Button onClick={() => setIsOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+            <Button onClick={() => setIsOpen(true)} className="gap-2">
                 <Plus className="w-4 h-4" /> Add RSS Feed
             </Button>
         );
@@ -229,7 +229,7 @@ export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
             </div>
 
             <div className="flex items-center gap-3 pt-2">
-                <Button type="submit" disabled={loading || !selectedBrand} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                <Button type="submit" disabled={loading || !selectedBrand} className="gap-2">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rss className="w-4 h-4" />}
                     Add Feed
                 </Button>

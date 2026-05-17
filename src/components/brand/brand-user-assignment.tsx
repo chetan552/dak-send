@@ -82,7 +82,7 @@ export function BrandUserAssignment({
                             required
                             className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus-visible:ring-indigo-500 text-zinc-900 dark:text-white"
                         />
-                        <Button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[80px]">
+                        <Button type="submit" disabled={loading} className="min-w-[80px]">
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assign"}
                         </Button>
                     </form>

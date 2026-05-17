@@ -890,7 +890,7 @@ export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps
                         <Button type="button" variant="outline" size="sm" onClick={handlePreview} className="gap-1.5 border-zinc-200 dark:border-zinc-700">
                             <Eye className="w-4 h-4" /> Preview
                         </Button>
-                        <Button type="button" size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white">
+                        <Button type="button" size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
                             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                             {saving ? "Saving…" : "Save"}
                         </Button>

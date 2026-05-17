@@ -27,7 +27,7 @@ export default async function TemplatesPage() {
                     </p>
                 </div>
                 <Link href="/dashboard/templates/save">
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)]">
+                    <Button className="gap-2">
                         <Plus className="w-4 h-4" /> Save Template
                     </Button>
                 </Link>

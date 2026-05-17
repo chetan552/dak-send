@@ -31,7 +31,7 @@ export default async function AutomationsPage() {
                     </p>
                 </div>
                 <Link href="/dashboard/automations/new">
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)]">
+                    <Button className="gap-2">
                         <Plus className="w-4 h-4" /> New Automation
                     </Button>
                 </Link>
@@ -47,7 +47,7 @@ export default async function AutomationsPage() {
                         </p>
                         <Link
                             href="/dashboard/automations/new"
-                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium text-sm"
                         >
                             <Plus className="w-4 h-4" /> Create Automation
                         </Link>

@@ -25,7 +25,7 @@ export default async function FormsPage() {
                     </p>
                 </div>
                 <Link href="/dashboard/forms/new">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-2 transition-all shadow-[0_0_20px_rgba(13,148,136,0.3)] hover:shadow-[0_0_25px_rgba(13,148,136,0.5)]">
+                    <Button className="gap-2">
                         <Plus className="w-4 h-4" /> New Form
                     </Button>
                 </Link>
@@ -41,7 +41,7 @@ export default async function FormsPage() {
                         </p>
                         <Link
                             href="/dashboard/forms/new"
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors text-sm font-medium"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium"
                         >
                             <Plus className="w-4 h-4" /> Create Form
                         </Link>

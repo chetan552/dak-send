@@ -88,7 +88,7 @@ export function ListSettingsForm({ list }: { list: any }) {
                     <Textarea id="goodbyeEmailHtml" name="goodbyeEmailHtml" defaultValue={list.goodbyeEmailHtml || ""} placeholder="<p>We're sad to see you go.</p>" className="h-32 font-mono text-sm" />
                 </div>
             </div>
-            <Button type="submit" disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save Settings"}
             </Button>
         </form>

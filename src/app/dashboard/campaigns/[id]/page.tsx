@@ -97,7 +97,7 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                             </Link>
                             <TestSendButton campaignId={campaign.id} />
                             <Link href={`/dashboard/campaigns/${campaign.id}/send`}>
-                                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)]">
+                                <Button className="gap-2">
                                     <Send className="w-4 h-4" /> Finalize & Send
                                 </Button>
                             </Link>

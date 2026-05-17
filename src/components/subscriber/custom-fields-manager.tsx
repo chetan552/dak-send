@@ -71,7 +71,7 @@ export function CustomFieldsManager({ listId, customFields }: { listId: string, 
                     <Switch id="required" checked={required} onCheckedChange={setRequired} />
                     <Label htmlFor="required" className="text-sm">Required</Label>
                 </div>
-                <Button type="submit" disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto">
+                <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
                     <Plus className="w-4 h-4 mr-2" /> Add Field
                 </Button>
             </form>
