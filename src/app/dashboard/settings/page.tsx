@@ -10,7 +10,6 @@ import { BrandUserAssignment } from "@/components/brand/brand-user-assignment";
 import { Briefcase, Cloud } from "lucide-react";
 import { EmailProviderForm } from "@/components/settings/email-provider-form";
 import { AIConfigForm } from "@/components/settings/ai-config-form";
-import { ThemeShortcutInput } from "@/components/settings/theme-shortcut-input";
 import { SESStats } from "@/components/settings/ses-stats";
 import { getSystemSettings } from "@/app/actions/settings";
 import { ApiKeyManager } from "@/components/settings/api-key-manager";
@@ -125,8 +124,6 @@ export default async function SettingsPage() {
                     </div>
                 </CardContent>
             </Card>
-
-            <ThemeShortcutInput />
 
             {currentUserRole === "admin" && (
                 <div className="grid grid-cols-1 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
