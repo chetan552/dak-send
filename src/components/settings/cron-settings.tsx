@@ -107,8 +107,8 @@ function CronRow({
         <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-4 bg-white dark:bg-zinc-950/50">
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <div className={`mt-0.5 w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${enabled ? "bg-blue-500/10" : "bg-zinc-100 dark:bg-zinc-800"}`}>
-                        <Clock className={`w-4 h-4 ${enabled ? "text-blue-500" : "text-zinc-400"}`} />
+                    <div className={`mt-0.5 w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${enabled ? "bg-primary/10" : "bg-zinc-100 dark:bg-zinc-800"}`}>
+                        <Clock className={`w-4 h-4 ${enabled ? "text-primary" : "text-zinc-400"}`} />
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -133,7 +133,7 @@ function CronRow({
                     aria-checked={enabled}
                     disabled={isPending}
                     onClick={() => handleToggle(!enabled)}
-                    className={`relative flex-shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${enabled ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"}`}
+                    className={`relative flex-shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${enabled ? "bg-primary" : "bg-zinc-300 dark:bg-zinc-700"}`}
                 >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
@@ -193,7 +193,7 @@ export function CronSettings({ settings, appUrl, cronSecret }: CronSettingsProps
 
     return (
         <div className="space-y-4">
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-500/5 border border-blue-200/60 dark:border-blue-500/20 p-3 text-xs text-blue-700 dark:text-blue-300">
+            <div className="rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-3 text-xs text-zinc-600 dark:text-zinc-400">
                 <strong>Built-in scheduler:</strong> When enabled, the worker process runs these jobs on schedule automatically — no external cron service needed. Changes take effect within 5 minutes as the worker re-reads settings. The HTTP endpoint URLs are also provided if you prefer an external scheduler (cron-job.org, Vercel, crontab).
             </div>
 
