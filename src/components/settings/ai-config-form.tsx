@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { updateSystemSettings } from "@/app/actions/settings";
-import type { LlmProviderId } from "@/lib/ai/config";
-import { LLM_PROVIDER_OPTIONS } from "@/lib/ai/config";
+import type { LlmProviderId } from "@/lib/ai/providers";
+import { LLM_PROVIDER_OPTIONS } from "@/lib/ai/providers";
 
 interface AIConfigFormProps {
     initialSettings: Record<string, string>;
