@@ -75,7 +75,7 @@ export function WebhooksManager({ webhooks: initialWebhooks, brands }: WebhooksM
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                        <Globe className="w-5 h-5 text-teal-500" /> Outgoing Webhooks
+                        <Globe className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Outgoing Webhooks
                     </h2>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
                         Send HTTP callbacks to external services like Zapier, n8n, or Make.

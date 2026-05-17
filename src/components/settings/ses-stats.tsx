@@ -50,7 +50,7 @@ export function SESStats() {
             <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                 <CardHeader>
                     <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5 text-zinc-400" /> Amazon SES Quota
+                        <BarChart3 className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Amazon SES Quota
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -74,7 +74,7 @@ export function SESStats() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <div>
                     <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Amazon SES Quota
+                        <BarChart3 className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Amazon SES Quota
                     </CardTitle>
                     <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">Real-time status of your SES account.</CardDescription>
                 </div>

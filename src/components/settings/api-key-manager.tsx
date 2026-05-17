@@ -37,7 +37,7 @@ export function ApiKeyManager({ hasExistingKey }: { hasExistingKey: boolean }) {
         <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
             <CardHeader>
                 <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                    <Key className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Transactional API Key
+                    <Key className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Transactional API Key
                 </CardTitle>
                 <CardDescription className="text-zinc-500 dark:text-zinc-400">
                     Used to authenticate requests to <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">/api/send</code>. Keys are stored as bcrypt hashes — the plaintext is shown only once upon rotation.

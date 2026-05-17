@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Shield, User, Flame, ShieldCheck, Timer } from "lucide-react";
+import { Settings, Shield, User, Flame, ShieldCheck, Timer, Plug } from "lucide-react";
 import { CreateUserButton } from "@/components/settings/create-user-button";
 import { DeleteUserButton } from "@/components/settings/delete-user-button";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,7 @@ export default async function SettingsPage() {
             <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                 <CardHeader>
                     <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                        <User className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Your Profile
+                        <User className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Your Profile
                     </CardTitle>
                     <CardDescription className="text-zinc-500 dark:text-zinc-400">Your personal account information.</CardDescription>
                 </CardHeader>
@@ -140,7 +140,7 @@ export default async function SettingsPage() {
                     <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                                <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Two-Factor Authentication Policy
+                                <Shield className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Two-Factor Authentication Policy
                             </CardTitle>
                             <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">
                                 Control whether 2FA is available or mandatory for all users.
@@ -158,7 +158,7 @@ export default async function SettingsPage() {
                     <CardHeader className="flex flex-row items-center justify-between">
                         <div>
                             <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                                <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> User Management
+                                <Shield className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> User Management
                             </CardTitle>
                             <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">Add and manage users on this DakSend instance.</CardDescription>
                         </div>
@@ -174,7 +174,7 @@ export default async function SettingsPage() {
                 <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm mt-8">
                     <CardHeader>
                         <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                            <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> Brand Access Management
+                            <Briefcase className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Brand Access Management
                         </CardTitle>
                         <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">
                             Assign users to manage specific sender brands.
@@ -206,7 +206,7 @@ export default async function SettingsPage() {
                 <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                     <CardHeader>
                         <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                            <Timer className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Cron Jobs
+                            <Timer className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Cron Jobs
                         </CardTitle>
                         <CardDescription className="text-zinc-500 dark:text-zinc-400 mt-1">
                             Enable the built-in scheduler or copy HTTP endpoints for your external cron service.
@@ -225,7 +225,7 @@ export default async function SettingsPage() {
             {/* Webhook & Integration Section */}
             <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-xl text-zinc-900 dark:text-white">Integrations</CardTitle>
+                    <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2"><Plug className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Integrations</CardTitle>
                     <CardDescription className="text-zinc-500 dark:text-zinc-400">Connect external services.</CardDescription>
                 </CardHeader>
                 <CardContent>

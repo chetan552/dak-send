@@ -118,7 +118,7 @@ export function EmailProviderForm({ initialSettings, appUrl }: EmailProviderForm
         <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
             <CardHeader>
                 <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                    <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Email Provider
+                    <Mail className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> Email Provider
                 </CardTitle>
                 <CardDescription className="text-zinc-500 dark:text-zinc-400">
                     DakSend can send through one of six transports. Pick a provider and add its credentials.

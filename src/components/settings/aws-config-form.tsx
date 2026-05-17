@@ -44,7 +44,7 @@ export function AWSConfigForm({ initialSettings }: AWSConfigFormProps) {
         <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
             <CardHeader>
                 <CardTitle className="text-xl text-zinc-900 dark:text-white flex items-center gap-2">
-                    <Key className="w-5 h-5 text-amber-600 dark:text-amber-400" /> AWS SES Credentials
+                    <Key className="w-5 h-5 text-zinc-500 dark:text-zinc-400" /> AWS SES Credentials
                 </CardTitle>
                 <CardDescription className="text-zinc-500 dark:text-zinc-400">Configure your Amazon Simple Email Service credentials.</CardDescription>
             </CardHeader>
