@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Rss, ListOrdered } from "lucide-react";
+import { Loader2, Plus, Rss, ListOrdered, SendHorizonal } from "lucide-react";
 import { createRssFeed } from "@/app/actions/rss";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,7 @@ export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
     const [loading, setLoading] = useState(false);
     const [selectedBrand, setSelectedBrand] = useState("");
     const [digestMode, setDigestMode] = useState(false);
+    const [autoSend, setAutoSend] = useState(false);
     const router = useRouter();
 
     const brandLists = lists.filter((l: any) => l.brandId === selectedBrand);
@@ -39,6 +40,7 @@ export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
             formData.set("listIds", checkedLists.map((l: any) => l.id).join(","));
             formData.set("brandId", selectedBrand);
             formData.set("digestMode", digestMode ? "1" : "0");
+            formData.set("autoSend", autoSend ? "1" : "0");
 
             await createRssFeed(formData);
             toast.success("RSS feed added!");
@@ -120,6 +122,26 @@ export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
                     </label>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                         Send <strong>one email per run</strong> listing all new items, instead of one email per item. Perfect for daily newsletters.
+                    </p>
+                </div>
+            </div>
+
+            {/* Auto-send toggle */}
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                <input
+                    type="checkbox"
+                    id="autoSend"
+                    checked={autoSend}
+                    onChange={(e) => setAutoSend(e.target.checked)}
+                    className="mt-0.5 rounded border-zinc-300"
+                />
+                <div>
+                    <label htmlFor="autoSend" className="text-sm font-medium text-zinc-900 dark:text-white cursor-pointer flex items-center gap-2">
+                        <SendHorizonal className="w-4 h-4 text-blue-500" />
+                        Auto-Send Campaigns
+                    </label>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Automatically dispatch each generated campaign to the selected lists without manual review. Leave off to review drafts first.
                     </p>
                 </div>
             </div>

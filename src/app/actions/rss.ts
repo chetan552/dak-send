@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Parser from "rss-parser";
+import { emailQueue } from "@/lib/queue";
+import { getWarmupRemaining } from "@/lib/warmup";
 
 const parser = new Parser();
 
@@ -95,6 +97,7 @@ export async function createRssFeed(formData: FormData) {
     const brandId = formData.get("brandId") as string;
     const listIdsStr = formData.get("listIds") as string;
     const digestMode = formData.get("digestMode") === "1";
+    const autoSend = formData.get("autoSend") === "1";
     const digestSubject = (formData.get("digestSubject") as string) || null;
     const digestWrapperHtml = (formData.get("digestWrapperHtml") as string) || null;
     // In digest mode templateHtml is the per-item block; in non-digest it's the full email.
@@ -126,6 +129,7 @@ export async function createRssFeed(formData: FormData) {
             listIds,
             templateHtml,
             digestMode,
+            autoSend,
             digestSubject,
             digestWrapperHtml,
         },
@@ -197,6 +201,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
     const listIdsStr = formData.get("listIds") as string;
     const templateHtml = formData.get("templateHtml") as string;
     const digestMode = formData.get("digestMode") === "1";
+    const autoSend = formData.get("autoSend") === "1";
     const digestSubject = formData.get("digestSubject") as string | null;
     const digestWrapperHtml = formData.get("digestWrapperHtml") as string | null;
 
@@ -213,6 +218,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
         data.templateHtml = templateHtml || null;
     }
     data.digestMode = digestMode;
+    data.autoSend = autoSend;
     data.digestSubject = digestSubject || null;
     data.digestWrapperHtml = digestWrapperHtml || null;
 
@@ -262,6 +268,63 @@ function renderItemBlock(template: string, item: {
         .replace(/\[RssAuthor\]/gi, item.creator || (item as any).author || "")
         .replace(/\[RssDate\]/gi, dateStr)
         .replace(/\[RssThumbnail\]/gi, item.enclosure?.url || "");
+}
+
+/** Internal helper: dispatch a just-created draft campaign to the given lists, without a user session. */
+async function autoDispatchCampaign(campaignId: string, brandId: string, listIds: string[]) {
+    // Gather subscribed emails across all target lists
+    const listSubs = await prisma.subscriber.findMany({
+        where: { listId: { in: listIds }, status: "subscribed" },
+        select: { id: true, email: true, name: true, listId: true },
+    });
+
+    if (listSubs.length === 0) return;
+
+    // Remove suppressed addresses (global + brand-scoped)
+    const suppressed = await prisma.suppressionList.findMany({
+        where: {
+            email: { in: listSubs.map(s => s.email) },
+            OR: [{ brandId: null }, { brandId }],
+        },
+        select: { email: true },
+    });
+    const suppressedSet = new Set(suppressed.map(s => s.email));
+
+    let subscribers = listSubs.filter(s => !suppressedSet.has(s.email));
+
+    // Deduplicate by email (subscriber may appear in multiple lists)
+    const seen = new Set<string>();
+    subscribers = subscribers.filter(s => {
+        if (seen.has(s.email)) return false;
+        seen.add(s.email);
+        return true;
+    });
+
+    // Apply domain warmup limit
+    const warmupRemaining = await getWarmupRemaining(brandId);
+    if (warmupRemaining !== -1 && subscribers.length > warmupRemaining) {
+        subscribers = subscribers.slice(0, warmupRemaining);
+    }
+
+    if (subscribers.length === 0) return;
+
+    await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: "sending", trackOpens: true, trackClicks: true },
+    });
+
+    await emailQueue.addBulk(
+        subscribers.map(sub => ({
+            name: "send-email",
+            data: {
+                campaignId,
+                subscriberId: sub.id,
+                subscriberEmail: sub.email,
+                subscriberName: sub.name,
+                listId: sub.listId,
+            },
+        }))
+    );
 }
 
 // Called by the cron endpoint to check all active feeds
@@ -326,7 +389,7 @@ export async function checkRssFeeds() {
                     .replace(/\[RssCount\]/gi, String(newItems.length))
                     .replace(/\[RssFeedName\]/gi, safeFeedName);
 
-                await prisma.campaign.create({
+                const campaign = await prisma.campaign.create({
                     data: {
                         name: `[Digest] ${safeFeedName} — ${today}`,
                         subject,
@@ -340,14 +403,18 @@ export async function checkRssFeeds() {
                     },
                 });
 
-                console.log(`Created digest campaign from RSS feed "${feed.name}" with ${newItems.length} item(s)`);
+                if (feed.autoSend && feed.listIds.length > 0) {
+                    await autoDispatchCampaign(campaign.id, feed.brandId, feed.listIds);
+                }
+
+                console.log(`Created digest campaign from RSS feed "${feed.name}" with ${newItems.length} item(s)${feed.autoSend ? " (auto-sending)" : ""}`);
             } else {
                 // ── PER-ITEM MODE (original behaviour): one campaign per new item ──
                 // Only create a campaign for the single newest item to avoid flooding
                 const template = feed.templateHtml || DEFAULT_RSS_TEMPLATE;
                 const htmlContent = renderItemBlock(template, newestItem);
 
-                await prisma.campaign.create({
+                const campaign = await prisma.campaign.create({
                     data: {
                         name: `[RSS] ${newestItem.title || safeFeedName}`,
                         subject: newestItem.title || `New from ${safeFeedName}`,
@@ -361,7 +428,11 @@ export async function checkRssFeeds() {
                     },
                 });
 
-                console.log(`Created campaign from RSS feed "${feed.name}" for item: ${newestItem.title}`);
+                if (feed.autoSend && feed.listIds.length > 0) {
+                    await autoDispatchCampaign(campaign.id, feed.brandId, feed.listIds);
+                }
+
+                console.log(`Created campaign from RSS feed "${feed.name}" for item: ${newestItem.title}${feed.autoSend ? " (auto-sending)" : ""}`);
             }
 
             await prisma.rssFeed.update({

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save, X, ListOrdered } from "lucide-react";
+import { Loader2, Save, X, ListOrdered, SendHorizonal } from "lucide-react";
 import { updateRssFeed } from "@/app/actions/rss";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,7 @@ const WRAPPER_TAGS = ["[RssItems]", "[RssDate]", "[RssCount]", "[RssFeedName]", 
 export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {
     const [loading, setLoading] = useState(false);
     const [digestMode, setDigestMode] = useState<boolean>(feed.digestMode ?? false);
+    const [autoSend, setAutoSend] = useState<boolean>(feed.autoSend ?? false);
     const router = useRouter();
 
     const brandLists = lists.filter((l: any) => l.brandId === feed.brandId);
@@ -36,6 +37,7 @@ export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {
             });
             formData.set("listIds", checkedLists.map((l: any) => l.id).join(","));
             formData.set("digestMode", digestMode ? "1" : "0");
+            formData.set("autoSend", autoSend ? "1" : "0");
 
             await updateRssFeed(feed.id, formData);
             toast.success("Feed updated!");
@@ -96,6 +98,26 @@ export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {
                     </label>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                         Send <strong>one email per run</strong> listing all new items instead of one email per item.
+                    </p>
+                </div>
+            </div>
+
+            {/* Auto-send toggle */}
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                <input
+                    type="checkbox"
+                    id="autoSendEdit"
+                    checked={autoSend}
+                    onChange={(e) => setAutoSend(e.target.checked)}
+                    className="mt-0.5 rounded border-zinc-300"
+                />
+                <div>
+                    <label htmlFor="autoSendEdit" className="text-sm font-medium text-zinc-900 dark:text-white cursor-pointer flex items-center gap-2">
+                        <SendHorizonal className="w-4 h-4 text-blue-500" />
+                        Auto-Send Campaigns
+                    </label>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Automatically dispatch each generated campaign to the selected lists without manual review. Leave off to review drafts first.
                     </p>
                 </div>
             </div>

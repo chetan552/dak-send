@@ -226,6 +226,7 @@ model RssFeed {
   digestMode        Boolean @default(false) // Send one email with ALL new items instead of one email per item
   digestSubject     String? // Subject template — supports [RssDate] [RssCount] [RssFeedName]
   digestWrapperHtml String? @db.Text // Outer email wrapper — use [RssItems] where items are injected. Also supports [RssDate] [RssCount] [RssFeedName] [Unsubscribe]
+  autoSend          Boolean @default(false) // Automatically dispatch campaigns without manual review
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
