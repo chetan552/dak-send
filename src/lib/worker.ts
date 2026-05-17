@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
 import cron from "node-cron";
