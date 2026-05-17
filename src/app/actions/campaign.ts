@@ -6,35 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { BlockEmailDocument } from "@/lib/blocks-to-html";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+import { safeOriginUrl } from "@/lib/safe-url";
 
 const MAX_HTML_BYTES = 1_500_000;
-
-function safeOriginUrl(raw: string): URL {
-    let url: URL;
-    try {
-        url = new URL(raw);
-    } catch {
-        throw new Error("That doesn't look like a valid URL.");
-    }
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-        throw new Error("Only http and https URLs are supported.");
-    }
-    const host = url.hostname.toLowerCase();
-    if (
-        host === "localhost" ||
-        host === "0.0.0.0" ||
-        host.endsWith(".localhost") ||
-        host.endsWith(".internal") ||
-        host.startsWith("127.") ||
-        host.startsWith("10.") ||
-        host.startsWith("192.168.") ||
-        /^169\.254\./.test(host) ||
-        /^172\.(1[6-9]|2[0-9]|3[01])\./.test(host)
-    ) {
-        throw new Error("Refusing to fetch from internal/private hosts.");
-    }
-    return url;
-}
 
 export async function importCampaignContent(input: { html?: string; url?: string }) {
     const session = await getServerSession(authOptions);

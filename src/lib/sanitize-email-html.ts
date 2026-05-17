@@ -4,6 +4,20 @@ import * as cheerio from "cheerio";
 const UNSAFE_TAGS = ["script", "iframe", "object", "embed", "applet", "base", "form"];
 const UNSAFE_ATTR_PREFIX = "on";
 
+// Allowlist of URL schemes permitted on href/src/action. Anything else (data:,
+// javascript:, vbscript:, file:, intent:, etc.) is stripped — data:image/svg+xml
+// can carry inline <script> and the dashboard preview is HTML-rendered.
+const SAFE_URL_SCHEMES = ["http:", "https:", "mailto:", "tel:", "cid:"];
+
+function isSafeAttrUrl(raw: string): boolean {
+    const trimmed = raw.trim();
+    if (!trimmed) return true; // empty href is harmless
+    // Relative URLs (no scheme) are fine
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return true;
+    const lower = trimmed.toLowerCase();
+    return SAFE_URL_SCHEMES.some((s) => lower.startsWith(s));
+}
+
 /**
  * Sanitize HTML pasted/fetched for use as email body or full email document.
  *
@@ -41,8 +55,7 @@ export function sanitizeEmailHtml(input: string): string {
                 continue;
             }
             if (lower === "href" || lower === "src" || lower === "action") {
-                const trimmed = (value || "").trim().toLowerCase();
-                if (trimmed.startsWith("javascript:") || trimmed.startsWith("data:text/html")) {
+                if (!isSafeAttrUrl(value || "")) {
                     $(el).removeAttr(name);
                 }
             }

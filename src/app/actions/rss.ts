@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import Parser from "rss-parser";
 import { emailQueue } from "@/lib/queue";
 import { getWarmupRemaining } from "@/lib/warmup";
+import { safeOriginUrl } from "@/lib/safe-url";
 
 const parser = new Parser();
 
@@ -105,9 +106,12 @@ export async function createRssFeed(formData: FormData) {
 
     if (!name || !url || !brandId) throw new Error("Missing required fields");
 
+    // Block SSRF before any network fetch
+    const safeUrl = safeOriginUrl(url);
+
     // Validate feed URL
     try {
-        await parser.parseURL(url);
+        await parser.parseURL(safeUrl.toString());
     } catch (e) {
         throw new Error("Invalid RSS feed URL — could not parse feed");
     }
@@ -208,8 +212,9 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
     const data: any = {};
     if (name) data.name = name;
     if (url && url !== feed.url) {
-        try { await parser.parseURL(url); } catch { throw new Error("Invalid RSS feed URL"); }
-        data.url = url;
+        const safeUrl = safeOriginUrl(url);
+        try { await parser.parseURL(safeUrl.toString()); } catch { throw new Error("Invalid RSS feed URL"); }
+        data.url = safeUrl.toString();
     }
     if (listIdsStr !== null && listIdsStr !== undefined) {
         data.listIds = listIdsStr.split(",").filter(Boolean);
@@ -344,7 +349,17 @@ export async function checkRssFeeds() {
                 if (minutesSinceCheck < feed.pollInterval) continue;
             }
 
-            const parsedFeed = await parser.parseURL(feed.url);
+            // Re-validate at fetch time: defense against DNS rebinding and against feeds
+            // created before SSRF checks were added.
+            let safeFeedUrl: URL;
+            try {
+                safeFeedUrl = safeOriginUrl(feed.url);
+            } catch (err) {
+                console.warn(`Skipping RSS feed ${feed.id} — unsafe URL:`, err instanceof Error ? err.message : err);
+                continue;
+            }
+
+            const parsedFeed = await parser.parseURL(safeFeedUrl.toString());
 
             if (!parsedFeed.items || parsedFeed.items.length === 0) {
                 await prisma.rssFeed.update({ where: { id: feed.id }, data: { lastCheckedAt: new Date() } });
