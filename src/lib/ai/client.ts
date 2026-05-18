@@ -46,6 +46,16 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
             headers["X-Title"] = "DakSend";
         }
 
+        // OpenAI's gpt-5 / o-series models reject `max_tokens` and require
+        // `max_completion_tokens`. Newer OpenAI chat models accept both, so
+        // for the openai provider we always send the new name. Other
+        // OpenAI-compatible providers (DeepSeek, OpenRouter, Groq) still
+        // expect the legacy `max_tokens`.
+        const tokenLimit = opts.maxTokens ?? 1024;
+        const tokenParam = provider.id === "openai"
+            ? { max_completion_tokens: tokenLimit }
+            : { max_tokens: tokenLimit };
+
         const res = await fetch(`${provider.baseUrl}/chat/completions`, {
             method: "POST",
             headers,
@@ -53,7 +63,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
                 model,
                 messages,
                 temperature: opts.temperature ?? 0.7,
-                max_tokens: opts.maxTokens ?? 1024,
+                ...tokenParam,
                 ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
             }),
             signal: controller.signal,
