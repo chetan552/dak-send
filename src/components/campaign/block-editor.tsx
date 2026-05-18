@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
     DndContext,
     closestCenter,
@@ -24,9 +24,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Type,
     Heading,
     ImageIcon,
+    Images,
     MousePointerClick,
     Minus,
     Space,
@@ -44,6 +51,9 @@ import {
     ChevronUp,
     Undo2,
     Redo2,
+    Smartphone,
+    Monitor,
+    AlertTriangle,
 } from "lucide-react";
 import {
     type EmailBlock,
@@ -55,6 +65,8 @@ import {
     type DividerBlock,
     type SpacerBlock,
     type ColumnsBlock,
+    type ImageRowBlock,
+    type ImageRowItem,
     type HtmlBlock,
     compileBlocksToHtml,
     createDefaultDocument,
@@ -103,6 +115,20 @@ const BLOCK_TYPES: {
         defaultProps: () => ({ src: "", alt: "", align: "center", href: "" }),
     },
     {
+        type: "imageRow",
+        icon: <Images className="w-5 h-5" />,
+        label: "Image Row",
+        description: "2 or 3 images side by side",
+        defaultProps: () => ({
+            images: [
+                { src: "", alt: "", href: "" },
+                { src: "", alt: "", href: "" },
+            ],
+            gap: 12,
+            align: "center",
+        }),
+    },
+    {
         type: "button",
         icon: <MousePointerClick className="w-5 h-5" />,
         label: "Button",
@@ -144,6 +170,101 @@ const BLOCK_TYPES: {
         defaultProps: () => ({ html: "<p>Custom HTML here</p>" }),
     },
 ];
+
+// ---------------------------------------------------------------------------
+// Per-block validation
+// ---------------------------------------------------------------------------
+
+type BlockIssue = { severity: "error" | "warning"; message: string };
+
+function validateBlock(block: BlockWithId): BlockIssue[] {
+    const issues: BlockIssue[] = [];
+    const stripTags = (s: string) => s.replace(/<[^>]*>/g, "").trim();
+
+    switch (block.type) {
+        case "text": {
+            const p = (block as TextBlock).props;
+            if (!p.content || !stripTags(p.content)) {
+                issues.push({ severity: "warning", message: "Text block is empty." });
+            }
+            break;
+        }
+        case "heading": {
+            const p = (block as HeadingBlock).props;
+            if (!p.content?.trim()) {
+                issues.push({ severity: "warning", message: "Heading has no text." });
+            }
+            break;
+        }
+        case "image": {
+            const p = (block as ImageBlock).props;
+            if (!p.src?.trim()) {
+                issues.push({ severity: "error", message: "Image is missing a URL." });
+            } else if (!/^https?:\/\//i.test(p.src.trim()) && !p.src.startsWith("data:")) {
+                issues.push({ severity: "error", message: "Image URL must start with http(s):// or data:." });
+            }
+            if (!p.alt?.trim()) {
+                issues.push({ severity: "warning", message: "Image has no alt text (hurts accessibility)." });
+            }
+            if (p.href?.trim() && !/^https?:\/\//i.test(p.href.trim())) {
+                issues.push({ severity: "error", message: "Image link URL must start with http(s)://." });
+            }
+            break;
+        }
+        case "button": {
+            const p = (block as ButtonBlock).props;
+            if (!p.text?.trim()) {
+                issues.push({ severity: "warning", message: "Button has no label." });
+            }
+            const href = p.href?.trim() ?? "";
+            if (!href || href === "https://" || href === "http://") {
+                issues.push({ severity: "error", message: "Button link URL is empty." });
+            } else if (!/^(https?:\/\/|mailto:|tel:)/i.test(href) && !href.includes("[")) {
+                issues.push({ severity: "error", message: "Button link must start with http(s)://, mailto:, or tel:." });
+            }
+            break;
+        }
+        case "imageRow": {
+            const p = (block as ImageRowBlock).props;
+            const images = p.images || [];
+            if (images.length === 0) {
+                issues.push({ severity: "error", message: "Image row has no images." });
+            }
+            images.forEach((img, i) => {
+                const src = img.src?.trim() ?? "";
+                if (!src) {
+                    issues.push({ severity: "error", message: `Image ${i + 1} is missing a URL.` });
+                } else if (!/^https?:\/\//i.test(src) && !src.startsWith("data:")) {
+                    issues.push({ severity: "error", message: `Image ${i + 1} URL must start with http(s):// or data:.` });
+                }
+                if (!img.alt?.trim()) {
+                    issues.push({ severity: "warning", message: `Image ${i + 1} has no alt text.` });
+                }
+                if (img.href?.trim() && !/^https?:\/\//i.test(img.href.trim())) {
+                    issues.push({ severity: "error", message: `Image ${i + 1} link URL must start with http(s)://.` });
+                }
+            });
+            break;
+        }
+        case "html": {
+            const p = (block as HtmlBlock).props;
+            if (!p.html?.trim()) {
+                issues.push({ severity: "warning", message: "HTML block is empty." });
+            }
+            break;
+        }
+    }
+    return issues;
+}
+
+function validateDoc(doc: BlockEmailDocument): Map<string, BlockIssue[]> {
+    const map = new Map<string, BlockIssue[]>();
+    for (const block of doc.blocks as BlockWithId[]) {
+        const issues = validateBlock(block);
+        if (issues.length > 0) map.set(block.id, issues);
+    }
+    return map;
+}
 
 // ---------------------------------------------------------------------------
 // Individual block renderer (preview)
@@ -214,6 +335,35 @@ function BlockPreview({ block }: { block: BlockWithId }) {
                     >
                         {p.text || "Button"}
                     </span>
+                </div>
+            );
+        }
+        case "imageRow": {
+            const p = (block as ImageRowBlock).props;
+            const imgs = p.images || [];
+            const justify = p.align === "left" ? "flex-start" : p.align === "right" ? "flex-end" : "center";
+            return (
+                <div style={{ display: "flex", justifyContent: justify, gap: `${p.gap ?? 12}px` }}>
+                    {imgs.map((img, i) =>
+                        img.src ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                key={i}
+                                src={img.src}
+                                alt={img.alt || ""}
+                                style={{ flex: 1, minWidth: 0, maxWidth: `${100 / imgs.length}%`, borderRadius: p.rounded ? 8 : 0 }}
+                            />
+                        ) : (
+                            <div
+                                key={i}
+                                className="flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded border-2 border-dashed border-zinc-300 dark:border-zinc-600"
+                                style={{ flex: 1, minHeight: 80, minWidth: 0 }}
+                            >
+                                <ImageIcon className="w-5 h-5 text-zinc-400 mb-1" />
+                                <span className="text-[10px] text-zinc-400">Image {i + 1}</span>
+                            </div>
+                        )
+                    )}
                 </div>
             );
         }
@@ -478,6 +628,104 @@ function BlockPropsPanel({
                 </div>
             );
         }
+        case "imageRow": {
+            const p = (block as ImageRowBlock).props;
+            const images = p.images || [];
+            const setCount = (n: number) => {
+                const next = images.slice(0, n);
+                while (next.length < n) next.push({ src: "", alt: "", href: "" });
+                update({ images: next });
+            };
+            const setImage = (i: number, patch: Partial<ImageRowItem>) => {
+                const next = images.map((img, idx) => (idx === i ? { ...img, ...patch } : img));
+                update({ images: next });
+            };
+            return (
+                <div className="space-y-3 p-4">
+                    <PropRow label="Number of Images">
+                        <div className="flex gap-1">
+                            {([2, 3] as const).map(n => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setCount(n)}
+                                    className={cn(
+                                        "flex-1 py-1 text-xs font-medium rounded border transition-colors",
+                                        images.length === n
+                                            ? "bg-indigo-600 text-white border-indigo-600"
+                                            : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                    )}
+                                >
+                                    {n} columns
+                                </button>
+                            ))}
+                        </div>
+                    </PropRow>
+                    <PropRow label="Gap (px)">
+                        <Input
+                            type="number"
+                            value={p.gap ?? 12}
+                            onChange={e => update({ gap: parseInt(e.target.value) || 0 })}
+                            className="h-8 text-sm"
+                        />
+                    </PropRow>
+                    <PropRow label="Row Alignment">
+                        <AlignSelect value={p.align} onChange={v => update({ align: v })} />
+                    </PropRow>
+                    <PropRow label="Padding (CSS)">
+                        <Input
+                            value={p.padding || "16px 24px"}
+                            onChange={e => update({ padding: e.target.value })}
+                            className="h-8 text-sm"
+                            placeholder="16px 24px"
+                        />
+                    </PropRow>
+                    <div className="flex items-center gap-2">
+                        <input
+                            id="row-rounded"
+                            type="checkbox"
+                            checked={!!p.rounded}
+                            onChange={e => update({ rounded: e.target.checked })}
+                            className="rounded"
+                        />
+                        <Label htmlFor="row-rounded" className="text-sm cursor-pointer">Rounded corners</Label>
+                    </div>
+
+                    {images.map((img, i) => (
+                        <div
+                            key={i}
+                            className="space-y-2 pt-3 border-t border-zinc-200 dark:border-zinc-800"
+                        >
+                            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Image {i + 1}</p>
+                            <PropRow label="Image URL">
+                                <Input
+                                    value={img.src}
+                                    onChange={e => setImage(i, { src: e.target.value })}
+                                    className="h-8 text-sm"
+                                    placeholder="https://..."
+                                />
+                            </PropRow>
+                            <PropRow label="Alt Text">
+                                <Input
+                                    value={img.alt || ""}
+                                    onChange={e => setImage(i, { alt: e.target.value })}
+                                    className="h-8 text-sm"
+                                    placeholder="Describe the image"
+                                />
+                            </PropRow>
+                            <PropRow label="Link URL (optional)">
+                                <Input
+                                    value={img.href || ""}
+                                    onChange={e => setImage(i, { href: e.target.value })}
+                                    className="h-8 text-sm"
+                                    placeholder="https://..."
+                                />
+                            </PropRow>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
         case "html": {
             const p = (block as HtmlBlock).props;
             return (
@@ -550,6 +798,7 @@ function DocumentSettingsPanel({
 function SortableBlockCard({
     block,
     isSelected,
+    issues,
     onSelect,
     onDelete,
     onDuplicate,
@@ -560,6 +809,7 @@ function SortableBlockCard({
 }: {
     block: BlockWithId;
     isSelected: boolean;
+    issues: BlockIssue[];
     onSelect: () => void;
     onDelete: () => void;
     onDuplicate: () => void;
@@ -584,6 +834,7 @@ function SortableBlockCard({
     };
 
     const blockMeta = BLOCK_TYPES.find(bt => bt.type === block.type);
+    const hasError = issues.some(i => i.severity === "error");
 
     return (
         <div
@@ -592,9 +843,13 @@ function SortableBlockCard({
             onClick={onSelect}
             className={cn(
                 "group relative border-2 rounded-lg transition-all cursor-pointer bg-white dark:bg-zinc-950",
-                isSelected
-                    ? "border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
-                    : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                isSelected && hasError
+                    ? "border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.15)]"
+                    : isSelected
+                        ? "border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
+                        : hasError
+                            ? "border-red-300 dark:border-red-900/60 hover:border-red-400 dark:hover:border-red-800"
+                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
             )}
         >
             {/* Block type label */}
@@ -615,6 +870,20 @@ function SortableBlockCard({
                 </span>
                 <span className="text-zinc-400 dark:text-zinc-500">{blockMeta?.icon}</span>
                 <span className="flex-1">{blockMeta?.label || block.type}</span>
+                {issues.length > 0 && (
+                    <span
+                        className={cn(
+                            "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                            hasError
+                                ? "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                                : "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400"
+                        )}
+                        title={issues.map(i => i.message).join("\n")}
+                    >
+                        <AlertTriangle className="w-3 h-3" />
+                        {issues.length}
+                    </span>
+                )}
 
                 {/* Actions — shown on hover/select */}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -674,44 +943,40 @@ interface BlockEditorProps {
 }
 
 export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps) {
-    const [doc, setDoc] = useState<BlockEmailDocument>(
-        initialDoc && initialDoc.blocks?.length > 0 ? initialDoc : createDefaultDocument()
-    );
+    const initial = initialDoc && initialDoc.blocks?.length > 0 ? initialDoc : createDefaultDocument();
+    // History stack as React state so undo/redo buttons reactively enable/disable.
+    const [history, setHistory] = useState<BlockEmailDocument[]>([initial]);
+    const [historyIndex, setHistoryIndex] = useState(0);
+    const doc = history[historyIndex];
+
     const [selectedBlockId, setSelectedBlockId] = useState<string | null>(
         doc.blocks[0]?.id ?? null
     );
     const [activeId, setActiveId] = useState<string | null>(null);
     const [showPreview, setShowPreview] = useState(false);
     const [previewHtml, setPreviewHtml] = useState("");
+    const [previewWidth, setPreviewWidth] = useState<"desktop" | "mobile">("desktop");
     const [saving, setSaving] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
 
-    // History for undo/redo
-    const historyRef = useRef<BlockEmailDocument[]>([doc]);
-    const historyIndexRef = useRef(0);
+    const canUndo = historyIndex > 0;
+    const canRedo = historyIndex < history.length - 1;
 
     const updateDoc = useCallback((newDoc: BlockEmailDocument) => {
-        const idx = historyIndexRef.current;
-        // Trim future history
-        historyRef.current = historyRef.current.slice(0, idx + 1);
-        historyRef.current.push(newDoc);
-        historyIndexRef.current = historyRef.current.length - 1;
-        setDoc(newDoc);
-    }, []);
+        setHistory(prev => {
+            const trimmed = prev.slice(0, historyIndex + 1);
+            return [...trimmed, newDoc];
+        });
+        setHistoryIndex(idx => idx + 1);
+    }, [historyIndex]);
 
     const undo = useCallback(() => {
-        if (historyIndexRef.current > 0) {
-            historyIndexRef.current--;
-            setDoc(historyRef.current[historyIndexRef.current]);
-        }
+        setHistoryIndex(idx => (idx > 0 ? idx - 1 : idx));
     }, []);
 
     const redo = useCallback(() => {
-        if (historyIndexRef.current < historyRef.current.length - 1) {
-            historyIndexRef.current++;
-            setDoc(historyRef.current[historyIndexRef.current]);
-        }
-    }, []);
+        setHistoryIndex(idx => (idx < history.length - 1 ? idx + 1 : idx));
+    }, [history.length]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -805,25 +1070,67 @@ export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps
     const selectedBlock = doc.blocks.find(b => b.id === selectedBlockId) as BlockWithId | undefined;
     const activeBlock = activeId ? (doc.blocks.find(b => b.id === activeId) as BlockWithId | undefined) : undefined;
 
+    const issuesByBlock = useMemo(() => validateDoc(doc), [doc]);
+    const totals = useMemo(() => {
+        let errors = 0;
+        let warnings = 0;
+        for (const list of issuesByBlock.values()) {
+            for (const i of list) {
+                if (i.severity === "error") errors++;
+                else warnings++;
+            }
+        }
+        return { errors, warnings };
+    }, [issuesByBlock]);
+    const selectedIssues = selectedBlock ? issuesByBlock.get(selectedBlock.id) ?? [] : [];
+
     if (showPreview) {
+        const isMobile = previewWidth === "mobile";
         return (
             <div className="fixed inset-0 z-50 bg-zinc-900/80 flex flex-col">
                 <div className="flex items-center justify-between p-4 bg-zinc-950 border-b border-zinc-800">
                     <span className="text-white font-semibold">Email Preview</span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPreview(false)}
-                        className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                    >
-                        <EyeOff className="w-4 h-4 mr-2" /> Close Preview
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-0.5 p-0.5 rounded-md border border-zinc-700 bg-zinc-900">
+                            <button
+                                type="button"
+                                onClick={() => setPreviewWidth("desktop")}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors",
+                                    !isMobile ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"
+                                )}
+                                title="Desktop width (640px)"
+                            >
+                                <Monitor className="w-3.5 h-3.5" /> Desktop
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPreviewWidth("mobile")}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors",
+                                    isMobile ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-zinc-200"
+                                )}
+                                title="Mobile width (375px)"
+                            >
+                                <Smartphone className="w-3.5 h-3.5" /> Mobile
+                            </button>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowPreview(false)}
+                            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                        >
+                            <EyeOff className="w-4 h-4 mr-2" /> Close Preview
+                        </Button>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-auto bg-zinc-200 p-8 flex justify-center">
                     <iframe
                         srcDoc={previewHtml}
                         title="Email preview"
-                        className="w-[640px] min-h-[800px] bg-white shadow-xl rounded"
+                        style={{ width: isMobile ? 375 : 640 }}
+                        className="min-h-[800px] bg-white shadow-xl rounded transition-[width] duration-200"
                         sandbox="allow-same-origin"
                     />
                 </div>
@@ -877,14 +1184,38 @@ export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps
                 {/* Toolbar */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 flex-shrink-0">
                     <div className="flex items-center gap-2">
-                        <button type="button" onClick={undo} title="Undo (Ctrl+Z)" className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 disabled:opacity-30" disabled={historyIndexRef.current <= 0}>
+                        <button type="button" onClick={undo} title="Undo (Ctrl+Z)" className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 disabled:opacity-30 disabled:hover:bg-transparent" disabled={!canUndo}>
                             <Undo2 className="w-4 h-4" />
                         </button>
-                        <button type="button" onClick={redo} title="Redo" className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 disabled:opacity-30" disabled={historyIndexRef.current >= historyRef.current.length - 1}>
+                        <button type="button" onClick={redo} title="Redo" className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 disabled:opacity-30 disabled:hover:bg-transparent" disabled={!canRedo}>
                             <Redo2 className="w-4 h-4" />
                         </button>
                         <span className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1" />
                         <span className="text-sm text-zinc-500 dark:text-zinc-400">{doc.blocks.length} block{doc.blocks.length !== 1 ? "s" : ""}</span>
+                        {(totals.errors > 0 || totals.warnings > 0) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const firstId = doc.blocks.find(b => issuesByBlock.has(b.id))?.id;
+                                    if (firstId) {
+                                        setSelectedBlockId(firstId);
+                                        setShowSettings(false);
+                                    }
+                                }}
+                                className={cn(
+                                    "ml-1 flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors",
+                                    totals.errors > 0
+                                        ? "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50"
+                                        : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
+                                )}
+                                title="Click to jump to the first block with issues"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                {totals.errors > 0 && `${totals.errors} error${totals.errors !== 1 ? "s" : ""}`}
+                                {totals.errors > 0 && totals.warnings > 0 && ", "}
+                                {totals.warnings > 0 && `${totals.warnings} warning${totals.warnings !== 1 ? "s" : ""}`}
+                            </button>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Button type="button" variant="outline" size="sm" onClick={handlePreview} className="gap-1.5 border-zinc-200 dark:border-zinc-700">
@@ -915,6 +1246,7 @@ export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps
                                         key={block.id}
                                         block={block as BlockWithId}
                                         isSelected={selectedBlockId === block.id}
+                                        issues={issuesByBlock.get(block.id) ?? []}
                                         onSelect={() => { setSelectedBlockId(block.id); setShowSettings(false); }}
                                         onDelete={() => deleteBlock(block.id)}
                                         onDuplicate={() => duplicateBlock(block.id)}
@@ -935,15 +1267,33 @@ export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps
                             </DragOverlay>
                         </DndContext>
 
-                        {/* Add block button */}
-                        <button
-                            type="button"
-                            onClick={() => addBlock("text")}
-                            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-400 hover:text-indigo-500 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span className="text-sm">Add text block</span>
-                        </button>
+                        {/* Add block picker */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-400 hover:text-indigo-500 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span className="text-sm">Add block</span>
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="center" className="w-56">
+                                {BLOCK_TYPES.map(bt => (
+                                    <DropdownMenuItem
+                                        key={bt.type}
+                                        onSelect={() => addBlock(bt.type)}
+                                        className="gap-3 py-2 cursor-pointer"
+                                    >
+                                        <span className="text-zinc-400">{bt.icon}</span>
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-medium">{bt.label}</div>
+                                            <div className="text-xs text-zinc-400 truncate">{bt.description}</div>
+                                        </div>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
             </main>
@@ -963,6 +1313,26 @@ export function BlockEditor({ campaignId, initialDoc, onSave }: BlockEditorProps
                                 {BLOCK_TYPES.find(b => b.type === selectedBlock.type)?.label} Properties
                             </p>
                         </div>
+                        {selectedIssues.length > 0 && (
+                            <div className="px-4 pt-3">
+                                <ul className="space-y-1.5">
+                                    {selectedIssues.map((issue, i) => (
+                                        <li
+                                            key={i}
+                                            className={cn(
+                                                "flex items-start gap-2 p-2 rounded text-xs border",
+                                                issue.severity === "error"
+                                                    ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300"
+                                                    : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300"
+                                            )}
+                                        >
+                                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                            <span>{issue.message}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                         <BlockPropsPanel block={selectedBlock} onChange={updateBlock} />
                     </>
                 ) : (

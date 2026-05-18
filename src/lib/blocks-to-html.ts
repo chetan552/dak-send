@@ -12,6 +12,7 @@ export type BlockType =
     | "divider"
     | "spacer"
     | "columns"
+    | "imageRow"
     | "html";
 
 export interface TextBlock {
@@ -104,6 +105,23 @@ export interface HtmlBlock {
     };
 }
 
+export interface ImageRowItem {
+    src: string;
+    alt?: string;
+    href?: string;
+}
+
+export interface ImageRowBlock {
+    type: "imageRow";
+    props: {
+        images: ImageRowItem[];
+        gap?: number; // px gap between images
+        padding?: string; // outer row padding
+        rounded?: boolean;
+        align?: "left" | "center" | "right";
+    };
+}
+
 export type EmailBlock =
     | TextBlock
     | HeadingBlock
@@ -112,6 +130,7 @@ export type EmailBlock =
     | DividerBlock
     | SpacerBlock
     | ColumnsBlock
+    | ImageRowBlock
     | HtmlBlock;
 
 export interface BlockEmailDocument {
@@ -247,6 +266,43 @@ function compileColumns(block: ColumnsBlock): string {
 </tr>`;
 }
 
+function compileImageRow(block: ImageRowBlock): string {
+    const p = block.props;
+    const padding = p.padding || "16px 24px";
+    const gap = p.gap ?? 12;
+    const align = p.align || "center";
+    const images = (p.images || []).filter(img => img.src?.trim());
+    if (images.length === 0) return "";
+
+    const totalWidth = 600 - 48; // content minus default outer padding
+    const colWidth = Math.floor((totalWidth - gap * (images.length - 1)) / images.length);
+    const radius = p.rounded ? "border-radius:8px;" : "";
+
+    const tds = images.map((img, i) => {
+        const safeSrc = escapeAttr(img.src);
+        const safeAlt = escapeAttr(img.alt || "");
+        const imgTag = `<img src="${safeSrc}" alt="${safeAlt}" width="${colWidth}" style="display:block;width:100%;max-width:${colWidth}px;height:auto;${radius}" border="0" />`;
+        const linked = img.href && safeHref(img.href)
+            ? `<a href="${safeHref(img.href)}" style="display:block;">${imgTag}</a>`
+            : imgTag;
+        const isLast = i === images.length - 1;
+        const tdStyle = `vertical-align:top;width:${colWidth}px;${!isLast && gap ? `padding-right:${gap}px;` : ""}`;
+        return `<td valign="top" class="stack-column" style="${tdStyle}">
+      ${linked}
+    </td>`;
+    }).join("\n    ");
+
+    return `<tr>
+  <td align="${align}" style="padding:${padding};">
+    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="width:100%;">
+      <tr>
+        ${tds}
+      </tr>
+    </table>
+  </td>
+</tr>`;
+}
+
 function compileHtml(block: HtmlBlock): string {
     const padding = block.props.padding || "0 24px";
     // Strip dangerous tags/attributes while preserving safe email HTML
@@ -275,6 +331,7 @@ function compileBlock(block: EmailBlock & { id: string }): string {
         case "divider":  return compileDivider(block);
         case "spacer":   return compileSpacer(block);
         case "columns":  return compileColumns(block);
+        case "imageRow": return compileImageRow(block);
         case "html":     return compileHtml(block);
         default:         return "";
     }
