@@ -66,6 +66,24 @@ export async function deleteSegment(id: string, listId: string) {
     return { success: true };
 }
 
+export async function previewSegmentQuery(listId: string, query: string) {
+    await verifyListAccess(listId);
+
+    let rawQuery: any = {};
+    try {
+        rawQuery = JSON.parse(query);
+    } catch {
+        throw new Error("Invalid JSON");
+    }
+
+    const translatedWhere = translateSegmentQuery(rawQuery);
+    const total = await prisma.subscriber.count({
+        where: { ...translatedWhere, listId },
+    });
+
+    return { total };
+}
+
 export async function previewSegment(segmentId: string, listId: string) {
     await verifyListAccess(listId);
 

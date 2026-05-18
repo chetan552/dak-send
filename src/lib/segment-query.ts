@@ -3,7 +3,6 @@ const SUBSCRIBER_FIELDS = new Set([
     "id", "email", "name", "status", "hasConfirmedGdpr",
     "createdAt", "updatedAt", "listId", "list",
     "customFields", "subscriptionTokens",
-    "AND", "OR", "NOT",
 ]);
 
 /**
@@ -12,6 +11,9 @@ const SUBSCRIBER_FIELDS = new Set([
  * Standard fields (email, name, status, etc.) pass through as-is.
  * Unknown fields are treated as custom field names and auto-translated to
  * `customFields: { some: { customField: { name: X }, value: Y } }`.
+ *
+ * AND / OR / NOT combinators recurse so custom fields nested inside them
+ * are translated correctly.
  *
  * Special operators:
  *   has_tag: "tag-name"
@@ -40,40 +42,32 @@ export function translateSegmentQuery(query: Record<string, any>): Record<string
             const opts = typeof value === "object" && value !== null ? value : { name: String(value) };
             const eventName: string = opts.name;
             const withinDays: number = typeof opts.within_days === "number" ? opts.within_days : 30;
-            const gte: number = typeof opts.gte === "number" ? opts.gte : 1;
-
             const since = new Date(Date.now() - withinDays * 24 * 60 * 60 * 1000);
 
-            if (gte <= 1) {
-                // "at least 1 event" — use `some` (more efficient than _count)
-                prismaWhere.events = {
-                    some: {
-                        name: eventName,
-                        occurredAt: { gte: since },
-                    },
-                };
+            prismaWhere.events = {
+                some: { name: eventName, occurredAt: { gte: since } },
+            };
+            continue;
+        }
+
+        // ── AND / OR combinators — recurse into each clause ────────────────────
+        if (key === "AND" || key === "OR") {
+            if (Array.isArray(value)) {
+                prismaWhere[key] = value.map(item =>
+                    item && typeof item === "object" ? translateSegmentQuery(item) : item
+                );
             } else {
-                // "at least N events" — requires _count filter (Prisma 4.3+)
-                prismaWhere.events = {
-                    some: {
-                        name: eventName,
-                        occurredAt: { gte: since },
-                    },
-                };
-                // Append an AND clause for the count threshold
-                prismaWhere.AND = [
-                    ...(prismaWhere.AND || []),
-                    {
-                        events: {
-                            // Prisma where count gte — filter must match event criteria
-                            some: { name: eventName, occurredAt: { gte: since } },
-                        },
-                        // NOTE: Prisma does not expose _count in where clauses in all versions.
-                        // The `some` above ensures at least one match; true count ≥ N requires
-                        // a raw query or post-filter for gte > 1. We keep this as a best-effort
-                        // approximation (at least 1 event) for broad compatibility.
-                    },
-                ];
+                prismaWhere[key] = value;
+            }
+            continue;
+        }
+
+        // ── NOT combinator — recurse into the negated clause ───────────────────
+        if (key === "NOT") {
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                prismaWhere[key] = translateSegmentQuery(value);
+            } else {
+                prismaWhere[key] = value;
             }
             continue;
         }
