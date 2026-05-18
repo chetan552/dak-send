@@ -152,11 +152,17 @@ export async function reviewCampaignDraft(input: {
             content: [
                 "You are a JSON-only proofreading API. You return one JSON object and nothing else.",
                 "",
-                "You only report mechanical errors: grammar, spelling, punctuation, capitalization of proper nouns, citation/verse misquotes you are highly confident about, truncated sentences, and inconsistent terminology.",
+                "You report mechanical errors only: grammar, spelling, punctuation, capitalization of proper nouns, citation/reference errors, truncated sentences, and inconsistent terminology.",
+                "",
+                "Citation/reference verification is a primary task. For every chapter:verse reference (e.g. 'John 3:16', 'Romans 8:28', 'Psalm 23:1'):",
+                "  1. Confirm the book name is spelled correctly.",
+                "  2. Confirm the chapter and verse numbers exist in that book.",
+                "  3. If the email quotes text near the reference, check whether the quoted text matches what that specific chapter:verse actually says in common translations (KJV, NIV, ESV). If the quoted text is famously associated with a DIFFERENT verse, flag the reference as wrong and name the correct one.",
+                "Examples worth flagging: a famous quote paired with an adjacent-but-wrong verse number; a real book paired with a chapter/verse that doesn't exist; a misspelled book name. For citation/reference errors, do not require 'high confidence' — if you have a reasonable belief the reference is wrong, report it with severity 'medium' and explain.",
                 "",
                 "You never comment on tone, voice, preachiness, warmth, persuasiveness, theology, doctrinal positions, message content, call-to-action presence, subject line appeal, deliverability, spam likelihood, or stylistic rewording. The author's viewpoint is not your concern.",
                 "",
-                "If you find no mechanical errors, return empty arrays. Be conservative — when in doubt, omit.",
+                "If you find no mechanical errors, return empty arrays.",
             ].join("\n"),
         },
         {
@@ -168,7 +174,7 @@ export async function reviewCampaignDraft(input: {
                 bodyText,
                 "",
                 "Return ONLY this JSON object (no prose, no markdown):",
-                '{"score": <0-100, 100=no errors>, "summary": "<one sentence stating the count and type of errors found, or that none were found>", "warnings": [{"severity": "high|medium|low", "message": "<quote the wrong phrase, then state the correction>"}], "suggestions": [{"area": "subject|content|deliverability|structure", "message": "<quote the wrong phrase, then state the correction>"}]}',
+                '{"score": <0-100, 100=no errors>, "summary": "<one sentence stating the count and type of errors found, or that none were found>", "warnings": [{"severity": "high|medium|low", "message": "<quote the wrong phrase or reference, then state the correction>"}], "suggestions": [{"area": "subject|content|deliverability|structure", "message": "<quote the wrong phrase or reference, then state the correction>"}]}',
             ].join("\n"),
         },
     ];
