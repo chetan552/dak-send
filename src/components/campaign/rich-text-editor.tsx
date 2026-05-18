@@ -19,7 +19,8 @@ import { DOMParser } from '@tiptap/pm/model';
 import {
     Bold, Italic, Underline as UnderlineIcon, Strikethrough,
     List, ListOrdered, Link as LinkIcon, Heading2, Heading3, Quote,
-    Image as ImageIcon, Loader2, AlignLeft, AlignCenter, AlignRight, Type
+    Image as ImageIcon, Loader2, AlignLeft, AlignCenter, AlignRight, Type,
+    FileText
 } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
@@ -317,6 +318,70 @@ function cleanHtml(html: string): string {
 }
 
 const TEMPLATE_CATEGORIES = ['Custom', 'Newsletter', 'Marketing', 'E-commerce', 'Personal', 'Onboarding', 'Events', 'Engagement'];
+
+function PasteMarkdownDialog({
+    open,
+    onClose,
+    onInsert,
+}: {
+    open: boolean;
+    onClose: () => void;
+    onInsert: (markdown: string) => void;
+}) {
+    const [markdown, setMarkdown] = useState('');
+
+    const handleClose = () => {
+        setMarkdown('');
+        onClose();
+    };
+
+    const handleInsert = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!markdown.trim()) return;
+        onInsert(markdown);
+        setMarkdown('');
+        onClose();
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+            <DialogContent className="max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                <DialogHeader>
+                    <DialogTitle className="text-zinc-900 dark:text-white">Paste Markdown</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleInsert} className="space-y-4 pt-2">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Paste markdown below. It will be converted to formatted content and inserted at your cursor position.
+                    </p>
+                    <textarea
+                        value={markdown}
+                        onChange={(e) => setMarkdown(e.target.value)}
+                        placeholder={"# Heading\n\nA paragraph with **bold** and *italic*.\n\n- list item one\n- list item two\n\n[a link](https://example.com)"}
+                        autoFocus
+                        rows={14}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder-zinc-400 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono resize-y"
+                    />
+                    <div className="flex gap-2 pt-1 justify-end">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-sm font-medium transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!markdown.trim()}
+                            className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium transition-colors disabled:opacity-50"
+                        >
+                            Insert
+                        </button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function SaveAsTemplateDialog({ open, onClose, html }: { open: boolean; onClose: () => void; html: string }) {
     const [name, setName] = useState('');
@@ -679,6 +744,7 @@ interface ToolbarProps {
     onClean?: () => void;
     onSaveAsTemplate?: () => void;
     onOpenMediaPicker: () => void;
+    onPasteMarkdown: () => void;
     onEditImage?: () => void;
     isComplexHtml: boolean;
     iframeImageSelected?: boolean;
@@ -686,7 +752,7 @@ interface ToolbarProps {
     onIframeStyle?: (cssProp: string, cssVal: string) => void;
 }
 
-const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, onEditImage, isComplexHtml, iframeImageSelected, onIframeCommand, onIframeStyle }: ToolbarProps) => {
+const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAsTemplate, onOpenMediaPicker, onPasteMarkdown, onEditImage, isComplexHtml, iframeImageSelected, onIframeCommand, onIframeStyle }: ToolbarProps) => {
     // True when the content is shown inside the iframe (not TipTap, not raw source)
     const iframeMode = isComplexHtml && !isHtmlMode;
     const isImageSelected = (!isHtmlMode && !iframeMode && editor?.isActive('image')) ||
@@ -987,6 +1053,18 @@ const Toolbar = ({ editor, isHtmlMode, onToggleMode, onFormat, onClean, onSaveAs
                     <ImageIcon className="h-4 w-4" />
                 </Button>
 
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={isHtmlMode || iframeMode || !editor}
+                    onClick={(e) => { e.preventDefault(); onPasteMarkdown(); }}
+                    className="px-2 h-8 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
+                    title="Paste Markdown — converts to formatted content"
+                >
+                    <FileText className="h-4 w-4" />
+                </Button>
+
                 {/* Image-specific controls (shown when image is selected) */}
                 {isImageSelected && (
                     <>
@@ -1104,6 +1182,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
     const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
     const [editImageOpen, setEditImageOpen] = useState(false);
+    const [pasteMarkdownOpen, setPasteMarkdownOpen] = useState(false);
     // Tracks whichever <img> element the user last clicked in the iframe.
     const [selectedIframeImg, setSelectedIframeImg] = useState<HTMLImageElement | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -1600,7 +1679,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
 
     return (
         <div className="w-full relative shadow-sm">
-            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} onEditImage={() => setEditImageOpen(true)} isComplexHtml={isComplexHtml(value)} iframeImageSelected={!!selectedIframeImg} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
+            <Toolbar editor={editor} isHtmlMode={isHtmlMode} onToggleMode={handleToggleMode} onFormat={handleFormat} onClean={handleClean} onSaveAsTemplate={() => setSaveTemplateOpen(true)} onOpenMediaPicker={() => setMediaPickerOpen(true)} onPasteMarkdown={() => setPasteMarkdownOpen(true)} onEditImage={() => setEditImageOpen(true)} isComplexHtml={isComplexHtml(value)} iframeImageSelected={!!selectedIframeImg} onIframeCommand={applyIframeCommand} onIframeStyle={applyIframeStyle} />
 
             {/* HTML Source View */}
             <div className={!isHtmlMode ? "hidden" : "block"}>
@@ -1701,6 +1780,20 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 onSelect={(url, _filename, meta) => {
                     insertImage(url, meta);
                     setMediaPickerOpen(false);
+                }}
+            />
+
+            {/* Paste Markdown Dialog */}
+            <PasteMarkdownDialog
+                open={pasteMarkdownOpen}
+                onClose={() => setPasteMarkdownOpen(false)}
+                onInsert={(markdown) => {
+                    if (!editor) return;
+                    const { from, to } = editor.state.selection;
+                    // tiptap-markdown overrides insertContentAt to parse markdown
+                    // via editor.storage.markdown.parser, so the string is
+                    // converted to formatted content at the cursor position.
+                    editor.chain().focus().insertContentAt({ from, to }, markdown).run();
                 }}
             />
         </div>
