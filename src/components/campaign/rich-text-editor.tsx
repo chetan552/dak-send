@@ -337,6 +337,11 @@ function PasteMarkdownDialog({
 
     const handleInsert = (e: React.FormEvent) => {
         e.preventDefault();
+        // Radix portals the dialog DOM out, but React synthetic events still
+        // bubble through the React tree — without stopPropagation the parent
+        // <form> (e.g. the campaign form) would also receive this submit and
+        // fire its own save action.
+        e.stopPropagation();
         if (!markdown.trim()) return;
         onInsert(markdown);
         setMarkdown('');
@@ -401,6 +406,10 @@ function SaveAsTemplateDialog({ open, onClose, html }: { open: boolean; onClose:
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        // Stop the submit from bubbling to the parent campaign <form> — React
+        // synthetic events bubble through the React tree even though Radix
+        // portals the dialog DOM out.
+        e.stopPropagation();
         if (!name.trim()) { setError('Template name is required.'); return; }
         setSaving(true); setError('');
         try {
