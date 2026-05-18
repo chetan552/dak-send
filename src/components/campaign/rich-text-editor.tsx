@@ -1066,12 +1066,12 @@ interface RichTextEditorProps {
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const isComplexHtml = useCallback((htmlStr: string) => {
         const v = (htmlStr || '').trim().toLowerCase();
-        // Full document wrapper
+        // Full document wrapper — TipTap can't represent <html>/<head>/<body>
         if (v.startsWith('<!doctype') || v.startsWith('<html') || v.includes('<body')) return true;
         // <style> blocks — TipTap strips these, so render in iframe to preserve CSS classes
         if (/<style[\s>]/i.test(htmlStr)) return true;
-        // Wide table layouts typical of email templates
-        if (v.includes('<table') && v.includes('width="100%"')) return true;
+        // MSO conditional comments — Outlook-specific markup TipTap would lose
+        if (/<!--\s*\[if\s+(mso|gte mso|lte mso|!mso)/i.test(htmlStr)) return true;
         return false;
     }, []);
 
@@ -1121,110 +1121,137 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     // closure without needing to re-open the iframe document.
     const iframeUploadHandler = useRef<(file: File) => void>(() => {});
 
+    // Debounce CodeMirror onChange so parent re-renders are throttled while typing.
+    // The pending value is held in a ref and flushed on a timer / mode toggle / unmount.
+    const codeMirrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const codeMirrorPending = useRef<string | null>(null);
+    const flushCodeMirror = useCallback(() => {
+        if (codeMirrorTimer.current) {
+            clearTimeout(codeMirrorTimer.current);
+            codeMirrorTimer.current = null;
+        }
+        if (codeMirrorPending.current !== null) {
+            const val = codeMirrorPending.current;
+            codeMirrorPending.current = null;
+            onChangeRef.current(val);
+        }
+    }, []);
+    const handleCodeMirrorChange = useCallback((val: string) => {
+        lastSelfValue.current = val;
+        codeMirrorPending.current = val;
+        if (codeMirrorTimer.current) clearTimeout(codeMirrorTimer.current);
+        codeMirrorTimer.current = setTimeout(() => {
+            codeMirrorTimer.current = null;
+            const pending = codeMirrorPending.current;
+            codeMirrorPending.current = null;
+            if (pending !== null) onChangeRef.current(pending);
+        }, 250);
+    }, []);
+    useEffect(() => {
+        return () => flushCodeMirror();
+    }, [flushCodeMirror]);
+
     // Write HTML into iframe for visual preview of complex templates
     const iframeWriting = useRef(false);
     useEffect(() => {
-        if (!isHtmlMode && isComplexHtml(value) && iframeRef.current) {
-            // Skip rewriting if the value change came from the iframe itself
-            // (typing, image insertion, etc.). The DOM already reflects the
-            // latest content — rewriting would destroy the cursor position.
-            if (value === lastSelfValue.current) return;
+        if (isHtmlMode || !isComplexHtml(value) || !iframeRef.current) return;
+        // Skip rewriting if the value change came from the iframe itself
+        // (typing, image insertion, etc.). The DOM already reflects the
+        // latest content — rewriting would destroy the cursor position.
+        if (value === lastSelfValue.current) return;
 
-            // External rewrite — clear any previously-selected iframe image
-            setSelectedIframeImg(null);
+        // External rewrite — clear any previously-selected iframe image
+        setSelectedIframeImg(null);
 
-            const doc = iframeRef.current.contentDocument;
-            if (doc) {
-                iframeWriting.current = true;
-                doc.open();
-                doc.write(value);
-                doc.close();
+        const doc = iframeRef.current.contentDocument;
+        if (!doc) return;
 
-                // Make the body editable
-                if (doc.body) {
-                    doc.body.contentEditable = 'true';
-                    doc.body.style.outline = 'none';
+        iframeWriting.current = true;
+        doc.open();
+        doc.write(value);
+        doc.close();
+        if (!doc.body) return;
 
-                    // Sync edits back to parent
-                    doc.body.addEventListener('input', () => {
-                        if (!iframeWriting.current) {
-                            // Reconstruct the full HTML including doctype/html/head
-                            const doctype = doc.doctype
-                                ? `<!DOCTYPE ${doc.doctype.name}>\n`
-                                : '';
-                            const fullHtml = doctype + doc.documentElement.outerHTML;
-                            lastSelfValue.current = fullHtml;
-                            onChangeRef.current(fullHtml);
-                        }
-                    });
+        doc.body.contentEditable = 'true';
+        doc.body.style.outline = 'none';
 
-                    // Track selection so toolbar commands can restore it.
-                    // savedIframeSelection keeps the last non-collapsed range (for
-                    // formatting commands that need a selection). savedIframeCursor
-                    // keeps the latest position of any kind (for image insertion).
-                    doc.addEventListener('selectionchange', () => {
-                        const sel = doc.getSelection();
-                        if (!sel || sel.rangeCount === 0) return;
-                        const r = sel.getRangeAt(0);
-                        savedIframeCursor.current = r.cloneRange();
-                        if (!sel.isCollapsed) {
-                            savedIframeSelection.current = r.cloneRange();
-                        }
-                    });
-
-                    // Enable drag-drop uploads
-                    doc.addEventListener('dragover', (e) => {
-                        if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
-                            e.preventDefault();
-                        }
-                    });
-                    doc.addEventListener('drop', (e) => {
-                        const files = e.dataTransfer?.files;
-                        if (!files || files.length === 0) return;
-                        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-                        if (imageFiles.length === 0) return;
-                        e.preventDefault();
-                        imageFiles.forEach(file => iframeUploadHandler.current(file));
-                    });
-
-                    // Enable paste-from-clipboard uploads
-                    doc.addEventListener('paste', (e) => {
-                        const items = e.clipboardData?.items;
-                        if (!items) return;
-                        for (const item of Array.from(items)) {
-                            if (item.type.startsWith('image/')) {
-                                e.preventDefault();
-                                const file = item.getAsFile();
-                                if (file) iframeUploadHandler.current(file);
-                                return;
-                            }
-                        }
-                    });
-
-                    // Track which <img> the user clicked so the "Edit Image"
-                    // toolbar button becomes available in iframe mode.
-                    doc.addEventListener('click', (e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.tagName === 'IMG') {
-                            const img = target as HTMLImageElement;
-                            // Visual selection ring
-                            doc.querySelectorAll('img').forEach(el =>
-                                el.style.removeProperty('outline'));
-                            img.style.outline = '2px solid #3b82f6';
-                            setSelectedIframeImg(img);
-                        } else {
-                            doc.querySelectorAll('img').forEach(el =>
-                                el.style.removeProperty('outline'));
-                            setSelectedIframeImg(null);
-                        }
-                    });
-                }
-                // Allow the input listener to fire after initial write
-                requestAnimationFrame(() => {
-                    iframeWriting.current = false;
-                });
+        // Listener handles — captured so cleanup can detach them on unmount
+        // or before the next iframe rewrite. doc.open()/write()/close() above
+        // already replaces the document for new content, but on unmount the
+        // old listeners would otherwise hold references to React state setters.
+        const onInput = () => {
+            if (iframeWriting.current) return;
+            const doctype = doc.doctype ? `<!DOCTYPE ${doc.doctype.name}>\n` : '';
+            const fullHtml = doctype + doc.documentElement.outerHTML;
+            lastSelfValue.current = fullHtml;
+            onChangeRef.current(fullHtml);
+        };
+        const onSelectionChange = () => {
+            const sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const r = sel.getRangeAt(0);
+            savedIframeCursor.current = r.cloneRange();
+            if (!sel.isCollapsed) {
+                savedIframeSelection.current = r.cloneRange();
             }
-        }
+        };
+        const onDragOver = (e: DragEvent) => {
+            if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+                e.preventDefault();
+            }
+        };
+        const onDrop = (e: DragEvent) => {
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return;
+            const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+            e.preventDefault();
+            imageFiles.forEach(file => iframeUploadHandler.current(file));
+        };
+        const onPaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (const item of Array.from(items)) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const file = item.getAsFile();
+                    if (file) iframeUploadHandler.current(file);
+                    return;
+                }
+            }
+        };
+        const onClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'IMG') {
+                const img = target as HTMLImageElement;
+                doc.querySelectorAll('img').forEach(el => el.style.removeProperty('outline'));
+                img.style.outline = '2px solid #3b82f6';
+                setSelectedIframeImg(img);
+            } else {
+                doc.querySelectorAll('img').forEach(el => el.style.removeProperty('outline'));
+                setSelectedIframeImg(null);
+            }
+        };
+
+        doc.body.addEventListener('input', onInput);
+        doc.addEventListener('selectionchange', onSelectionChange);
+        doc.addEventListener('dragover', onDragOver);
+        doc.addEventListener('drop', onDrop);
+        doc.addEventListener('paste', onPaste);
+        doc.addEventListener('click', onClick);
+
+        // Allow the input listener to fire after initial write
+        const raf = requestAnimationFrame(() => { iframeWriting.current = false; });
+
+        return () => {
+            cancelAnimationFrame(raf);
+            doc.body?.removeEventListener('input', onInput);
+            doc.removeEventListener('selectionchange', onSelectionChange);
+            doc.removeEventListener('dragover', onDragOver);
+            doc.removeEventListener('drop', onDrop);
+            doc.removeEventListener('paste', onPaste);
+            doc.removeEventListener('click', onClick);
+        };
     }, [value, isHtmlMode, isComplexHtml]);
 
     /** Serialize the iframe's current DOM back to the parent onChange. */
@@ -1334,7 +1361,9 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
             TableCell,
             Markdown.configure({
                 html: true,
-                transformPastedText: true,
+                // Do NOT transform pasted text: users pasting prose that happens to
+                // contain `*`, `_`, or `#` would otherwise get unexpected formatting.
+                transformPastedText: false,
                 transformCopiedText: false,
             }),
             Link.configure({
@@ -1506,6 +1535,8 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     }, [handleDropOrPasteUpload]);
 
     const handleToggleMode = () => {
+        // Push any pending CodeMirror edits to the parent before switching views
+        flushCodeMirror();
         userExplicitMode.current = true;
         setIsHtmlMode(!isHtmlMode);
         if (editor) {
@@ -1578,7 +1609,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                         value={value}
                         height="600px"
                         extensions={[html()]}
-                        onChange={(val) => { lastSelfValue.current = val; onChange(val); }}
+                        onChange={handleCodeMirrorChange}
                         theme={theme === 'system' ? (systemTheme === 'dark' ? 'dark' : 'light') : (theme === 'dark' ? 'dark' : 'light')}
                         className="text-sm"
                     />
