@@ -159,7 +159,7 @@ export function EmailReviewPanel({
                         <div className="pt-3 mt-3 border-t border-zinc-200/70 dark:border-zinc-800/70 space-y-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="text-xs text-zinc-500 dark:text-zinc-400 flex-1">
-                                    The checks above are deterministic. Run AI review for judgment calls — tone, clarity, off-brand wording, weak CTAs.
+                                    AI proofreading — flags grammar, spelling, punctuation, and likely-incorrect references. Does not give style, tone, or content advice.
                                 </div>
                                 <button
                                     type="button"
@@ -172,7 +172,7 @@ export function EmailReviewPanel({
                                     ) : (
                                         <Sparkles className="w-3.5 h-3.5" />
                                     )}
-                                    {aiLoading ? "Reviewing…" : aiReview ? "Re-run AI" : "Run AI review"}
+                                    {aiLoading ? "Proofreading…" : aiReview ? "Re-run proofread" : "Proofread with AI"}
                                 </button>
                             </div>
 
