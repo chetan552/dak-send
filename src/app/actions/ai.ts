@@ -136,6 +136,71 @@ export async function reviewCampaign(campaignId: string): Promise<CampaignReview
     }
 }
 
+export async function reviewCampaignDraft(input: {
+    brandId: string;
+    subject: string;
+    html: string;
+}): Promise<CampaignReview> {
+    const brand = await requireBrandAccess(input.brandId);
+    const bodyText = htmlToText(input.html || "", { wordwrap: false }).slice(0, 6000);
+
+    if (!bodyText.trim()) throw new Error("Email body is empty — write some content before running review.");
+
+    const messages = [
+        {
+            role: "system" as const,
+            content:
+                "You are an email deliverability and clarity reviewer. Evaluate drafts honestly. Be specific. Avoid generic advice. Return JSON only.",
+        },
+        {
+            role: "user" as const,
+            content: [
+                "Review this email draft and return JSON.",
+                "",
+                `Subject: ${input.subject || "(none yet)"}`,
+                `From: ${brand.fromName || ""} <${brand.fromEmail || ""}>`,
+                "",
+                "Body (plain text):",
+                bodyText,
+                "",
+                'Return JSON with this exact shape:',
+                '{',
+                '  "score": 0-100,',
+                '  "summary": "one sentence",',
+                '  "warnings": [{"severity": "high"|"medium"|"low", "message": "..."}],',
+                '  "suggestions": [{"area": "subject"|"content"|"deliverability"|"structure", "message": "..."}]',
+                '}',
+                "",
+                "Focus on judgment calls a regex can't catch: tone, clarity, off-brand wording, weak/strong CTAs, unintended meaning. Skip mechanical checks (we run those separately). Aim for 3-6 items combined.",
+            ].join("\n"),
+        },
+    ];
+
+    try {
+        const result = await chatJson<CampaignReview>(messages, {
+            brandId: input.brandId,
+            model: "reasoner",
+            temperature: 0.4,
+            maxTokens: 1500,
+            timeoutMs: 60_000,
+        });
+
+        return {
+            score: typeof result.score === "number" ? Math.max(0, Math.min(100, Math.round(result.score))) : 50,
+            summary: typeof result.summary === "string" ? result.summary : "",
+            warnings: Array.isArray(result.warnings)
+                ? result.warnings.filter((w) => w && typeof w.message === "string").slice(0, 10)
+                : [],
+            suggestions: Array.isArray(result.suggestions)
+                ? result.suggestions.filter((s) => s && typeof s.message === "string").slice(0, 10)
+                : [],
+        };
+    } catch (err) {
+        if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
+        throw err;
+    }
+}
+
 export interface CampaignInsights {
     headline: string;
     summary: string;

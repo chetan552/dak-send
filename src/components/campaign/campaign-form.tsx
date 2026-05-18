@@ -12,6 +12,7 @@ import { createCampaignDraft, updateCampaignDraft } from "@/app/actions/campaign
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AiSubjectGenerator } from "@/components/campaign/ai-subject-generator";
+import { EmailReviewPanel } from "@/components/campaign/email-review-panel";
 
 interface CampaignFormProps {
     brands: any[];
@@ -172,6 +173,12 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                         <Label htmlFor="htmlText" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>
                         {!initialData && <TemplatePicker onSelect={setHtmlContent} />}
                     </div>
+                    <EmailReviewPanel
+                        html={htmlContent}
+                        subject={subject}
+                        brandId={brandId}
+                        aiEnabled={aiAvailable}
+                    />
                     <RichTextEditor
                         value={htmlContent}
                         onChange={setHtmlContent}
