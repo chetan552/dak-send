@@ -84,29 +84,27 @@ export async function reviewCampaign(campaignId: string): Promise<CampaignReview
     const messages = [
         {
             role: "system" as const,
-            content:
-                "You are an email deliverability and clarity reviewer. Evaluate campaigns honestly. Be specific. Avoid generic advice. Return JSON only.",
+            content: [
+                "You are a JSON-only email pre-send reviewer API. You return one JSON object and nothing else.",
+                "",
+                "You evaluate email campaigns for deliverability and clarity. Be specific and honest. Avoid generic advice.",
+                "",
+                "Do not comment on theology, religious interpretation, or the author's viewpoint. The message content's opinions are not your concern — only how it will perform.",
+            ].join("\n"),
         },
         {
             role: "user" as const,
             content: [
-                "Review this email campaign and return JSON.",
-                "",
                 `Subject: ${campaign.subject}`,
                 `From: ${campaign.brand?.fromName || ""} <${campaign.brand?.fromEmail || ""}>`,
                 "",
                 "Body (plain text):",
                 bodyText,
                 "",
-                'Return JSON with this exact shape:',
-                '{',
-                '  "score": 0-100,',
-                '  "summary": "one sentence",',
-                '  "warnings": [{"severity": "high"|"medium"|"low", "message": "..."}],',
-                '  "suggestions": [{"area": "subject"|"content"|"deliverability"|"structure", "message": "..."}]',
-                '}',
-                "",
                 "Consider: spam-trigger words, all-caps, excessive punctuation, image-to-text ratio (estimate from <img> tag count and body length), broken/empty links, missing unsubscribe, weak subject line, unclear call to action, deliverability red flags. Aim for 3-6 warnings/suggestions combined. Be specific about which part of the email each item refers to.",
+                "",
+                "Return ONLY this JSON object (no prose, no markdown):",
+                '{"score": <0-100>, "summary": "<one sentence>", "warnings": [{"severity": "high|medium|low", "message": "..."}], "suggestions": [{"area": "subject|content|deliverability|structure", "message": "..."}]}',
             ].join("\n"),
         },
     ];
@@ -114,8 +112,7 @@ export async function reviewCampaign(campaignId: string): Promise<CampaignReview
     try {
         const result = await chatJson<CampaignReview>(messages, {
             brandId: campaign.brandId,
-            model: "reasoner",
-            temperature: 0.4,
+            temperature: 0.3,
             maxTokens: 1500,
             timeoutMs: 60_000,
         });
