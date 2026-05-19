@@ -1243,30 +1243,29 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     const iframeWriting = useRef(false);
     useEffect(() => {
         if (isHtmlMode || !isComplexHtml(value) || !iframeRef.current) return;
-        // Skip rewriting if the value change came from the iframe itself
-        // (typing, image insertion, etc.). The DOM already reflects the
-        // latest content — rewriting would destroy the cursor position.
-        if (value === lastSelfValue.current) return;
-
-        // External rewrite — clear any previously-selected iframe image
-        setSelectedIframeImg(null);
 
         const doc = iframeRef.current.contentDocument;
         if (!doc) return;
 
-        iframeWriting.current = true;
-        doc.open();
-        doc.write(value);
-        doc.close();
+        // Only rewrite the iframe when the value came from outside (template
+        // load, source-mode edit). On self-changes (user typing in iframe)
+        // the DOM is already correct — rewriting would destroy the cursor.
+        // BUT we still need to re-attach listeners every effect run, because
+        // React's cleanup detaches them between runs.
+        const isSelfChange = value === lastSelfValue.current;
+        if (!isSelfChange) {
+            setSelectedIframeImg(null);
+            iframeWriting.current = true;
+            doc.open();
+            doc.write(value);
+            doc.close();
+            if (!doc.body) return;
+            doc.body.contentEditable = 'true';
+            doc.body.style.outline = 'none';
+        }
+
         if (!doc.body) return;
 
-        doc.body.contentEditable = 'true';
-        doc.body.style.outline = 'none';
-
-        // Listener handles — captured so cleanup can detach them on unmount
-        // or before the next iframe rewrite. doc.open()/write()/close() above
-        // already replaces the document for new content, but on unmount the
-        // old listeners would otherwise hold references to React state setters.
         const onInput = () => {
             if (iframeWriting.current) return;
             const doctype = doc.doctype ? `<!DOCTYPE ${doc.doctype.name}>\n` : '';
@@ -1626,6 +1625,13 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
         // Push any pending CodeMirror edits to the parent before switching views
         flushCodeMirror();
         userExplicitMode.current = true;
+        // When switching FROM source TO visual on complex HTML, the iframe DOM
+        // is stale relative to value (CodeMirror edits never touched it).
+        // Clearing lastSelfValue forces the iframe useEffect to rewrite on the
+        // next render instead of treating value as a self-change.
+        if (isHtmlMode && isComplexHtml(value)) {
+            lastSelfValue.current = null;
+        }
         setIsHtmlMode(!isHtmlMode);
         if (editor) {
             if (isHtmlMode && !isComplexHtml(value)) {
