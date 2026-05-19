@@ -33,6 +33,7 @@ const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { ssr: false }
 import { html } from '@codemirror/lang-html';
 import { useTheme } from 'next-themes';
 import { MediaPicker, AttrFieldsRow, type ImageInsertMeta } from '@/components/campaign/media-picker';
+import { isComplexHtml as isComplexHtmlHeuristic } from '@/lib/email-html';
 
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
@@ -1151,16 +1152,7 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
-    const isComplexHtml = useCallback((htmlStr: string) => {
-        const v = (htmlStr || '').trim().toLowerCase();
-        // Full document wrapper — TipTap can't represent <html>/<head>/<body>
-        if (v.startsWith('<!doctype') || v.startsWith('<html') || v.includes('<body')) return true;
-        // <style> blocks — TipTap strips these, so render in iframe to preserve CSS classes
-        if (/<style[\s>]/i.test(htmlStr)) return true;
-        // MSO conditional comments — Outlook-specific markup TipTap would lose
-        if (/<!--\s*\[if\s+(mso|gte mso|lte mso|!mso)/i.test(htmlStr)) return true;
-        return false;
-    }, []);
+    const isComplexHtml = useCallback((htmlStr: string) => isComplexHtmlHeuristic(htmlStr), []);
 
     const [isHtmlMode, setIsHtmlMode] = useState(() => isComplexHtml(value));
     const [prevValueProp, setPrevValueProp] = useState(value);

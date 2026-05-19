@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { AiSubjectGenerator } from "@/components/campaign/ai-subject-generator";
 import { EmailReviewPanel } from "@/components/campaign/email-review-panel";
 import { renderMailyToHtml, EMPTY_MAILY_DOC } from "@/lib/maily";
+import { isComplexHtml } from "@/lib/email-html";
 import type { JSONContent } from "@tiptap/core";
 
 interface CampaignFormProps {
@@ -261,8 +262,17 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                         {!initialData && (
                             <TemplatePicker
                                 onSelect={(html) => {
-                                    // Load HTML directly into Maily — TipTap parses on mount,
-                                    // so bump the key to force a remount of MailyEditor.
+                                    // Templates with <!DOCTYPE>, <style> blocks, or table-based
+                                    // email layouts can't round-trip through TipTap's schema —
+                                    // they degrade to plain text in Maily. Auto-route those
+                                    // to the legacy editor (which renders them in an iframe
+                                    // and preserves the source exactly) so the user keeps the
+                                    // visual integrity of the template.
+                                    if (isComplexHtml(html)) {
+                                        setHtmlContent(html);
+                                        setEditorMode("html");
+                                        return;
+                                    }
                                     setMailyDoc(html);
                                     setMailyContentKey((k) => k + 1);
                                 }}
