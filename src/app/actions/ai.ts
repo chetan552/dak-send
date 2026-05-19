@@ -77,7 +77,7 @@ export interface CampaignReview {
 
 export async function reviewCampaign(campaignId: string): Promise<CampaignReview> {
     const campaign = await loadCampaignForBrandAccess(campaignId);
-    const bodyText = htmlToText(campaign.htmlText || "", { wordwrap: false }).slice(0, 6000);
+    const bodyText = htmlToText(campaign.htmlText || "", { wordwrap: false }).slice(0, 20000);
 
     if (!bodyText.trim()) throw new Error("Campaign has no content yet.");
 
@@ -90,6 +90,8 @@ export async function reviewCampaign(campaignId: string): Promise<CampaignReview
                 "You evaluate email campaigns for deliverability and clarity. Be specific and honest. Avoid generic advice.",
                 "",
                 "Do not comment on theology, religious interpretation, or the author's viewpoint. The message content's opinions are not your concern — only how it will perform.",
+                "",
+                "The platform guarantees an unsubscribe link in every sent email — it auto-appends a CAN-SPAM-compliant unsubscribe footer at send time if the author hasn't included one. Do NOT flag 'missing unsubscribe link' under any circumstances; the recipient will always see one.",
             ].join("\n"),
         },
         {
@@ -101,7 +103,7 @@ export async function reviewCampaign(campaignId: string): Promise<CampaignReview
                 "Body (plain text):",
                 bodyText,
                 "",
-                "Consider: spam-trigger words, all-caps, excessive punctuation, image-to-text ratio (estimate from <img> tag count and body length), broken/empty links, missing unsubscribe, weak subject line, unclear call to action, deliverability red flags. Aim for 3-6 warnings/suggestions combined. Be specific about which part of the email each item refers to.",
+                "Consider: spam-trigger words, all-caps, excessive punctuation, image-to-text ratio (estimate from <img> tag count and body length), broken/empty links, weak subject line, unclear call to action, deliverability red flags. Aim for 3-6 warnings/suggestions combined. Be specific about which part of the email each item refers to.",
                 "",
                 "Return ONLY this JSON object (no prose, no markdown):",
                 '{"score": <0-100>, "summary": "<one sentence>", "warnings": [{"severity": "high|medium|low", "message": "..."}], "suggestions": [{"area": "subject|content|deliverability|structure", "message": "..."}]}',
