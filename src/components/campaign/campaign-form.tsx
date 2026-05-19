@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/campaign/rich-text-editor";
+import { MailyEditor } from "@/components/campaign/maily-editor";
 import { TemplatePicker } from "@/components/campaign/template-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Blocks, Code2 } from "lucide-react";
+import { Loader2, Save, Blocks, Code2, Sparkles } from "lucide-react";
 import { createCampaignDraft, updateCampaignDraft } from "@/app/actions/campaign";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AiSubjectGenerator } from "@/components/campaign/ai-subject-generator";
 import { EmailReviewPanel } from "@/components/campaign/email-review-panel";
+import { renderMailyToHtml, EMPTY_MAILY_DOC } from "@/lib/maily";
+import type { JSONContent } from "@tiptap/core";
 
 interface CampaignFormProps {
     brands: any[];
@@ -20,18 +23,68 @@ interface CampaignFormProps {
     aiEnabledByBrand?: Record<string, boolean>;
 }
 
+type EditorMode = "html" | "blocks" | "maily";
+
+// Feature flag — when enabled, new campaigns use Maily instead of the legacy
+// HTML editor. The legacy editor stays available for backward-compat editing
+// of existing `contentFormat = "html"` (or null) campaigns.
+const MAILY_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MAILY === "1";
+
+function resolveInitialEditorMode(initialData?: any): EditorMode {
+    if (initialData) {
+        if (initialData.contentFormat === "maily") return "maily";
+        if (initialData.contentFormat === "blocks" || initialData.contentJson) return "blocks";
+        return "html";
+    }
+    // New campaign defaults: blocks card is selected first; user can switch.
+    return "blocks";
+}
+
 export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: CampaignFormProps) {
     const [loading, setLoading] = useState(false);
     const [htmlContent, setHtmlContent] = useState(initialData?.htmlText || "");
+    const [mailyDoc, setMailyDoc] = useState<JSONContent | string>(
+        initialData?.contentFormat === "maily" && initialData?.contentJson
+            ? (initialData.contentJson as JSONContent)
+            : EMPTY_MAILY_DOC
+    );
+    // Bumping this key force-remounts MailyEditor so it re-parses fresh
+    // content. Needed when the user picks a template after the editor is
+    // already mounted, since the underlying TipTap editor only consumes
+    // `content` on initial render.
+    const [mailyContentKey, setMailyContentKey] = useState(0);
     const [subject, setSubject] = useState<string>(initialData?.subject || "");
     const [brandId, setBrandId] = useState<string | undefined>(
         initialData?.brandId || (brands.length === 1 ? brands[0].id : undefined),
     );
-    const [editorMode, setEditorMode] = useState<"html" | "blocks">(
-        initialData ? (initialData.contentJson ? "blocks" : "html") : "blocks"
-    );
+    const [editorMode, setEditorMode] = useState<EditorMode>(resolveInitialEditorMode(initialData));
     const router = useRouter();
     const aiAvailable = brandId ? aiEnabledByBrand[brandId] === true : false;
+
+    // Derive HTML from Maily JSON whenever it changes (debounced 350ms).
+    // This drives the EmailReviewPanel, AiSubjectGenerator, and is also what
+    // gets serialized into the formData fallback — but the source of truth
+    // on the server is `contentJson`; the server re-renders for security.
+    useEffect(() => {
+        if (editorMode !== "maily") return;
+        // Pre-parsed template HTML: defer derivation until the editor mounts
+        // and emits its parsed JSON via onChange.
+        if (typeof mailyDoc === "string") return;
+        let cancelled = false;
+        const t = setTimeout(() => {
+            renderMailyToHtml(mailyDoc)
+                .then((html) => {
+                    if (!cancelled) setHtmlContent(html);
+                })
+                .catch((err) => {
+                    console.error("Maily render failed:", err);
+                });
+        }, 350);
+        return () => {
+            cancelled = true;
+            clearTimeout(t);
+        };
+    }, [mailyDoc, editorMode]);
 
     // Load template HTML / subject / brand from sessionStorage (set by Template Library, AI generator, or importer)
     useEffect(() => {
@@ -60,8 +113,24 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
         setLoading(true);
         try {
             const formData = new FormData(e.currentTarget);
-            // For block builder mode on a new campaign, use placeholder HTML; blocks are set in the builder
-            formData.set("htmlText", editorMode === "blocks" && !initialData ? "<p>Draft</p>" : htmlContent);
+
+            if (editorMode === "maily") {
+                if (typeof mailyDoc === "string") {
+                    // User never edited after loading a template — server can't
+                    // store a raw HTML string in contentJson. Reject the save
+                    // so the user opens the editor and confirms the layout.
+                    throw new Error("Open the editor and make a change before saving.");
+                }
+                formData.set("contentFormat", "maily");
+                formData.set("contentJson", JSON.stringify(mailyDoc));
+                // Server re-renders to HTML — no need to send htmlText.
+                formData.set("htmlText", htmlContent || "<p>Draft</p>");
+            } else if (editorMode === "blocks" && !initialData) {
+                // Block builder: placeholder HTML; the builder page populates real content.
+                formData.set("htmlText", "<p>Draft</p>");
+            } else {
+                formData.set("htmlText", htmlContent);
+            }
 
             if (initialData) {
                 await updateCampaignDraft(initialData.id, formData);
@@ -76,11 +145,21 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
             }
         } catch (error) {
             console.error(error);
-            alert("An error occurred while saving the campaign.");
+            alert(error instanceof Error ? error.message : "An error occurred while saving the campaign.");
         } finally {
             setLoading(false);
         }
     };
+
+    // Editing an existing Maily campaign: show Maily editor inline (no card picker).
+    const editingMailyCampaign = !!initialData && initialData?.contentFormat === "maily";
+    // Editing a legacy HTML campaign: show legacy editor (backward-compat).
+    const editingLegacyHtmlCampaign = !!initialData && initialData?.contentFormat !== "maily" && initialData?.contentFormat !== "blocks";
+    // Show editor mode picker only when creating new + (more than one editor available)
+    const showModePicker = !initialData;
+
+    // For new campaigns: which "non-blocks" card to show? Maily if flag on, else HTML.
+    const richEditorMode: "maily" | "html" = MAILY_ENABLED ? "maily" : "html";
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -126,7 +205,7 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
             </div>
 
             {/* Editor mode toggle — only shown when creating a new campaign */}
-            {!initialData && (
+            {showModePicker && (
                 <div className="space-y-2">
                     <Label className="text-zinc-700 dark:text-zinc-300">Editor Type</Label>
                     <div className="grid grid-cols-2 gap-3">
@@ -148,26 +227,59 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                         </button>
                         <button
                             type="button"
-                            onClick={() => setEditorMode("html")}
+                            onClick={() => setEditorMode(richEditorMode)}
                             className={cn(
                                 "flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-all",
-                                editorMode === "html"
+                                editorMode === richEditorMode
                                     ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
                                     : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
                             )}
                         >
-                            <Code2 className={cn("w-5 h-5 mt-0.5 flex-shrink-0", editorMode === "html" ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400")} />
+                            {richEditorMode === "maily" ? (
+                                <Sparkles className={cn("w-5 h-5 mt-0.5 flex-shrink-0", editorMode === "maily" ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400")} />
+                            ) : (
+                                <Code2 className={cn("w-5 h-5 mt-0.5 flex-shrink-0", editorMode === "html" ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400")} />
+                            )}
                             <div>
-                                <p className={cn("text-sm font-semibold", editorMode === "html" ? "text-indigo-700 dark:text-indigo-300" : "text-zinc-700 dark:text-zinc-300")}>HTML Editor</p>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Rich text or raw HTML</p>
+                                <p className={cn("text-sm font-semibold", editorMode === richEditorMode ? "text-indigo-700 dark:text-indigo-300" : "text-zinc-700 dark:text-zinc-300")}>
+                                    {richEditorMode === "maily" ? "Maily Editor" : "HTML Editor"}
+                                </p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                    {richEditorMode === "maily" ? "Modern email composer with blocks & variables" : "Rich text or raw HTML"}
+                                </p>
                             </div>
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Email content — only shown in HTML mode (or when editing an existing HTML campaign) */}
-            {(editorMode === "html" || !!initialData) && (
+            {/* Email content — show Maily editor when in maily mode, RichTextEditor for html/legacy */}
+            {(editorMode === "maily" || editingMailyCampaign) && (
+                <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-2">
+                        <Label htmlFor="content" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>
+                        {!initialData && (
+                            <TemplatePicker
+                                onSelect={(html) => {
+                                    // Load HTML directly into Maily — TipTap parses on mount,
+                                    // so bump the key to force a remount of MailyEditor.
+                                    setMailyDoc(html);
+                                    setMailyContentKey((k) => k + 1);
+                                }}
+                            />
+                        )}
+                    </div>
+                    <EmailReviewPanel
+                        html={htmlContent}
+                        subject={subject}
+                        brandId={brandId}
+                        aiEnabled={aiAvailable}
+                    />
+                    <MailyEditor key={mailyContentKey} value={mailyDoc} onChange={setMailyDoc} />
+                </div>
+            )}
+
+            {(editorMode === "html" || editingLegacyHtmlCampaign) && !editingMailyCampaign && (
                 <div className="space-y-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-2">
                         <Label htmlFor="htmlText" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>

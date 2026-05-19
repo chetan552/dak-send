@@ -107,7 +107,8 @@ model Campaign {
   subject     String
   htmlText    String   @db.Text
   plainText   String?  @db.Text
-  contentJson Json?    // Block-based editor JSON; null means HTML editor was used
+  contentJson   Json?    // Authoring-format JSON. Shape depends on contentFormat.
+  contentFormat String?  // "html" (or null = legacy HTML editor), "blocks" (drag-drop builder), "maily" (Maily TipTap editor)
   brandId     String
   brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   status      String   @default("draft") // draft, queuing, sending, sent

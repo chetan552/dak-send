@@ -7,6 +7,39 @@ import { revalidatePath } from "next/cache";
 import type { BlockEmailDocument } from "@/lib/blocks-to-html";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { safeOriginUrl } from "@/lib/safe-url";
+import { renderMailyToHtml } from "@/lib/maily";
+
+/**
+ * If the form was submitted from the Maily editor, the source of truth is
+ * `contentJson` — we server-render it to HTML here so the worker doesn't
+ * have to. Returns { htmlText, contentFormat, contentJson } for the caller
+ * to persist. Returns null if no Maily input was provided.
+ */
+async function resolveMailyContent(formData: FormData): Promise<{
+    htmlText: string;
+    contentFormat: "maily";
+    contentJson: any;
+} | null> {
+    const contentFormat = formData.get("contentFormat") as string | null;
+    if (contentFormat !== "maily") return null;
+
+    const contentJsonRaw = formData.get("contentJson") as string | null;
+    if (!contentJsonRaw) throw new Error("Maily content is missing.");
+
+    let contentJson: any;
+    try {
+        contentJson = JSON.parse(contentJsonRaw);
+    } catch {
+        throw new Error("Maily content is not valid JSON.");
+    }
+
+    // Re-render server-side rather than trusting client-supplied HTML.
+    const htmlText = await renderMailyToHtml(contentJson);
+    if (!htmlText || !htmlText.trim()) {
+        throw new Error("Maily content rendered to empty HTML.");
+    }
+    return { htmlText, contentFormat: "maily", contentJson };
+}
 
 const MAX_HTML_BYTES = 1_500_000;
 
@@ -51,9 +84,11 @@ export async function createCampaignDraft(formData: FormData) {
 
     const name = formData.get("name") as string;
     const subject = formData.get("subject") as string;
-    const htmlText = formData.get("htmlText") as string;
     const plainText = formData.get("plainText") as string;
     const brandId = formData.get("brandId") as string;
+
+    const maily = await resolveMailyContent(formData);
+    const htmlText = maily ? maily.htmlText : (formData.get("htmlText") as string);
 
     if (!name || !subject || !brandId || !htmlText) {
         throw new Error("Missing required fields");
@@ -76,7 +111,8 @@ export async function createCampaignDraft(formData: FormData) {
             htmlText,
             plainText: plainText || null,
             brandId,
-            status: "draft"
+            status: "draft",
+            ...(maily ? { contentFormat: maily.contentFormat, contentJson: maily.contentJson } : {}),
         }
     });
 
@@ -93,8 +129,10 @@ export async function updateCampaignDraft(id: string, formData: FormData) {
 
     const name = formData.get("name") as string;
     const subject = formData.get("subject") as string;
-    const htmlText = formData.get("htmlText") as string;
     const plainText = formData.get("plainText") as string;
+
+    const maily = await resolveMailyContent(formData);
+    const htmlText = maily ? maily.htmlText : (formData.get("htmlText") as string);
 
     const whereCondition: any = currentUserRole === 'admin'
         ? { id }
@@ -115,6 +153,7 @@ export async function updateCampaignDraft(id: string, formData: FormData) {
             subject,
             htmlText,
             plainText: plainText || null,
+            ...(maily ? { contentFormat: maily.contentFormat, contentJson: maily.contentJson } : {}),
         }
     });
 
