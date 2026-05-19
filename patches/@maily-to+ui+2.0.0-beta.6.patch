@@ -1,0 +1,14 @@
+diff --git a/node_modules/@maily-to/ui/package.json b/node_modules/@maily-to/ui/package.json
+index 0000000..0000001 100644
+--- a/node_modules/@maily-to/ui/package.json
++++ b/node_modules/@maily-to/ui/package.json
+@@ -19,7 +19,8 @@
+   "types": "./dist/index.d.cts",
+   "exports": {
+     ".": {
+-      "import": "./dist/index.js",
++      "types": "./dist/index.d.cts",
++      "import": "./dist/index.mjs",
+       "require": "./dist/index.cjs"
+     },
+     "./package.json": "./package.json"

@@ -1,0 +1,26 @@
+diff --git a/node_modules/@maily-to/core/package.json b/node_modules/@maily-to/core/package.json
+index 0000000..0000001 100644
+--- a/node_modules/@maily-to/core/package.json
++++ b/node_modules/@maily-to/core/package.json
+@@ -19,9 +19,20 @@
+   "types": "./dist/index.d.cts",
+   "exports": {
+     ".": {
+-      "import": "./dist/index.js",
++      "types": "./dist/index.d.cts",
++      "import": "./dist/index.mjs",
+       "require": "./dist/index.cjs"
+     },
++    "./extensions": {
++      "types": "./dist/extensions/index.d.cts",
++      "import": "./dist/extensions/index.mjs",
++      "require": "./dist/extensions/index.cjs"
++    },
++    "./blocks": {
++      "types": "./dist/blocks/index.d.cts",
++      "import": "./dist/blocks/index.mjs",
++      "require": "./dist/blocks/index.cjs"
++    },
+     "./package.json": "./package.json",
+     "./style.css": "./dist/index.css"
+   },
