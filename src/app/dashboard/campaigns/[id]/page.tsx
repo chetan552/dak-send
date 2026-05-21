@@ -12,7 +12,7 @@ import { CancelCampaignButton } from "@/components/campaign/cancel-campaign-butt
 import { DuplicateCampaignButton } from "@/components/campaign/duplicate-campaign-button";
 import { UnscheduleCampaignButton } from "@/components/campaign/unschedule-campaign-button";
 import { TestSendButton } from "@/components/campaign/test-send-button";
-import { isAiEnabledForBrand } from "@/lib/ai/config";
+import { getBrandAiEnabledMap } from "@/lib/ai/config";
 
 export default async function CampaignDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -34,10 +34,7 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
         where: brandsQuery,
     });
 
-    const aiEntries = await Promise.all(
-        brands.map(async (b) => [b.id, await isAiEnabledForBrand(b.id)] as const),
-    );
-    const aiEnabledByBrand = Object.fromEntries(aiEntries);
+    const aiEnabledByBrand = await getBrandAiEnabledMap(brands.map((b) => b.id));
 
     const isDraft = campaign.status === 'draft';
     const isScheduled = campaign.status === 'scheduled';

@@ -56,18 +56,36 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
             ? { max_completion_tokens: tokenLimit }
             : { max_tokens: tokenLimit };
 
-        const res = await fetch(`${provider.baseUrl}/chat/completions`, {
+        // OpenAI reasoning models (o-series, gpt-5 family) only accept the
+        // default temperature; sending any explicit value 400s the request.
+        const isOpenAiReasoner = provider.id === "openai" && /^(o\d|gpt-5)/i.test(model);
+        const temperatureParam = isOpenAiReasoner ? {} : { temperature: opts.temperature ?? 0.7 };
+
+        const requestInit: RequestInit = {
             method: "POST",
             headers,
             body: JSON.stringify({
                 model,
                 messages,
-                temperature: opts.temperature ?? 0.7,
+                ...temperatureParam,
                 ...tokenParam,
                 ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
             }),
             signal: controller.signal,
-        });
+        };
+
+        // Retry once on 429 / 5xx. Honors Retry-After when the provider sets it,
+        // otherwise backs off ~750ms. The shared AbortController still enforces
+        // the overall timeout across both attempts.
+        const url = `${provider.baseUrl}/chat/completions`;
+        let res = await fetch(url, requestInit);
+        if (!res.ok && (res.status === 429 || (res.status >= 500 && res.status < 600))) {
+            const retryAfterHeader = Number(res.headers.get("retry-after")) || 0;
+            const backoffMs = retryAfterHeader > 0 ? Math.min(retryAfterHeader * 1000, 5000) : 750;
+            try { await res.body?.cancel(); } catch { /* ignore */ }
+            await new Promise((r) => setTimeout(r, backoffMs));
+            res = await fetch(url, requestInit);
+        }
 
         if (!res.ok) {
             const body = await res.text();

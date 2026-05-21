@@ -124,7 +124,7 @@ export function AiEmailGenerator({ brands, aiEnabledByBrand }: AiEmailGeneratorP
                             {loading && (
                                 <div className="flex flex-col items-center justify-center py-12 text-center">
                                     <Loader2 className="w-8 h-8 animate-spin text-violet-500 mb-3" />
-                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">DeepSeek is drafting your email...</p>
+                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">AI is drafting your email...</p>
                                     <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">Usually 15-40 seconds.</p>
                                 </div>
                             )}

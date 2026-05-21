@@ -70,7 +70,7 @@ export function AiPreSendReview({ campaignId }: AiPreSendReviewProps) {
                             {loading && (
                                 <div className="flex flex-col items-center justify-center py-12 text-center">
                                     <Loader2 className="w-8 h-8 animate-spin text-violet-500 mb-3" />
-                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">DeepSeek is reviewing your campaign...</p>
+                                    <p className="text-sm text-zinc-600 dark:text-zinc-400">AI is reviewing your campaign...</p>
                                     <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">This usually takes 10-30 seconds.</p>
                                 </div>
                             )}

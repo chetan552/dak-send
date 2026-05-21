@@ -141,7 +141,7 @@ export async function reviewCampaignDraft(input: {
     html: string;
 }): Promise<CampaignReview> {
     const brand = await requireBrandAccess(input.brandId);
-    const bodyText = htmlToText(input.html || "", { wordwrap: false }).slice(0, 6000);
+    const bodyText = htmlToText(input.html || "", { wordwrap: false }).slice(0, 20000);
 
     if (!bodyText.trim()) throw new Error("Email body is empty — write some content before running review.");
 

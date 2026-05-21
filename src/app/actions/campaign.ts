@@ -263,7 +263,9 @@ export async function duplicateCampaign(id: string) {
             htmlText: campaign.htmlText,
             plainText: campaign.plainText,
             brandId: campaign.brandId,
-            status: "draft"
+            status: "draft",
+            contentFormat: campaign.contentFormat,
+            contentJson: campaign.contentJson ?? undefined,
         }
     });
 

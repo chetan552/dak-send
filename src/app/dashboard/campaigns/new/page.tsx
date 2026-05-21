@@ -7,7 +7,7 @@ import Link from "next/link";
 import { CampaignForm } from "@/components/campaign/campaign-form";
 import { CampaignImporter } from "@/components/campaign/campaign-importer";
 import { AiEmailGenerator } from "@/components/campaign/ai-email-generator";
-import { isAiEnabledForBrand } from "@/lib/ai/config";
+import { getBrandAiEnabledMap } from "@/lib/ai/config";
 
 export default async function NewCampaignPage() {
     const session = await getServerSession(authOptions);
@@ -17,10 +17,7 @@ export default async function NewCampaignPage() {
         orderBy: { createdAt: 'desc' }
     });
 
-    const aiEntries = await Promise.all(
-        brands.map(async (b) => [b.id, await isAiEnabledForBrand(b.id)] as const),
-    );
-    const aiEnabledByBrand = Object.fromEntries(aiEntries);
+    const aiEnabledByBrand = await getBrandAiEnabledMap(brands.map((b) => b.id));
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

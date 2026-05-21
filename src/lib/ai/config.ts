@@ -170,6 +170,21 @@ export async function isAiEnabledForBrand(brandId: string): Promise<boolean> {
     return s[`${BRAND_FLAG_PREFIX}${brandId}`] !== "false";
 }
 
+/**
+ * Batched equivalent of {@link isAiEnabledForBrand} for callers that need the
+ * flag for many brands at once (e.g. dashboard pages listing all the user's
+ * brands). One DB query instead of N.
+ */
+export async function getBrandAiEnabledMap(brandIds: string[]): Promise<Record<string, boolean>> {
+    if (brandIds.length === 0) return {};
+    const keys = [GLOBAL_FLAG, ...brandIds.map((id) => `${BRAND_FLAG_PREFIX}${id}`)];
+    const settings = await readSettings(keys);
+    const globalOn = settings[GLOBAL_FLAG] === "true";
+    return Object.fromEntries(
+        brandIds.map((id) => [id, globalOn && settings[`${BRAND_FLAG_PREFIX}${id}`] !== "false"]),
+    );
+}
+
 export async function setBrandAiEnabled(brandId: string, enabled: boolean) {
     const key = `${BRAND_FLAG_PREFIX}${brandId}`;
     await prisma.setting.upsert({
