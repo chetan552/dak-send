@@ -101,13 +101,47 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
     }
 }
 
+/**
+ * Pulls the first balanced JSON object out of text that may be wrapped in
+ * ```json fences, prose, or other noise. Tracks string state so braces inside
+ * strings don't confuse the depth counter.
+ */
+function extractJsonObject(text: string): string | null {
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenced) {
+        const inner = fenced[1].trim();
+        if (inner.startsWith("{")) return inner;
+    }
+
+    const start = text.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (ch === "\\") { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+            depth--;
+            if (depth === 0) return text.slice(start, i + 1);
+        }
+    }
+    return null;
+}
+
 export async function chatJson<T>(messages: ChatMessage[], opts: ChatOptions = {}): Promise<T> {
     const raw = await chat(messages, { ...opts, jsonMode: true });
     try {
         return JSON.parse(raw) as T;
     } catch {
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (match) return JSON.parse(match[0]) as T;
+        const extracted = extractJsonObject(raw);
+        if (extracted) {
+            try { return JSON.parse(extracted) as T; } catch { /* fall through */ }
+        }
         throw new Error("LLM returned non-JSON content");
     }
 }

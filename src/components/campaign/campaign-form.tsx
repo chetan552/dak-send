@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +44,7 @@ function resolveInitialEditorMode(initialData?: any): EditorMode {
 
 export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: CampaignFormProps) {
     const [loading, setLoading] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [htmlContent, setHtmlContent] = useState(initialData?.htmlText || "");
     const [mailyDoc, setMailyDoc] = useState<JSONContent | string>(
         initialData?.contentFormat === "maily" && initialData?.contentJson
@@ -112,6 +114,7 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
+        setSubmitError(null);
         try {
             const formData = new FormData(e.currentTarget);
 
@@ -146,7 +149,7 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
             }
         } catch (error) {
             console.error(error);
-            alert(error instanceof Error ? error.message : "An error occurred while saving the campaign.");
+            setSubmitError(error instanceof Error ? error.message : "An error occurred while saving the campaign.");
         } finally {
             setLoading(false);
         }
@@ -195,14 +198,25 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                     required
                     className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-sm"
                 />
-                {aiAvailable && (
+                {aiAvailable ? (
                     <AiSubjectGenerator
                         brandId={brandId}
                         getBodyHtml={() => htmlContent}
                         currentSubject={subject}
                         onPick={setSubject}
                     />
-                )}
+                ) : brandId ? (
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" />
+                        AI subject suggestions disabled.{" "}
+                        <Link
+                            href={`/dashboard/brands/${brandId}`}
+                            className="underline hover:text-zinc-700 dark:hover:text-zinc-200"
+                        >
+                            Enable in brand settings
+                        </Link>
+                    </p>
+                ) : null}
             </div>
 
             {/* Editor mode toggle — only shown when creating a new campaign */}
@@ -317,7 +331,15 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                 </div>
             )}
 
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/50 flex justify-end">
+            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/50 flex flex-col items-end gap-3">
+                {submitError && (
+                    <div
+                        role="alert"
+                        className="w-full p-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 text-sm text-red-700 dark:text-red-300"
+                    >
+                        {submitError}
+                    </div>
+                )}
                 <Button type="submit" disabled={loading} className="gap-2">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {initialData ? 'Update Draft' : 'Save Draft'}
