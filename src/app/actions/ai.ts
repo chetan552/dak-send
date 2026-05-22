@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { chatJson, AiUnavailableError } from "@/lib/ai/client";
+import { chat, chatJson, AiUnavailableError } from "@/lib/ai/client";
 
 function aiErrorMessage(reason: AiUnavailableError["reason"]): string {
     switch (reason) {
@@ -497,53 +497,72 @@ export async function translateCampaignDraft(input: {
         throw new Error("Email body is too long to translate in one pass. Shorten it or translate in sections.");
     }
 
-    const messages = [
-        {
-            role: "system" as const,
-            content: [
-                `You translate marketing/newsletter HTML emails into ${target.label} (${target.nativeName}).`,
-                "",
-                "Rules:",
-                `- Translate all human-readable text into ${target.label} with natural, fluent phrasing — not literal word-for-word.`,
-                "- Preserve the HTML structure exactly: keep every tag, attribute, class, style, id, and nesting unchanged.",
-                "- Preserve URLs in href/src attributes verbatim — never translate or modify them.",
-                "- Preserve placeholders such as [Name], [Email], [UnsubscribeUrl], [CustomField:Anything], {{var}}, and %recipient.name% unchanged.",
-                "- Preserve HTML entities (&amp;, &nbsp;, etc.) and email-safe tags like <table>, <tr>, <td>, <style>, <head>, <meta>.",
-                "- Translate alt text on images.",
-                "- Do not add explanations, comments, or markdown fences. Return ONLY a JSON object.",
-                "- If a phrase is a proper noun, brand name, or product name, leave it as-is.",
-            ].join("\n"),
-        },
+    const systemPrompt = [
+        `You translate marketing/newsletter copy into ${target.label} (${target.nativeName}).`,
+        "",
+        "Rules:",
+        `- Translate all human-readable text into ${target.label} with natural, fluent phrasing — not literal word-for-word.`,
+        "- Preserve placeholders such as [Name], [Email], [UnsubscribeUrl], [CustomField:Anything], {{var}}, %recipient.name% unchanged.",
+        "- Proper nouns, brand names, and product names stay as-is.",
+        "- Output only the translation. No explanations, no comments, no markdown fences, no surrounding quotes.",
+    ].join("\n");
+
+    const subjectMessages = [
+        { role: "system" as const, content: systemPrompt },
         {
             role: "user" as const,
             content: [
-                `Translate the following email into ${target.label} (${target.nativeName}).`,
+                `Translate this email subject line into ${target.label}. Output the translated subject only, nothing else.`,
                 "",
-                `Subject: ${input.subject || "(empty)"}`,
+                input.subject?.trim() || "(empty)",
+            ].join("\n"),
+        },
+    ];
+
+    const htmlSystemPrompt = [
+        systemPrompt,
+        "",
+        "Additional rules for HTML:",
+        "- Preserve the HTML structure exactly: keep every tag, attribute, class, style, id, and nesting unchanged.",
+        "- Preserve URLs in href/src attributes verbatim — never translate or modify them.",
+        "- Preserve HTML entities (&amp;, &nbsp;, etc.) and email-safe tags like <table>, <tr>, <td>, <style>, <head>, <meta>.",
+        "- Translate alt text on images.",
+        "- Output raw HTML only. Do not wrap in ```html fences.",
+    ].join("\n");
+
+    const htmlMessages = [
+        { role: "system" as const, content: htmlSystemPrompt },
+        {
+            role: "user" as const,
+            content: [
+                `Translate the following HTML email body into ${target.label}. Output the translated HTML only — no prose, no markdown fences.`,
                 "",
-                "HTML body:",
                 bodyHtml,
-                "",
-                'Return ONLY this JSON object (no prose, no markdown): {"subject": "<translated subject>", "html": "<translated HTML, same structure>"}',
             ].join("\n"),
         },
     ];
 
     try {
-        const result = await chatJson<{ subject?: unknown; html?: unknown }>(messages, {
-            brandId: brand.id,
-            temperature: 0.3,
-            // Allow plenty of headroom — translated text is often longer than the original.
-            maxTokens: 6000,
-            timeoutMs: 90_000,
-        });
+        const [rawSubject, rawHtml] = await Promise.all([
+            (input.subject?.trim() ? chat(subjectMessages, {
+                brandId: brand.id,
+                temperature: 0.3,
+                maxTokens: 400,
+                timeoutMs: 30_000,
+            }) : Promise.resolve("")),
+            chat(htmlMessages, {
+                brandId: brand.id,
+                temperature: 0.3,
+                maxTokens: 6000,
+                timeoutMs: 90_000,
+            }),
+        ]);
 
-        const translatedHtml = typeof result.html === "string" ? sanitizeEmailHtml(result.html) : "";
+        const translatedHtml = sanitizeEmailHtml(stripCodeFences(rawHtml));
         if (!translatedHtml.trim()) throw new Error("Translation returned empty HTML.");
 
-        const translatedSubject = typeof result.subject === "string" && result.subject.trim()
-            ? result.subject.trim()
-            : input.subject;
+        const cleanedSubject = stripCodeFences(rawSubject).trim().replace(/^["'`]|["'`]$/g, "").trim();
+        const translatedSubject = cleanedSubject || input.subject;
 
         return {
             subject: translatedSubject,
@@ -555,4 +574,10 @@ export async function translateCampaignDraft(input: {
         if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
         throw err;
     }
+}
+
+function stripCodeFences(text: string): string {
+    const trimmed = (text || "").trim();
+    const fenced = trimmed.match(/^```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)\s*```$/);
+    return fenced ? fenced[1].trim() : trimmed;
 }
