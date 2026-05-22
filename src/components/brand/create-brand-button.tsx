@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Loader2 } from "lucide-react";
 import { createBrand } from "@/app/actions/brand";
+import { BRAND_LANGUAGES } from "@/lib/languages";
 
 export function CreateBrandButton() {
     const [open, setOpen] = useState(false);
@@ -56,6 +58,26 @@ export function CreateBrandButton() {
                     <div className="space-y-2">
                         <Label htmlFor="replyTo" className="text-zinc-300">Reply-To Email</Label>
                         <Input id="replyTo" name="replyTo" type="email" placeholder="support@acme.com" className="bg-zinc-900 border-zinc-800 text-white" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="language" className="text-zinc-300">Language</Label>
+                        <Select name="language" defaultValue="__none__">
+                            <SelectTrigger id="language" className="bg-zinc-900 border-zinc-800 text-white">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-950 border-zinc-800 text-white max-h-72">
+                                <SelectItem value="__none__">None (don&apos;t translate)</SelectItem>
+                                {BRAND_LANGUAGES.map((lang) => (
+                                    <SelectItem key={lang.code} value={lang.code}>
+                                        {lang.label}
+                                        <span className="text-zinc-500 ml-2">{lang.nativeName}</span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-zinc-500">
+                            Sets the default target language for AI translation when composing campaigns.
+                        </p>
                     </div>
                     <DialogFooter className="pt-4">
                         <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800">

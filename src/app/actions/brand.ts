@@ -4,6 +4,14 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { isSupportedLanguageCode } from "@/lib/languages";
+
+function normalizeLanguage(raw: FormDataEntryValue | null): string | null {
+    const value = typeof raw === "string" ? raw.trim() : "";
+    if (!value || value === "__none__") return null;
+    if (!isSupportedLanguageCode(value)) return null;
+    return value;
+}
 
 export async function createBrand(formData: FormData) {
     const session = await getServerSession(authOptions);
@@ -18,6 +26,7 @@ export async function createBrand(formData: FormData) {
     const fromName = formData.get("fromName") as string;
     const fromEmail = formData.get("fromEmail") as string;
     const replyTo = formData.get("replyTo") as string;
+    const language = normalizeLanguage(formData.get("language"));
 
     if (!name) {
         throw new Error("Brand name is required");
@@ -35,6 +44,7 @@ export async function createBrand(formData: FormData) {
             fromName: fromName || null,
             fromEmail: fromEmail || null,
             replyTo: replyTo || null,
+            language,
             userId, // Owner
             users: {
                 connect: { id: userId } // Initial access granted to owner
@@ -120,6 +130,7 @@ export async function updateBrandSettings(brandId: string, formData: FormData) {
     const fromName = formData.get("fromName") as string;
     const fromEmail = formData.get("fromEmail") as string;
     const replyTo = formData.get("replyTo") as string;
+    const language = normalizeLanguage(formData.get("language"));
 
     if (!name) {
         throw new Error("Brand name is required");
@@ -132,6 +143,7 @@ export async function updateBrandSettings(brandId: string, formData: FormData) {
             fromName: fromName || null,
             fromEmail: fromEmail || null,
             replyTo: replyTo || null,
+            language,
         },
     });
 

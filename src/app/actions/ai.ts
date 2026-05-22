@@ -20,6 +20,7 @@ import { randomUUID } from "crypto";
 import type { BlockEmailDocument, EmailBlock } from "@/lib/blocks-to-html";
 import { compileBlocksToHtml } from "@/lib/blocks-to-html";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+import { getBrandLanguage } from "@/lib/languages";
 
 async function requireUser() {
     const session = await getServerSession(authOptions);
@@ -460,6 +461,96 @@ export async function generateSubjectLines(input: {
             : [];
         if (suggestions.length === 0) throw new Error("No subject lines returned.");
         return { suggestions };
+    } catch (err) {
+        if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
+        throw err;
+    }
+}
+
+export interface TranslateCampaignDraftResult {
+    subject: string;
+    html: string;
+    languageCode: string;
+    languageLabel: string;
+}
+
+export async function translateCampaignDraft(input: {
+    brandId: string;
+    subject: string;
+    html: string;
+    /** Optional override; falls back to the brand's configured language. */
+    targetLanguageCode?: string;
+}): Promise<TranslateCampaignDraftResult> {
+    const brand = await requireBrandAccess(input.brandId);
+
+    const target = getBrandLanguage(input.targetLanguageCode || brand.language);
+    if (!target) {
+        throw new Error("Set a language on this brand before translating, or pass an explicit target language.");
+    }
+
+    const bodyHtml = (input.html || "").trim();
+    if (!bodyHtml) throw new Error("Email body is empty — write some content before translating.");
+
+    // Sanity-cap the input so we don't ship megabytes to the LLM. ~24k chars is
+    // enough for any reasonable newsletter; longer drafts should be split.
+    if (bodyHtml.length > 24000) {
+        throw new Error("Email body is too long to translate in one pass. Shorten it or translate in sections.");
+    }
+
+    const messages = [
+        {
+            role: "system" as const,
+            content: [
+                `You translate marketing/newsletter HTML emails into ${target.label} (${target.nativeName}).`,
+                "",
+                "Rules:",
+                `- Translate all human-readable text into ${target.label} with natural, fluent phrasing — not literal word-for-word.`,
+                "- Preserve the HTML structure exactly: keep every tag, attribute, class, style, id, and nesting unchanged.",
+                "- Preserve URLs in href/src attributes verbatim — never translate or modify them.",
+                "- Preserve placeholders such as [Name], [Email], [UnsubscribeUrl], [CustomField:Anything], {{var}}, and %recipient.name% unchanged.",
+                "- Preserve HTML entities (&amp;, &nbsp;, etc.) and email-safe tags like <table>, <tr>, <td>, <style>, <head>, <meta>.",
+                "- Translate alt text on images.",
+                "- Do not add explanations, comments, or markdown fences. Return ONLY a JSON object.",
+                "- If a phrase is a proper noun, brand name, or product name, leave it as-is.",
+            ].join("\n"),
+        },
+        {
+            role: "user" as const,
+            content: [
+                `Translate the following email into ${target.label} (${target.nativeName}).`,
+                "",
+                `Subject: ${input.subject || "(empty)"}`,
+                "",
+                "HTML body:",
+                bodyHtml,
+                "",
+                'Return ONLY this JSON object (no prose, no markdown): {"subject": "<translated subject>", "html": "<translated HTML, same structure>"}',
+            ].join("\n"),
+        },
+    ];
+
+    try {
+        const result = await chatJson<{ subject?: unknown; html?: unknown }>(messages, {
+            brandId: brand.id,
+            temperature: 0.3,
+            // Allow plenty of headroom — translated text is often longer than the original.
+            maxTokens: 6000,
+            timeoutMs: 90_000,
+        });
+
+        const translatedHtml = typeof result.html === "string" ? sanitizeEmailHtml(result.html) : "";
+        if (!translatedHtml.trim()) throw new Error("Translation returned empty HTML.");
+
+        const translatedSubject = typeof result.subject === "string" && result.subject.trim()
+            ? result.subject.trim()
+            : input.subject;
+
+        return {
+            subject: translatedSubject,
+            html: translatedHtml,
+            languageCode: target.code,
+            languageLabel: target.label,
+        };
     } catch (err) {
         if (err instanceof AiUnavailableError) throw new Error(aiErrorMessage(err.reason));
         throw err;

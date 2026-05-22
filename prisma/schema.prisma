@@ -35,6 +35,7 @@ model Brand {
   fromEmail   String?
   fromName    String?
   replyTo     String?
+  language    String?      // BCP-47-ish language code, e.g. "en", "es", "hi". Used as the default target for AI translation in campaigns.
   rssFeeds    RssFeed[]
   automations Automation[]
   warmup      DomainWarmup?

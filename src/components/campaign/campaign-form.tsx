@@ -14,6 +14,7 @@ import { createCampaignDraft, updateCampaignDraft } from "@/app/actions/campaign
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AiSubjectGenerator } from "@/components/campaign/ai-subject-generator";
+import { AiTranslateButton } from "@/components/campaign/ai-translate-button";
 import { EmailReviewPanel } from "@/components/campaign/email-review-panel";
 import { renderMailyToHtml, EMPTY_MAILY_DOC } from "@/lib/maily";
 import { isComplexHtml } from "@/lib/email-html";
@@ -63,6 +64,21 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
     const [editorMode, setEditorMode] = useState<EditorMode>(resolveInitialEditorMode(initialData));
     const router = useRouter();
     const aiAvailable = brandId ? aiEnabledByBrand[brandId] === true : false;
+    const selectedBrand = brandId ? brands.find((b) => b.id === brandId) : undefined;
+    const brandLanguageCode: string | null = selectedBrand?.language ?? null;
+
+    const applyTranslation = (next: { subject: string; html: string }) => {
+        setSubject(next.subject);
+        setHtmlContent(next.html);
+        // For Maily mode, push the new HTML back into the editor and force a
+        // remount so TipTap re-parses. The save handler refuses string-typed
+        // mailyDoc (template HTML that was never edited), so the user must
+        // open the editor and make any tweak before saving.
+        if (editorMode === "maily" || (initialData && initialData.contentFormat === "maily")) {
+            setMailyDoc(next.html);
+            setMailyContentKey((k) => k + 1);
+        }
+    };
 
     // Derive HTML from Maily JSON whenever it changes (debounced 350ms).
     // This drives the EmailReviewPanel, AiSubjectGenerator, and is also what
@@ -273,25 +289,35 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                 <div className="space-y-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-2">
                         <Label htmlFor="content" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>
-                        {!initialData && (
-                            <TemplatePicker
-                                onSelect={(html) => {
-                                    // Templates with <!DOCTYPE>, <style> blocks, or table-based
-                                    // email layouts can't round-trip through TipTap's schema —
-                                    // they degrade to plain text in Maily. Auto-route those
-                                    // to the legacy editor (which renders them in an iframe
-                                    // and preserves the source exactly) so the user keeps the
-                                    // visual integrity of the template.
-                                    if (isComplexHtml(html)) {
-                                        setHtmlContent(html);
-                                        setEditorMode("html");
-                                        return;
-                                    }
-                                    setMailyDoc(html);
-                                    setMailyContentKey((k) => k + 1);
-                                }}
-                            />
-                        )}
+                        <div className="flex items-center gap-3">
+                            {aiAvailable && brandId && brandLanguageCode && (
+                                <AiTranslateButton
+                                    brandId={brandId}
+                                    languageCode={brandLanguageCode}
+                                    getDraft={() => ({ subject, html: htmlContent })}
+                                    onTranslated={applyTranslation}
+                                />
+                            )}
+                            {!initialData && (
+                                <TemplatePicker
+                                    onSelect={(html) => {
+                                        // Templates with <!DOCTYPE>, <style> blocks, or table-based
+                                        // email layouts can't round-trip through TipTap's schema —
+                                        // they degrade to plain text in Maily. Auto-route those
+                                        // to the legacy editor (which renders them in an iframe
+                                        // and preserves the source exactly) so the user keeps the
+                                        // visual integrity of the template.
+                                        if (isComplexHtml(html)) {
+                                            setHtmlContent(html);
+                                            setEditorMode("html");
+                                            return;
+                                        }
+                                        setMailyDoc(html);
+                                        setMailyContentKey((k) => k + 1);
+                                    }}
+                                />
+                            )}
+                        </div>
                     </div>
                     <EmailReviewPanel
                         html={htmlContent}
@@ -307,7 +333,17 @@ export function CampaignForm({ brands, initialData, aiEnabledByBrand = {} }: Cam
                 <div className="space-y-2">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-2">
                         <Label htmlFor="htmlText" className="text-zinc-700 dark:text-zinc-300">Email Content</Label>
-                        {!initialData && <TemplatePicker onSelect={setHtmlContent} />}
+                        <div className="flex items-center gap-3">
+                            {aiAvailable && brandId && brandLanguageCode && (
+                                <AiTranslateButton
+                                    brandId={brandId}
+                                    languageCode={brandLanguageCode}
+                                    getDraft={() => ({ subject, html: htmlContent })}
+                                    onTranslated={applyTranslation}
+                                />
+                            )}
+                            {!initialData && <TemplatePicker onSelect={setHtmlContent} />}
+                        </div>
                     </div>
                     <EmailReviewPanel
                         html={htmlContent}
