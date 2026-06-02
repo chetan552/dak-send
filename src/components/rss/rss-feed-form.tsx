@@ -16,6 +16,7 @@ interface RssFeedFormProps {
 }
 
 const ITEM_TAGS = ["[RssTitle]", "[RssLink]", "[RssContent]", "[RssDescription]", "[RssAuthor]", "[RssDate]", "[RssThumbnail]"];
+const SUBJECT_TAGS = ["[RssTitle]", "[RssLink]", "[RssContent]", "[RssAuthor]", "[RssDate]", "[RssFeedName]"];
 const WRAPPER_TAGS = ["[RssItems]", "[RssDate]", "[RssCount]", "[RssFeedName]", "[Unsubscribe]"];
 
 export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
@@ -206,25 +207,42 @@ export function RssFeedForm({ brands, lists }: RssFeedFormProps) {
                         </details>
                     </>
                 ) : (
-                    /* Non-digest: single full-email template */
-                    <details className="border border-zinc-200 dark:border-zinc-800 rounded-lg">
-                        <summary className="px-4 py-3 cursor-pointer text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-                            Custom Email Template <span className="text-zinc-400">(optional — uses default if empty)</span>
-                        </summary>
-                        <div className="px-4 pb-4 space-y-3 pt-2">
-                            <div className="flex flex-wrap gap-1.5">
-                                {ITEM_TAGS.map(tag => (
-                                    <code key={tag} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded text-xs">{tag}</code>
-                                ))}
-                            </div>
-                            <textarea
-                                name="templateHtml"
-                                rows={8}
-                                placeholder={`<div style="font-family: system-ui; max-width: 600px; margin: 0 auto; padding: 40px 20px;">\n  <h1>[RssTitle]</h1>\n  <p>By [RssAuthor] — [RssDate]</p>\n  <div>[RssContent]</div>\n  <a href="[RssLink]">Read Full Article →</a>\n</div>`}
-                                className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-mono resize-y"
+                    /* Non-digest: subject plus single full-email template */
+                    <>
+                        <div className="space-y-2">
+                            <Label>Subject Line</Label>
+                            <Input
+                                name="subject"
+                                placeholder="[RssTitle]"
+                                className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                             />
+                            <p className="text-xs text-zinc-400">
+                                Tags:{" "}
+                                {SUBJECT_TAGS.map(tag => (
+                                    <code key={tag} className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded mr-1">{tag}</code>
+                                ))}
+                            </p>
                         </div>
-                    </details>
+
+                        <details className="border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                            <summary className="px-4 py-3 cursor-pointer text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                                Custom Email Template <span className="text-zinc-400">(optional — uses default if empty)</span>
+                            </summary>
+                            <div className="px-4 pb-4 space-y-3 pt-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                    {ITEM_TAGS.map(tag => (
+                                        <code key={tag} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded text-xs">{tag}</code>
+                                    ))}
+                                </div>
+                                <textarea
+                                    name="templateHtml"
+                                    rows={8}
+                                    placeholder={`<div style="font-family: system-ui; max-width: 600px; margin: 0 auto; padding: 40px 20px;">\n  <h1>[RssTitle]</h1>\n  <p>By [RssAuthor] — [RssDate]</p>\n  <div>[RssContent]</div>\n  <a href="[RssLink]">Read Full Article →</a>\n</div>`}
+                                    className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-mono resize-y"
+                                />
+                            </div>
+                        </details>
+                    </>
                 )}
             </div>
 

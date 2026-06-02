@@ -67,6 +67,7 @@ const DEFAULT_DIGEST_WRAPPER = `<!DOCTYPE html>
 </body></html>`;
 
 const DEFAULT_DIGEST_SUBJECT = "New Sermons Added — [RssDate]";
+const DEFAULT_RSS_SUBJECT = "[RssTitle]";
 
 export async function getRssFeeds() {
     const session = await getServerSession(authOptions);
@@ -101,6 +102,7 @@ export async function createRssFeed(formData: FormData) {
     const autoSend = formData.get("autoSend") === "1";
     const digestSubject = (formData.get("digestSubject") as string) || null;
     const digestWrapperHtml = (formData.get("digestWrapperHtml") as string) || null;
+    const subject = (formData.get("subject") as string) || null;
     // In digest mode templateHtml is the per-item block; in non-digest it's the full email.
     const templateHtml = (formData.get("templateHtml") as string) || null;
 
@@ -131,6 +133,7 @@ export async function createRssFeed(formData: FormData) {
             url,
             brandId,
             listIds,
+            subject,
             templateHtml,
             digestMode,
             autoSend,
@@ -203,6 +206,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
     const name = formData.get("name") as string;
     const url = formData.get("url") as string;
     const listIdsStr = formData.get("listIds") as string;
+    const subject = formData.get("subject") as string | null;
     const templateHtml = formData.get("templateHtml") as string;
     const digestMode = formData.get("digestMode") === "1";
     const autoSend = formData.get("autoSend") === "1";
@@ -222,6 +226,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
     if (templateHtml !== null && templateHtml !== undefined) {
         data.templateHtml = templateHtml || null;
     }
+    data.subject = subject || null;
     data.digestMode = digestMode;
     data.autoSend = autoSend;
     data.digestSubject = digestSubject || null;
@@ -273,6 +278,16 @@ function renderItemBlock(template: string, item: {
         .replace(/\[RssAuthor\]/gi, item.creator || (item as any).author || "")
         .replace(/\[RssDate\]/gi, dateStr)
         .replace(/\[RssThumbnail\]/gi, item.enclosure?.url || "");
+}
+
+/** Render RSS merge tags into a subject line and strip CRLF header injection. */
+function renderItemSubject(template: string, item: Parameters<typeof renderItemBlock>[1], feedName: string): string {
+    return renderItemBlock(template, item)
+        .replace(/\[RssFeedName\]/gi, feedName)
+        .replace(/<[^>]*>/g, "")
+        .replace(/[\r\n]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 /** Internal helper: dispatch a just-created draft campaign to the given lists, without a user session. */
@@ -427,12 +442,16 @@ export async function checkRssFeeds() {
                 // ── PER-ITEM MODE (original behaviour): one campaign per new item ──
                 // Only create a campaign for the single newest item to avoid flooding
                 const template = feed.templateHtml || DEFAULT_RSS_TEMPLATE;
+                const subjectTemplate = feed.subject || DEFAULT_RSS_SUBJECT;
                 const htmlContent = renderItemBlock(template, newestItem);
+                const subject = renderItemSubject(subjectTemplate, newestItem, safeFeedName)
+                    || newestItem.title
+                    || `New from ${safeFeedName}`;
 
                 const campaign = await prisma.campaign.create({
                     data: {
                         name: `[RSS] ${newestItem.title || safeFeedName}`,
-                        subject: newestItem.title || `New from ${safeFeedName}`,
+                        subject,
                         htmlText: htmlContent,
                         brandId: feed.brandId,
                         status: "draft",

@@ -16,6 +16,7 @@ interface RssFeedEditProps {
 }
 
 const ITEM_TAGS = ["[RssTitle]", "[RssLink]", "[RssContent]", "[RssDescription]", "[RssAuthor]", "[RssDate]", "[RssThumbnail]"];
+const SUBJECT_TAGS = ["[RssTitle]", "[RssLink]", "[RssContent]", "[RssAuthor]", "[RssDate]", "[RssFeedName]"];
 const WRAPPER_TAGS = ["[RssItems]", "[RssDate]", "[RssCount]", "[RssFeedName]", "[Unsubscribe]"];
 
 export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {
@@ -182,23 +183,41 @@ export function RssFeedEdit({ feed, lists, onClose }: RssFeedEditProps) {
                     </details>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                        Email Template
-                        <span className="text-xs text-zinc-400 font-normal">(optional)</span>
-                    </Label>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                        {ITEM_TAGS.map(tag => (
-                            <code key={tag} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded text-xs">{tag}</code>
-                        ))}
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Subject Line</Label>
+                        <Input
+                            name="subject"
+                            defaultValue={feed.subject || ""}
+                            placeholder="[RssTitle]"
+                            className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                        />
+                        <p className="text-xs text-zinc-400">
+                            Tags:{" "}
+                            {SUBJECT_TAGS.map(tag => (
+                                <code key={tag} className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded mr-1">{tag}</code>
+                            ))}
+                        </p>
                     </div>
-                    <textarea
-                        name="templateHtml"
-                        rows={6}
-                        defaultValue={feed.templateHtml || ""}
-                        placeholder="Leave empty to use the default template"
-                        className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-mono resize-y"
-                    />
+
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                            Email Template
+                            <span className="text-xs text-zinc-400 font-normal">(optional)</span>
+                        </Label>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                            {ITEM_TAGS.map(tag => (
+                                <code key={tag} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded text-xs">{tag}</code>
+                            ))}
+                        </div>
+                        <textarea
+                            name="templateHtml"
+                            rows={6}
+                            defaultValue={feed.templateHtml || ""}
+                            placeholder="Leave empty to use the default template"
+                            className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-800 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm font-mono resize-y"
+                        />
+                    </div>
                 </div>
             )}
 
