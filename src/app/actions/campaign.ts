@@ -1,6 +1,7 @@
 "use server";
 
 import { getServerSession } from "next-auth";
+import type { JSONContent } from "@tiptap/core";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -8,6 +9,29 @@ import type { BlockEmailDocument } from "@/lib/blocks-to-html";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { safeOriginUrl } from "@/lib/safe-url";
 import { renderMailyToHtml } from "@/lib/maily";
+
+const MAX_HTML_BYTES = 1_500_000;
+const BLOCKED_MAILY_NODE_TYPES = new Set(["htmlCodeBlock", "html-code-block"]);
+
+function assertSafeMailyJson(value: unknown) {
+    const stack: unknown[] = [value];
+    while (stack.length) {
+        const current = stack.pop();
+        if (!current || typeof current !== "object") continue;
+
+        if (Array.isArray(current)) {
+            stack.push(...current);
+            continue;
+        }
+
+        const record = current as Record<string, unknown>;
+        if (typeof record.type === "string" && BLOCKED_MAILY_NODE_TYPES.has(record.type)) {
+            throw new Error("Raw HTML blocks are not allowed in Maily content.");
+        }
+
+        stack.push(...Object.values(record));
+    }
+}
 
 /**
  * If the form was submitted from the Maily editor, the source of truth is
@@ -18,30 +42,32 @@ import { renderMailyToHtml } from "@/lib/maily";
 async function resolveMailyContent(formData: FormData): Promise<{
     htmlText: string;
     contentFormat: "maily";
-    contentJson: any;
+    contentJson: JSONContent;
 } | null> {
     const contentFormat = formData.get("contentFormat") as string | null;
     if (contentFormat !== "maily") return null;
 
     const contentJsonRaw = formData.get("contentJson") as string | null;
     if (!contentJsonRaw) throw new Error("Maily content is missing.");
+    if (contentJsonRaw.length > MAX_HTML_BYTES) throw new Error("Maily content is too large (max 1.5 MB).");
 
-    let contentJson: any;
+    let contentJson: JSONContent;
     try {
-        contentJson = JSON.parse(contentJsonRaw);
+        contentJson = JSON.parse(contentJsonRaw) as JSONContent;
     } catch {
         throw new Error("Maily content is not valid JSON.");
     }
 
-    // Re-render server-side rather than trusting client-supplied HTML.
-    const htmlText = await renderMailyToHtml(contentJson);
+    assertSafeMailyJson(contentJson);
+
+    // Re-render server-side rather than trusting client-supplied HTML, then
+    // sanitize the renderer output before storing or sending it.
+    const htmlText = sanitizeEmailHtml(await renderMailyToHtml(contentJson));
     if (!htmlText || !htmlText.trim()) {
         throw new Error("Maily content rendered to empty HTML.");
     }
     return { htmlText, contentFormat: "maily", contentJson };
 }
-
-const MAX_HTML_BYTES = 1_500_000;
 
 export async function importCampaignContent(input: { html?: string; url?: string }) {
     const session = await getServerSession(authOptions);
