@@ -17,6 +17,22 @@ export function safeOriginUrl(raw: string): URL {
     // URL.hostname strips IPv6 brackets, so "[::1]" → "::1"
     const host = url.hostname.toLowerCase();
 
+    // Reject obfuscated IPv4 encodings that decode to a private/loopback address
+    // but slip past the dotted-decimal prefix checks below:
+    //   http://2130706433/    (decimal)   = 127.0.0.1
+    //   http://0x7f000001/    (hex)        = 127.0.0.1
+    //   http://0177.0.0.1/    (octal)      = 127.0.0.1
+    // These forms are never legitimate for a user-pasted feed/import URL.
+    if (/^0x[0-9a-f]+$/.test(host) || /^[0-9]+$/.test(host)) {
+        throw new Error("Refusing to fetch from a numeric-encoded host.");
+    }
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+        // Any octet with a leading zero is an octal escape; reject the whole address.
+        if (host.split(".").some(oct => oct.length > 1 && oct.startsWith("0"))) {
+            throw new Error("Refusing to fetch from an octal-encoded host.");
+        }
+    }
+
     // IPv6 loopback / link-local / unique-local / IPv4-mapped loopback
     if (
         host === "::1" ||

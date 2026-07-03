@@ -79,15 +79,30 @@ export async function importCampaignContent(input: { html?: string; url?: string
     }
 
     if (input.url) {
-        const url = safeOriginUrl(input.url);
+        let url = safeOriginUrl(input.url);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15_000);
         try {
-            const res = await fetch(url.toString(), {
-                signal: controller.signal,
-                redirect: "follow",
-                headers: { "User-Agent": "DakSend/1.0 (+import)" },
-            });
+            // Follow redirects manually so each hop is re-validated against the
+            // SSRF guard. With redirect:"follow", a public host could 302 to
+            // http://169.254.169.254/ (or any internal host) and fetch() would
+            // follow it, defeating the initial safeOriginUrl() check.
+            let res: Response;
+            for (let hop = 0; ; hop++) {
+                if (hop > 5) throw new Error("Too many redirects.");
+                res = await fetch(url.toString(), {
+                    signal: controller.signal,
+                    redirect: "manual",
+                    headers: { "User-Agent": "DakSend/1.0 (+import)" },
+                });
+                if (res.status >= 300 && res.status < 400) {
+                    const location = res.headers.get("location");
+                    if (!location) throw new Error(`Redirect with no Location header.`);
+                    url = safeOriginUrl(new URL(location, url).toString());
+                    continue;
+                }
+                break;
+            }
             if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
             const buf = await res.arrayBuffer();
             if (buf.byteLength > MAX_HTML_BYTES) throw new Error("Fetched HTML is too large (max 1.5 MB).");

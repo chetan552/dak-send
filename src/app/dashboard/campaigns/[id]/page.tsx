@@ -3,15 +3,15 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Clock, FileEdit, Send, RefreshCw, XCircle, FlaskConical, Eye, CalendarClock, Blocks } from "lucide-react";
+import { ArrowLeft, FileEdit, Send, RefreshCw, XCircle, FlaskConical, Eye, CalendarClock, Blocks } from "lucide-react";
 import Link from "next/link";
 import { CampaignForm } from "@/components/campaign/campaign-form";
 import { Button } from "@/components/ui/button";
-import { DeleteCampaignButton } from "@/components/campaign/delete-campaign-button";
 import { CancelCampaignButton } from "@/components/campaign/cancel-campaign-button";
-import { DuplicateCampaignButton } from "@/components/campaign/duplicate-campaign-button";
 import { UnscheduleCampaignButton } from "@/components/campaign/unschedule-campaign-button";
 import { TestSendButton } from "@/components/campaign/test-send-button";
+import { CampaignActionsMenu } from "@/components/campaign/campaign-actions-menu";
+import { CampaignSteps } from "@/components/campaign/campaign-steps";
 import { getBrandAiEnabledMap } from "@/lib/ai/config";
 
 export default async function CampaignDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -87,15 +87,10 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                                     <FlaskConical className="w-4 h-4" /> A/B Test
                                 </Button>
                             </Link>
-                            <Link href={`/dashboard/campaigns/${campaign.id}/preview`}>
-                                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 gap-2">
-                                    <Eye className="w-4 h-4" /> Preview
-                                </Button>
-                            </Link>
                             <TestSendButton campaignId={campaign.id} />
                             <Link href={`/dashboard/campaigns/${campaign.id}/send`}>
                                 <Button className="gap-2">
-                                    <Send className="w-4 h-4" /> Finalize & Send
+                                    <Send className="w-4 h-4" /> Finalize &amp; Send
                                 </Button>
                             </Link>
                         </>
@@ -108,6 +103,11 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                                 </Button>
                             </Link>
                             <TestSendButton campaignId={campaign.id} />
+                            <UnscheduleCampaignButton
+                                campaignId={campaign.id}
+                                showText={true}
+                                className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 h-10 px-4 transition-colors font-medium border border-zinc-200 dark:border-zinc-700 rounded-md flex items-center justify-center gap-2 pointer-events-auto"
+                            />
                         </>
                     )}
                     {campaign.status === 'sending' && (
@@ -116,25 +116,11 @@ export default async function CampaignDetailsPage({ params }: { params: Promise<
                             className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-yellow-500 h-10 px-4 transition-colors font-medium border border-yellow-500/20 rounded-md flex items-center justify-center pointer-events-auto"
                         />
                     )}
-                    {isScheduled && (
-                        <UnscheduleCampaignButton
-                            campaignId={campaign.id}
-                            showText={true}
-                            className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 h-10 px-4 transition-colors font-medium border border-zinc-200 dark:border-zinc-700 rounded-md flex items-center justify-center gap-2 pointer-events-auto"
-                        />
-                    )}
-                    <DuplicateCampaignButton
-                        campaignId={campaign.id}
-                        className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 h-10 px-4 transition-colors font-medium border border-zinc-200 dark:border-zinc-700 rounded-md flex items-center justify-center pointer-events-auto"
-                        showText={true}
-                    />
-                    <DeleteCampaignButton
-                        campaignId={campaign.id}
-                        className="bg-red-500/10 hover:bg-red-500/20 text-red-500 h-10 px-4 transition-colors font-medium border border-red-500/20 rounded-md flex items-center justify-center pointer-events-auto"
-                        showText={true}
-                    />
+                    <CampaignActionsMenu campaignId={campaign.id} />
                 </div>
             </div>
+
+            {isDraft && <CampaignSteps campaignId={campaign.id} current="content" />}
 
             <Card className="bg-white dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 shadow-sm">
                 <CardHeader>

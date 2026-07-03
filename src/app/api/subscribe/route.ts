@@ -9,6 +9,16 @@ import { writeAuditLog } from "@/lib/audit";
 const RATE_LIMIT_WINDOW_SEC = 60;
 const MAX_REQUESTS_PER_WINDOW = 10;
 
+// Escape user-supplied values before interpolating them into email HTML sent
+// from the brand's verified domain (prevents HTML/link injection into emails).
+function esc(str: string): string {
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
 export async function OPTIONS() {
     return NextResponse.json({}, {
         headers: {
@@ -229,8 +239,8 @@ export async function POST(req: NextRequest) {
                     subject: `Please confirm your subscription to ${list.name}`,
                     html: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:2rem;">
 <h2>Confirm your subscription</h2>
-<p>Hi ${name || "there"},</p>
-<p>Please confirm your subscription to <strong>${list.name}</strong> by clicking the button below:</p>
+<p>Hi ${esc(name || "there")},</p>
+<p>Please confirm your subscription to <strong>${esc(list.name)}</strong> by clicking the button below:</p>
 <p style="text-align:center;margin:2rem 0;">
 <a href="${confirmUrl}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Confirm Subscription</a>
 </p>
@@ -248,8 +258,8 @@ export async function POST(req: NextRequest) {
                 try {
                     const brandName = list.brand.fromName || list.brand.name;
                     const html = list.welcomeEmailHtml
-                        .replace(/\[Name\]/gi, name || "Friend")
-                        .replace(/\[Email\]/gi, email);
+                        .replace(/\[Name\]/gi, esc(name || "Friend"))
+                        .replace(/\[Email\]/gi, esc(email));
                     const provider = await getProvider();
                     await provider.send({
                         from: { email: list.brand.fromEmail, name: brandName },
@@ -314,8 +324,13 @@ export async function POST(req: NextRequest) {
                 const parsed = new URL(redirectUrl);
                 safeRedirect = parsed.protocol === "http:" || parsed.protocol === "https:";
             } catch {
-                // Relative URLs are fine too
-                safeRedirect = redirectUrl.startsWith("/");
+                // Same-site relative paths are fine, but reject protocol-relative
+                // ("//evil.com") and backslash ("/\evil.com") forms that browsers
+                // resolve to an external origin.
+                safeRedirect =
+                    redirectUrl.startsWith("/") &&
+                    !redirectUrl.startsWith("//") &&
+                    !redirectUrl.startsWith("/\\");
             }
             if (!safeRedirect) {
                 return NextResponse.json({ error: "Invalid redirect URL" }, {

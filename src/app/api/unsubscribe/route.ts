@@ -102,8 +102,8 @@ export async function GET(req: NextRequest) {
             try {
                 const brandName = list.brand.fromName || list.brand.name;
                 const html = list.goodbyeEmailHtml
-                    .replace(/\[Name\]/gi, subscriber!.name || "Friend")
-                    .replace(/\[Email\]/gi, subscriber!.email);
+                    .replace(/\[Name\]/gi, escHtml(subscriber!.name || "Friend"))
+                    .replace(/\[Email\]/gi, escHtml(subscriber!.email));
                 const provider = await getProvider();
                 await provider.send({
                     from: { email: list.brand.fromEmail, name: brandName },
@@ -187,6 +187,15 @@ export async function POST(req: NextRequest) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Escape user-supplied values before interpolating into goodbye-email HTML. */
+function escHtml(str: string): string {
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
 
 /** Allow only http/https redirect targets (rejects javascript:, data:, etc.) */
 function isSafeUrl(url: string): boolean {

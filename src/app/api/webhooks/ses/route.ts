@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createVerify } from "crypto";
 
+// A legitimate SNS signing cert is always served from the regional SNS host
+// over HTTPS, e.g. https://sns.us-east-1.amazonaws.com/SimpleNotification...pem
+function isValidSnsCertUrl(raw: string): boolean {
+    try {
+        const url = new URL(raw);
+        return (
+            url.protocol === "https:" &&
+            /^sns\.[a-z0-9-]+\.amazonaws\.com$/.test(url.hostname) &&
+            url.pathname.endsWith(".pem")
+        );
+    } catch {
+        return false;
+    }
+}
+
 // SNS Message signature verification
 async function verifySnsSignature(payload: any): Promise<boolean> {
     try {
@@ -11,9 +26,13 @@ async function verifySnsSignature(payload: any): Promise<boolean> {
         const signingCertUrl = payload.SigningCertURL || payload.SigningCertUrl;
         if (!signingCertUrl) return false;
 
-        // Verify the cert URL is from AWS
-        const certUrl = new URL(signingCertUrl);
-        if (!certUrl.hostname.endsWith('.amazonaws.com')) return false;
+        // Pin the cert URL to the exact SNS host pattern (sns.<region>.amazonaws.com)
+        // over HTTPS. A loose `.amazonaws.com` suffix check would accept
+        // attacker-controlled content on any AWS host (e.g. a public S3 bucket:
+        // evil.s3.amazonaws.com), letting them serve their own cert and sign
+        // their own forged payload. Requiring the real SNS host means the cert
+        // can only be Amazon's, which the attacker cannot sign against.
+        if (!isValidSnsCertUrl(signingCertUrl)) return false;
 
         // Fetch the signing cert
         const certResponse = await fetch(signingCertUrl);
@@ -32,8 +51,11 @@ async function verifySnsSignature(payload: any): Promise<boolean> {
             .map(key => `${key}\n${payload[key]}\n`)
             .join('');
 
-        const verify = createVerify('SHA1');
-        verify.update(stringToSign);
+        // SNS SignatureVersion 1 = SHA1, version 2 = SHA256. Default to SHA1
+        // for backward compatibility with older notifications.
+        const algorithm = String(payload.SignatureVersion) === '2' ? 'RSA-SHA256' : 'RSA-SHA1';
+        const verify = createVerify(algorithm);
+        verify.update(stringToSign, 'utf8');
         return verify.verify(cert, payload.Signature, 'base64');
     } catch (e) {
         console.error("SNS signature verification failed:", e);
@@ -174,7 +196,7 @@ export async function handleSnsPayload(payload: any): Promise<{ status: number; 
         // Validate URL is a legitimate AWS SNS endpoint before fetching (SSRF guard)
         try {
             const subUrl = new URL(payload.SubscribeURL);
-            const isAwsHost = subUrl.hostname.endsWith(".amazonaws.com");
+            const isAwsHost = /^sns\.[a-z0-9-]+\.amazonaws\.com$/.test(subUrl.hostname);
             const isHttps = subUrl.protocol === "https:";
             if (!isAwsHost || !isHttps) {
                 console.warn("SNS SubscribeURL rejected — not an AWS endpoint:", subUrl.hostname);

@@ -61,7 +61,18 @@
       "Bash(awk '/^\\\\/Users\\\\/chetanchadalavada\\\\/Development\\\\/github\\\\/dak-send\\\\/src\\\\/\\(app\\\\/api\\\\/automations|app\\\\/api\\\\/cron\\\\/automations|app\\\\/api\\\\/send|lib\\\\/auth\\)/,/^$/')",
       "Bash(npm i *)",
       "Bash(grep -E \"^pg$|neon|postgres\")",
-      "Bash(grep -E \"^\\\\.env$|^\\\\.env\\\\.\")"
+      "Bash(grep -E \"^\\\\.env$|^\\\\.env\\\\.\")",
+      "Bash(npm audit *)",
+      "Bash(grep -rn 'queryRaw\\\\|executeRaw\\\\|queryRawUnsafe\\\\|executeRawUnsafe\\\\|$queryRaw\\\\|Prisma.raw\\\\|Prisma.sql' /Users/chetanchadalavada/Development/github/dak-send/src)",
+      "Bash(awk '/^model Subscriber /,/^}/' prisma/schema.prisma)",
+      "Bash(node -e ' *)",
+      "Bash(grep -rn 'queryRawUnsafe\\\\|executeRawUnsafe\\\\|$queryRaw\\\\|$executeRaw' src)",
+      "Bash(node -e 'const p=require\\(\"rss-parser\"\\);const inst=new p\\(\\);console.log\\(\"rss-parser opts default follows redirects. version:\", require\\(\"rss-parser/package.json\"\\).version\\);')",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "Bash(sed -n '1,60p' src/app/dashboard/campaigns/[id]/send/page.tsx)",
+      "Bash(sed -n '1,50p' src/app/dashboard/campaigns/[id]/builder/page.tsx)",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(echo \"eslint exit: $?\")"
     ],
     "additionalDirectories": [
       "/Users/chetanchadalavada/Development/github/dak-send/src/app/dashboard/campaigns/[id]/send",

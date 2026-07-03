@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { EmailPreview } from "@/components/campaign/email-preview";
 import { ArrowLeft, Eye } from "lucide-react";
 import Link from "next/link";
+import { CampaignSteps } from "@/components/campaign/campaign-steps";
 
 export default async function CampaignPreviewPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -40,6 +41,8 @@ export default async function CampaignPreviewPage({ params }: { params: Promise<
                     <ArrowLeft className="w-4 h-4" /> Back to Campaign
                 </Link>
             </div>
+
+            {campaign.status === "draft" && <CampaignSteps campaignId={id} current="preview" />}
 
             <div>
                 <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">

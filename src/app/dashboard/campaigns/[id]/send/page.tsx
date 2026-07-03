@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ListSelectionForm } from "@/components/campaign/list-selection";
 import { AiPreSendReview } from "@/components/campaign/ai-pre-send-review";
 import { isAiEnabledForBrand } from "@/lib/ai/config";
+import { CampaignSteps } from "@/components/campaign/campaign-steps";
 
 export default async function SendCampaignPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -56,6 +57,8 @@ export default async function SendCampaignPage({ params }: { params: Promise<{ i
                     <ArrowLeft className="w-4 h-4" /> Back to Campaign
                 </Link>
             </div>
+
+            <CampaignSteps campaignId={campaign.id} current="send" />
 
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1">Send Campaign</h1>

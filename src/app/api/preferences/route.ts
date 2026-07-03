@@ -5,14 +5,19 @@ import { verifyToken } from "@/lib/sign-url";
 
 interface PrefsToken { i: string; }
 
-function resolveSubscriberId(searchParams: URLSearchParams): string | null {
+// Resolve the subscriber from either a signed token (?s=) or the legacy unsigned
+// id (?i=). The `signed` flag is the authorization boundary: subscriber IDs are
+// cuids, not secrets, so an unsigned id must NOT unlock PII disclosure or
+// account mutation — only the compliance-required one-click "unsubscribe from
+// all". Full preference management requires a signed token.
+function resolveSubscriber(searchParams: URLSearchParams): { id: string; signed: boolean } | null {
     const s = searchParams.get("s");
     if (s) {
         const claims = verifyToken<PrefsToken>("prefs", s);
-        return claims?.i ?? null;
+        return claims?.i ? { id: claims.i, signed: true } : null;
     }
-    // Legacy unsigned path
-    return searchParams.get("i");
+    const i = searchParams.get("i");
+    return i ? { id: i, signed: false } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -25,12 +30,14 @@ export async function GET(req: NextRequest) {
     const limited = await redisRateLimit(req, "preferences", 30, 60);
     if (limited) return limited;
 
-    const subscriberId = resolveSubscriberId(req.nextUrl.searchParams);
+    const resolved = resolveSubscriber(req.nextUrl.searchParams);
     const action = req.nextUrl.searchParams.get("action");
 
-    if (!subscriberId) {
+    if (!resolved) {
         return new NextResponse("Missing or invalid subscriber token", { status: 400 });
     }
+    const { id: subscriberId, signed } = resolved;
+    const token = signed ? req.nextUrl.searchParams.get("s") : null;
 
     const subscriber = await prisma.subscriber.findUnique({
         where: { id: subscriberId },
@@ -49,10 +56,19 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Subscriber not found", { status: 404 });
     }
 
-    // ── Unsubscribe-all shortcut (GET now only renders a confirm page) ────────
+    // ── Unsubscribe-all confirm page ─────────────────────────────────────────
+    // Rendered when the user explicitly asks to unsubscribe from all, OR for any
+    // unsigned (legacy) link — an unsigned link discloses no PII and can only
+    // reach this protective action, never the full preference center below.
     // The actual unsubscribe is done via POST to prevent CSRF/accidental prefetch.
-    if (action === "unsubscribe_all") {
+    if (!signed || action === "unsubscribe_all") {
         const brandName = esc(subscriber.list.brand.name);
+        // Carry the signed token forward when present so the POST is authorized;
+        // otherwise fall back to the raw id (unsubscribe-all is the only action
+        // the unsigned path permits, and it is user-protective).
+        const authField = signed
+            ? `<input type="hidden" name="token" value="${esc(token!)}">`
+            : `<input type="hidden" name="subscriberId" value="${esc(subscriberId)}">`;
         return new NextResponse(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Confirm Unsubscribe — ${brandName}</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f4f4f5;}
@@ -66,7 +82,7 @@ h1{font-size:1.375rem;margin:0 0 .75rem;}p{margin:0 0 1.5rem;color:#71717a;font-
 <p>You will no longer receive any emails from <strong>${brandName}</strong>.</p>
 <form method="POST" action="/api/preferences">
   <input type="hidden" name="action" value="unsubscribe_all">
-  <input type="hidden" name="subscriberId" value="${esc(subscriberId)}">
+  ${authField}
   <button class="btn-red" type="submit">Yes, unsubscribe me</button>
   <button class="btn-ghost" type="button" onclick="history.back()">Cancel</button>
 </form>
@@ -199,14 +215,14 @@ body{background:#09090b;color:#fafafa;}
   <!-- Footer actions -->
   <div class="footer-row">
     <button class="save-btn" id="saveBtn">Save Preferences</button>
-    <a class="unsub-all" href="/api/preferences?action=unsubscribe_all&i=${esc(subscriberId)}">Unsubscribe from all</a>
+    <a class="unsub-all" href="/api/preferences?action=unsubscribe_all&s=${encodeURIComponent(token!)}">Unsubscribe from all</a>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
 (function() {
-  var subscriberId = ${JSON.stringify(subscriberId)};
+  var token = ${JSON.stringify(token)};
   var brandId = ${JSON.stringify(brandId)};
 
   function showToast(msg, color) {
@@ -226,7 +242,7 @@ body{background:#09090b;color:#fafafa;}
     fetch('/api/preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save_prefs', subscriberId: subscriberId, brandId: brandId, selectedLists: selectedLists })
+      body: JSON.stringify({ action: 'save_prefs', token: token, brandId: brandId, selectedLists: selectedLists })
     }).then(function(r) { return r.json(); }).then(function() {
       showToast('Preferences saved!', '#166534');
     }).catch(function() {
@@ -245,7 +261,7 @@ body{background:#09090b;color:#fafafa;}
       fetch('/api/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pause', subscriberId: subscriberId, brandId: brandId, days: parseInt(days, 10) })
+        body: JSON.stringify({ action: 'pause', token: token, brandId: brandId, days: parseInt(days, 10) })
       }).then(function(r) { return r.json(); }).then(function() {
         showToast('Emails paused for ' + days + ' days.', '#1e3a5f');
         setTimeout(function() { location.reload(); }, 1000);
@@ -263,7 +279,7 @@ body{background:#09090b;color:#fafafa;}
       fetch('/api/preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resume', subscriberId: subscriberId, brandId: brandId })
+        body: JSON.stringify({ action: 'resume', token: token, brandId: brandId })
       }).then(function(r) { return r.json(); }).then(function() {
         showToast('Emails resumed!', '#166534');
         setTimeout(function() { location.reload(); }, 900);
@@ -286,9 +302,12 @@ body{background:#09090b;color:#fafafa;}
 // ---------------------------------------------------------------------------
 // POST — handle preference actions (JSON body)
 //
-// { action: "save_prefs", subscriberId, brandId, selectedLists: string[] }
-// { action: "pause",      subscriberId, brandId, days: 30|60|90 }
-// { action: "resume",     subscriberId, brandId }
+// Authorized by `token` (signed) for all actions; a legacy unsigned
+// `subscriberId` is accepted only for `unsubscribe_all`.
+// { action: "save_prefs", token, brandId, selectedLists: string[] }
+// { action: "pause",      token, brandId, days: 30|60|90 }
+// { action: "resume",     token, brandId }
+// { action: "unsubscribe_all", token | subscriberId }
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
@@ -309,10 +328,32 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    const { action, subscriberId, brandId } = body as { action?: string; subscriberId?: string; brandId?: string };
+    const { action, brandId } = body as { action?: string; brandId?: string };
+
+    // Authorization: a signed token is authoritative and unlocks every action.
+    // A raw subscriberId (legacy, unsigned) is NOT proof of ownership — a cuid is
+    // guessable/observable — so it may only perform the user-protective
+    // "unsubscribe_all". PII-bearing or mutating actions (save_prefs/pause/resume)
+    // require the token.
+    let subscriberId: string | null = null;
+    let viaToken = false;
+    if (typeof body.token === "string" && body.token) {
+        const claims = verifyToken<PrefsToken>("prefs", body.token);
+        if (!claims?.i) {
+            return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+        }
+        subscriberId = claims.i;
+        viaToken = true;
+    } else if (typeof body.subscriberId === "string" && body.subscriberId) {
+        subscriberId = body.subscriberId;
+    }
 
     if (!subscriberId) {
-        return NextResponse.json({ error: "Missing subscriberId" }, { status: 400 });
+        return NextResponse.json({ error: "Missing subscriber token" }, { status: 400 });
+    }
+
+    if (!viaToken && action !== "unsubscribe_all") {
+        return NextResponse.json({ error: "This action requires a signed link." }, { status: 403 });
     }
 
     // Verify the subscriber exists; fetch brand info for unsubscribe_all

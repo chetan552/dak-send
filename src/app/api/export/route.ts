@@ -61,9 +61,21 @@ export async function GET(req: NextRequest) {
         ];
     });
 
+    // Neutralize CSV/formula injection: a cell whose value begins with =, +, -, @,
+    // or a control char is interpreted as a formula by Excel/Sheets. Subscriber
+    // name/email/custom fields are attacker-controlled via the public signup form,
+    // so prefix any such value with a single quote before quoting the cell.
+    const escapeCsvCell = (value: unknown): string => {
+        let cell = String(value);
+        if (/^[=+\-@\t\r]/.test(cell)) {
+            cell = "'" + cell;
+        }
+        return `"${cell.replace(/"/g, '""')}"`;
+    };
+
     const csvContent = [
-        headers.join(","),
-        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        headers.map(escapeCsvCell).join(","),
+        ...rows.map(row => row.map(escapeCsvCell).join(","))
     ].join("\n");
 
     writeAuditLog({
