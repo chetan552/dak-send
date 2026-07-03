@@ -234,7 +234,7 @@ export function CampaignsView({ campaigns }: CampaignsViewProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {campaigns.map((campaign, i) => (
+                            {campaigns.map((campaign) => (
                                 <tr
                                     key={campaign.id}
                                     className={`border-b border-zinc-100 dark:border-zinc-800/60 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors ${selected.has(campaign.id) ? "bg-primary/5" : ""}`}
