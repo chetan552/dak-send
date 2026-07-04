@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { BlockEmailDocument } from "@/lib/blocks-to-html";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
-import { safeOriginUrl } from "@/lib/safe-url";
+import { safeOriginUrl, assertPublicHost } from "@/lib/safe-url";
 import { renderMailyToHtml } from "@/lib/maily";
 
 const MAX_HTML_BYTES = 1_500_000;
@@ -90,6 +90,9 @@ export async function importCampaignContent(input: { html?: string; url?: string
             let res: Response;
             for (let hop = 0; ; hop++) {
                 if (hop > 5) throw new Error("Too many redirects.");
+                // Hostname string checks alone don't stop a domain whose DNS
+                // record points at an internal IP — verify resolution too.
+                await assertPublicHost(url);
                 res = await fetch(url.toString(), {
                     signal: controller.signal,
                     redirect: "manual",

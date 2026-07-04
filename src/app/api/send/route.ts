@@ -70,6 +70,24 @@ export async function POST(req: NextRequest) {
         }
 
         const recipients: string[] = Array.isArray(to) ? to : [to];
+
+        // The per-key rate limit counts requests, not recipients — cap the
+        // fan-out per request so one call can't dispatch an unbounded batch.
+        if (recipients.length > 50) {
+            return NextResponse.json(
+                { error: "Too many recipients. Maximum 50 per request." },
+                { status: 400 }
+            );
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const invalid = recipients.filter((r) => typeof r !== "string" || !emailRegex.test(r));
+        if (invalid.length > 0) {
+            return NextResponse.json(
+                { error: `Invalid recipient address(es): ${invalid.slice(0, 5).join(", ")}` },
+                { status: 400 }
+            );
+        }
+
         const provider = await getProvider();
 
         // Send one message per recipient so each provider's per-recipient APIs work uniformly.

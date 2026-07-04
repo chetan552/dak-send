@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 import { isSafeWebhookUrl } from "@/lib/validators";
+import { assertPublicHost } from "@/lib/safe-url";
 
 type WebhookEvent = "subscribe" | "unsubscribe" | "open" | "click" | "bounce" | "complaint";
 
@@ -51,6 +52,13 @@ export async function dispatchWebhooks(event: WebhookEvent, data: Record<string,
 
                 if (!isSafeWebhookUrl(wh.url)) {
                     console.warn(`Blocked unsafe webhook URL: ${wh.url}`);
+                    return;
+                }
+                // Also verify the hostname doesn't resolve to a private address
+                try {
+                    await assertPublicHost(new URL(wh.url));
+                } catch (err) {
+                    console.warn(`Blocked webhook URL resolving to private address: ${wh.url}`, err instanceof Error ? err.message : err);
                     return;
                 }
 

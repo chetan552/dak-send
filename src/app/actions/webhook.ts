@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { isSafeWebhookUrl } from "@/lib/validators";
+import { assertPublicHost } from "@/lib/safe-url";
 
 export async function getWebhooks() {
     const session = await getServerSession(authOptions);
@@ -33,7 +34,16 @@ export async function createWebhook(data: {
 }) {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
+    const role = session?.user?.role || "user";
     if (!userId) throw new Error("Unauthorized");
+
+    // Webhooks receive subscriber events (emails) for the brand — the caller
+    // must actually have access to that brand.
+    const brandWhere = role === "admin"
+        ? { id: data.brandId }
+        : { id: data.brandId, users: { some: { id: userId } } };
+    const brand = await prisma.brand.findFirst({ where: brandWhere, select: { id: true } });
+    if (!brand) throw new Error("Brand not found or unauthorized");
 
     if (!isSafeWebhookUrl(data.url)) {
         throw new Error("Invalid or blocked webhook URL");
@@ -96,6 +106,7 @@ export async function testWebhook(id: string) {
     const webhook = await prisma.webhook.findFirst({ where });
     if (!webhook) throw new Error("Not found");
     if (!isSafeWebhookUrl(webhook.url)) throw new Error("Invalid or blocked webhook URL");
+    await assertPublicHost(new URL(webhook.url));
 
     const payload = JSON.stringify({
         event: "test",

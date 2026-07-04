@@ -72,7 +72,8 @@
       "Bash(sed -n '1,60p' src/app/dashboard/campaigns/[id]/send/page.tsx)",
       "Bash(sed -n '1,50p' src/app/dashboard/campaigns/[id]/builder/page.tsx)",
       "Bash(echo \"tsc exit: $?\")",
-      "Bash(echo \"eslint exit: $?\")"
+      "Bash(echo \"eslint exit: $?\")",
+      "Bash(npm test *)"
     ],
     "additionalDirectories": [
       "/Users/chetanchadalavada/Development/github/dak-send/src/app/dashboard/campaigns/[id]/send",

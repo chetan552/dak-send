@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import Parser from "rss-parser";
 import { emailQueue } from "@/lib/queue";
 import { getWarmupRemaining } from "@/lib/warmup";
-import { safeOriginUrl } from "@/lib/safe-url";
+import { safeOriginUrl, assertPublicHost } from "@/lib/safe-url";
 
 const parser = new Parser();
 
@@ -108,8 +108,9 @@ export async function createRssFeed(formData: FormData) {
 
     if (!name || !url || !brandId) throw new Error("Missing required fields");
 
-    // Block SSRF before any network fetch
+    // Block SSRF before any network fetch (string checks + DNS resolution)
     const safeUrl = safeOriginUrl(url);
+    await assertPublicHost(safeUrl);
 
     // Validate feed URL
     try {
@@ -217,6 +218,7 @@ export async function updateRssFeed(feedId: string, formData: FormData) {
     if (name) data.name = name;
     if (url && url !== feed.url) {
         const safeUrl = safeOriginUrl(url);
+        await assertPublicHost(safeUrl);
         try { await parser.parseURL(safeUrl.toString()); } catch { throw new Error("Invalid RSS feed URL"); }
         data.url = safeUrl.toString();
     }
@@ -369,6 +371,7 @@ export async function checkRssFeeds() {
             let safeFeedUrl: URL;
             try {
                 safeFeedUrl = safeOriginUrl(feed.url);
+                await assertPublicHost(safeFeedUrl);
             } catch (err) {
                 console.warn(`Skipping RSS feed ${feed.id} — unsafe URL:`, err instanceof Error ? err.message : err);
                 continue;
